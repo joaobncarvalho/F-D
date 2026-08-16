@@ -169,11 +169,15 @@ export async function spinWheel(room, playerId) {
     g.phase = 'prompt';
   } else if (gt.key === 'intrigas') {
     const p = await repo.getRandomPrompt('intrigas', g.intensity);
-    round.prompt = p ? { text: p.text } : null;
-    round.votes = {};
-    round.revealed = false;
-    round.tally = null;
-    g.phase = 'voting';
+    round.reason = p ? p.text : 'Quem é mais provável?'; // SERVER-SIDE (nunca no broadcast)
+    round.prompt = null;
+    round.substate = 'choosing'; // 'choosing' | 'rps' | 'reveal'
+    round.accusedId = null;
+    round.accusedName = null;
+    round.rps = {}; // playerId -> 'pedra'|'papel'|'tesoura'
+    round.ties = 0;
+    round.result = null;
+    g.phase = 'intrigas';
   } else if (gt.key === 'segredos') {
     const secret = pickSecret(g, playerId);
     if (secret) {
@@ -227,38 +231,61 @@ export function resolveAction(room, playerId, action) {
   return { round: g.round, effect };
 }
 
-/** Intrigas: um jogador vota (anónimo). Auto-revela quando todos votarem. */
-export function castVote(room, voterId, targetId) {
+/**
+ * Intrigas — passo 1: quem girou (acusador) escolhe o "acusado".
+ * O acusado NÃO sabe a razão. Passa a pedra-papel-tesoura.
+ */
+export function chooseTarget(room, accuserId, accusedId) {
   const g = room.game;
-  if (!g || g.phase !== 'voting' || !g.round) throw new AppError('Não há votação ativa.');
-  if (g.round.revealed) throw new AppError('A votação já fechou.');
-  const voter = room.players.get(voterId);
-  const target = room.players.get(targetId);
-  if (!voter) throw new AppError('Jogador inválido.');
-  if (!target) throw new AppError('Escolhe um jogador válido.');
+  if (!g || g.phase !== 'intrigas' || !g.round) throw new AppError('Não há Intrigas ativa.');
+  if (g.round.substate !== 'choosing') throw new AppError('Já escolheste.');
+  if (accuserId !== g.round.currentPlayerId) throw new AppError('Só quem girou pode escolher.');
+  const accused = room.players.get(accusedId);
+  if (!accused || !accused.connected) throw new AppError('Escolhe um jogador válido.');
+  if (accusedId === accuserId) throw new AppError('Escolhe outra pessoa.');
 
-  g.round.votes[voterId] = targetId;
-
-  const connected = connectedOrder(room).map((p) => p.id);
-  if (connected.every((id) => g.round.votes[id] !== undefined)) tallyIntrigas(room);
+  g.round.accusedId = accusedId;
+  g.round.accusedName = accused.name;
+  g.round.substate = 'rps';
   return g.round;
 }
 
-function tallyIntrigas(room) {
+const RPS_BEATS = { pedra: 'tesoura', papel: 'pedra', tesoura: 'papel' };
+
+/**
+ * Intrigas — passo 2: acusador e acusado jogam pedra-papel-tesoura.
+ * Empate → repete. Acusado ganha → fica a saber a razão. Acusado perde → bebe
+ * e nunca saberá. Devolve metadados para o socket.js tratar da entrega privada.
+ */
+export function submitRps(room, playerId, move) {
   const g = room.game;
-  const r = g.round;
-  const counts = {};
-  for (const target of Object.values(r.votes)) counts[target] = (counts[target] || 0) + 1;
-  const max = Math.max(0, ...Object.values(counts));
-  const drinkers = Object.keys(counts).filter((id) => counts[id] === max && max > 0);
-  drinkers.forEach((id) => drink(g, id, 1));
-  r.tally = {
-    counts: Object.entries(counts)
-      .map(([id, count]) => ({ id, name: nameOf(room, id), count }))
-      .sort((a, b) => b.count - a.count),
-    drinkers: drinkers.map((id) => ({ id, name: nameOf(room, id) })),
-  };
-  r.revealed = true;
+  const r = g?.round;
+  if (!g || g.phase !== 'intrigas' || !r) throw new AppError('Não há Intrigas ativa.');
+  if (r.substate !== 'rps') throw new AppError('Não é altura de jogar.');
+  if (playerId !== r.currentPlayerId && playerId !== r.accusedId)
+    throw new AppError('Não estás neste duelo.');
+  if (!RPS_BEATS[move]) throw new AppError('Jogada inválida.');
+
+  r.rps[playerId] = move;
+  const aMove = r.rps[r.currentPlayerId]; // acusador
+  const bMove = r.rps[r.accusedId]; // acusado
+  if (!aMove || !bMove) return { round: r, resolved: false };
+
+  if (aMove === bMove) {
+    r.rps = {}; // empate → repete
+    r.ties = (r.ties || 0) + 1;
+    return { round: r, resolved: false, tie: true };
+  }
+
+  const accusedWon = RPS_BEATS[bMove] === aMove;
+  r.substate = 'reveal';
+  if (accusedWon) {
+    r.result = { accusedWon: true, accusedLearns: true, drinker: null };
+  } else {
+    drink(g, r.accusedId, 1);
+    r.result = { accusedWon: false, accusedLearns: false, drinker: { id: r.accusedId, name: r.accusedName } };
+  }
+  return { round: r, resolved: true, accusedWon, accusedId: r.accusedId, reason: r.reason };
 }
 
 /** Segredos: um jogador (não o autor) adivinha. Auto-revela quando todos adivinharem. */
@@ -309,15 +336,14 @@ function revealSegredos(room) {
   r.revealed = true;
 }
 
-/** Força o reveal (host ou quem girou), mesmo sem todos terem votado/adivinhado. */
+/** Força o reveal do Segredos (host ou quem girou), sem todos terem adivinhado. */
 export function revealResult(room, playerId) {
   const g = room.game;
   if (!g || !g.round) throw new AppError('Nada para revelar.');
   const p = room.players.get(playerId);
   if (!p || (!p.isHost && playerId !== g.currentPlayerId))
     throw new AppError('Só o host ou quem girou pode revelar.');
-  if (g.phase === 'voting' && !g.round.revealed) tallyIntrigas(room);
-  else if (g.phase === 'guessing' && !g.round.revealed) revealSegredos(room);
+  if (g.phase === 'guessing' && !g.round.revealed) revealSegredos(room);
   else throw new AppError('Nada para revelar.');
   return g.round;
 }
@@ -329,8 +355,7 @@ export function continueRound(room, playerId) {
   const p = room.players.get(playerId);
   if (!p || (!p.isHost && playerId !== g.currentPlayerId))
     throw new AppError('Só o host ou quem girou pode continuar.');
-  if (!['voting', 'guessing'].includes(g.phase))
-    throw new AppError('Nada a continuar.');
+  if (!['intrigas', 'guessing'].includes(g.phase)) throw new AppError('Nada a continuar.');
   advanceTurn(room);
   g.round = null;
   g.phase = 'wheel';
@@ -395,9 +420,13 @@ function serializeRound(g) {
     status: r.status,
   };
   if (r.gameTypeKey === 'intrigas') {
-    base.voters = Object.keys(r.votes || {}); // quem já votou (não em quem)
-    base.revealed = !!r.revealed;
-    base.tally = r.revealed ? r.tally : null;
+    base.substate = r.substate; // 'choosing' | 'rps' | 'reveal'
+    base.accusedId = r.accusedId || null;
+    base.accusedName = r.accusedName || null;
+    base.rpsSubmitted = Object.keys(r.rps || {}); // quem já jogou (não o quê)
+    base.ties = r.ties || 0;
+    base.result = r.substate === 'reveal' ? r.result : null;
+    // base.prompt fica null — a razão nunca vai no broadcast (entrega privada)
   }
   if (r.gameTypeKey === 'segredos') {
     base.guessers = Object.keys(r.guesses || {});

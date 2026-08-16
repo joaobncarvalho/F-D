@@ -25,6 +25,7 @@ export default function App() {
   const [error, setError] = useState(null);
   const [conn, setConn] = useState('online');
   const [authorRoundId, setAuthorRoundId] = useState(null);
+  const [intrigasReason, setIntrigasReason] = useState(null); // { roundId, reason }
   const [muted, setMuted] = useState(sfx.isMuted());
 
   const sessionRef = useRef(loadSession());
@@ -59,14 +60,19 @@ export default function App() {
     }
     function onGameStarted() {
       setAuthorRoundId(null);
+      setIntrigasReason(null);
       setScreen('countdown');
     }
     function onBackToLobby() {
       setAuthorRoundId(null);
+      setIntrigasReason(null);
       setScreen('lobby');
     }
     function onYouAreAuthor({ roundId }) {
       setAuthorRoundId(roundId);
+    }
+    function onIntrigasReason({ roundId, reason }) {
+      setIntrigasReason({ roundId, reason });
     }
     function onError({ message }) {
       setError(message);
@@ -86,6 +92,7 @@ export default function App() {
     socket.on('game_started', onGameStarted);
     socket.on('back_to_lobby', onBackToLobby);
     socket.on('you_are_author', onYouAreAuthor);
+    socket.on('intrigas_reason', onIntrigasReason);
     socket.on('error_msg', onError);
     socket.on('session_invalid', onSessionInvalid);
 
@@ -96,6 +103,7 @@ export default function App() {
       socket.off('game_started', onGameStarted);
       socket.off('back_to_lobby', onBackToLobby);
       socket.off('you_are_author', onYouAreAuthor);
+      socket.off('intrigas_reason', onIntrigasReason);
       socket.off('error_msg', onError);
       socket.off('session_invalid', onSessionInvalid);
     };
@@ -159,7 +167,11 @@ export default function App() {
   const beginPlay = useCallback(() => socket.emit('begin_play'), []);
   const spinWheel = useCallback(() => socket.emit('spin_wheel'), []);
   const playerAction = useCallback((action) => socket.emit('player_action', { action }), []);
-  const castVote = useCallback((targetPlayerId) => socket.emit('cast_vote', { targetPlayerId }), []);
+  const chooseTarget = useCallback(
+    (accusedPlayerId) => socket.emit('choose_target', { accusedPlayerId }),
+    []
+  );
+  const submitRps = useCallback((move) => socket.emit('submit_rps', { move }), []);
   const castGuess = useCallback(
     (guessedPlayerId) => socket.emit('cast_guess', { guessedPlayerId }),
     []
@@ -178,6 +190,7 @@ export default function App() {
     setMessages([]);
     setError(null);
     setAuthorRoundId(null);
+    setIntrigasReason(null);
     setScreen('home');
   }, []);
 
@@ -224,12 +237,14 @@ export default function App() {
             room={room}
             youId={youId}
             authorRoundId={authorRoundId}
+            intrigasReason={intrigasReason}
             onAddQuestion={addQuestion}
             onAddSecret={addSecret}
             onBeginPlay={beginPlay}
             onSpin={spinWheel}
             onAction={playerAction}
-            onVote={castVote}
+            onChooseTarget={chooseTarget}
+            onSubmitRps={submitRps}
             onGuess={castGuess}
             onReveal={revealResult}
             onContinue={continueRound}

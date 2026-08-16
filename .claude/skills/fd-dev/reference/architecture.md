@@ -116,9 +116,10 @@ Objetivo: a app nunca fala Prisma diretamente nos handlers. Introduzir um
 | `add_question` | `{ targetPlayerId, text }` | Fase `prep`. Pergunta dirigida a outro (não a si) → Boca Calada. |
 | `add_secret` | `{ text }` | Fase `prep`. Segredo anónimo → Segredos. |
 | `begin_play` | — | Só host. Fase `prep` → `wheel`; define o 1.º jogador da vez. |
-| `cast_vote` | `{ targetPlayerId }` | Intrigas (fase `voting`). Voto anónimo; auto-revela quando todos votam. |
+| `choose_target` | `{ accusedPlayerId }` | Intrigas (substate `choosing`). O acusador escolhe o acusado. |
+| `submit_rps` | `{ move: 'pedra'\|'papel'\|'tesoura' }` | Intrigas (substate `rps`). Acusador e acusado jogam; empate repete; acusado perde → bebe. |
 | `cast_guess` | `{ guessedPlayerId }` | Segredos (fase `guessing`). Adivinha o autor (o autor não pode). |
-| `reveal_result` | — | Host ou quem girou força o reveal de Intrigas/Segredos. |
+| `reveal_result` | — | Host ou quem girou força o reveal do Segredos. |
 | `continue_round` | — | Host ou quem girou avança para a próxima vez após reveal. |
 | `spin_wheel` | — | **Só o jogador da vez** (não o host), fase `wheel`. Escolhe o tipo+prompt (a vez já está definida); Boca Calada usa pergunta dirigida; emite `round_started`. |
 | `player_action` | `{ action: 'accept'\|'refuse' }` | Só o jogador da vez. Recusa → vida/shot; emite `action_result`. |
@@ -137,6 +138,7 @@ Objetivo: a app nunca fala Prisma diretamente nos handlers. Introduzir um
 | `chat_message` | `{ playerId, name, text, at }` | Nova mensagem. |
 | `game_started` | `{}` | Dispara a transição de countdown no cliente. |
 | `you_are_author` | `{ roundId }` | **PRIVADO** (só ao autor do segredo, via sala por playerId). |
+| `intrigas_reason` | `{ roundId, reason }` | **PRIVADO**. Intrigas: a pergunta secreta. Vai ao acusador (spin), aos espectadores (ao escolher) e ao acusado só se ganhar o RPS. |
 | `round_started` | `{ gameTypeKey }` | Só o tipo (para animar a roda); resto vem no room_state. |
 | `round_started` | `{ round }` | Nova ronda; cliente anima a roda até `round.gameTypeKey` e revela o prompt. |
 | `action_result` | `{ effect }` | Feedback da ação (`accepted`/`vida_perdida`/`shot`) para o flash. |
@@ -148,7 +150,8 @@ Objetivo: a app nunca fala Prisma diretamente nos handlers. Introduzir um
 > `room_state.game` transporta `{ phase, intensity, startingLives, roundCount,
 > round, currentPlayerId, finalStats, questionCount, questionsByTarget }` — é a
 > fonte de verdade que o cliente usa para renderizar o jogo. `phase` ∈
-> `prep | wheel | prompt | voting | guessing | gameover`. O **texto** das perguntas nunca vai no
+> `prep | wheel | prompt | intrigas | guessing | gameover` (Intrigas com
+> `round.substate` = `choosing | rps | reveal`). O **texto** das perguntas nunca vai no
 > `room_state` (só contagens); só aparece no `round.prompt` quando calha, no Boca
 > Calada. Os eventos acima são gatilhos de animação/feedback pontuais.
 > **Conteúdo dos prompts:** `repo.js` (async, seam de integração) → hoje lê de

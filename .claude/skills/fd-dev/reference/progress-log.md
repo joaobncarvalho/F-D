@@ -5,6 +5,36 @@
 
 ---
 
+## 2026-08-16 — Intrigas v2: pergunta secreta + pedra-papel-tesoura
+
+Redesenho do Intrigas a pedido do João (substitui a votação anónima anterior).
+
+**Mecânica**
+- Sai Intrigas → pergunta secreta **só no ecrã de quem girou** (acusador).
+- O acusador escolhe alguém (o acusado **não sabe a razão** nem porque foi escolhido).
+- Acusador e acusado jogam **pedra-papel-tesoura** (empate repete).
+- Acusado ganha → fica a saber a razão. Acusado perde → **bebe** e nunca saberá.
+- Espectadores ficam a par da pergunta (é a piada); só o acusado fica às escuras.
+
+**Entrega privada da razão** (nunca no broadcast): `intrigas_reason` vai ao
+acusador no spin, aos espectadores quando ele escolhe, e ao acusado só se ganhar.
+Serialização de Intrigas nunca inclui a `reason` (verificado no payload).
+
+**Ficheiros**
+- `server/src/game.js` (chooseTarget, submitRps, RPS_BEATS; removidos castVote/tally;
+  serializeRound com substate/accused/rps)
+- `server/src/socket.js` (choose_target, submit_rps, intrigas_reason privado)
+- `client/src/App.jsx` (intrigasReason state + listener; emitters), `pages/Game.jsx`
+  (IntrigasCard: choosing → rps → reveal)
+
+**Verificação (e2e, 3 jogadores)**
+- Só o acusador tem a razão no spin ✓ · espectadores recebem-na ao escolher ✓ ·
+  **acusado nunca a vê** ✓ · perde RPS → bebe e continua sem saber ✓ · ganha RPS →
+  recebe a razão ✓ · empate repete ✓ · razão nunca no payload ✓
+- Build 500 módulos sem erros ✓
+
+---
+
 ## 2026-08-16 — Intrigas + Segredos + grande redesign (tema festa)
 
 Fecha os 4 tipos de jogo e dá um upgrade visual/sensorial completo.

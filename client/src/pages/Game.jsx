@@ -11,7 +11,7 @@ const TYPES = [
   { key: 'intrigas', label: 'Intrigas', color: '#ffb020', emoji: '🗳️' },
   { key: 'segredos', label: 'Segredos', color: '#1fd3b6', emoji: '🤫' },
 ];
-const SPIN_PHASES = ['prompt', 'voting', 'guessing'];
+const SPIN_PHASES = ['prompt', 'intrigas', 'guessing'];
 
 export default function Game(props) {
   const { room, youId, authorRoundId } = props;
@@ -57,13 +57,17 @@ export default function Game(props) {
 
   // Som + confetti no reveal de Intrigas/Segredos.
   useEffect(() => {
-    if (round?.revealed && revealedRef.current !== round.id) {
+    const isReveal = round && (round.revealed || round.substate === 'reveal');
+    if (isReveal && revealedRef.current !== round.id) {
       revealedRef.current = round.id;
       sfx.reveal();
       confetti({ count: 70, power: 12 });
       haptic([30, 40, 30]);
+      if (round.result?.drinker || round.result?.drinkers?.length) {
+        setTimeout(() => sfx.drink(), 250);
+      }
     }
-  }, [round?.id, round?.revealed]);
+  }, [round?.id, round?.revealed, round?.substate]);
 
   if (!g) return null;
 
@@ -82,6 +86,9 @@ export default function Game(props) {
   const spinning = inSpin && round.id !== animatedRoundId;
   const revealed = inSpin && round.id === animatedRoundId;
   const currentPlayer = room.players.find((p) => p.id === g.currentPlayerId);
+  // Razão do Intrigas, entregue em privado (só a tenho se o servidor ma enviou).
+  const intrigasReason =
+    props.intrigasReason?.roundId === round?.id ? props.intrigasReason.reason : null;
 
   return (
     <motion.div
@@ -141,15 +148,18 @@ export default function Game(props) {
             onAction={props.onAction}
           />
         )}
-        {revealed && g.phase === 'voting' && (
-          <VotingCard
+        {revealed && g.phase === 'intrigas' && (
+          <IntrigasCard
             key={round.id}
             round={round}
             room={room}
             youId={youId}
+            reason={intrigasReason}
+            isAccuser={round.currentPlayerId === youId}
+            isAccused={round.accusedId === youId}
             canControl={isHost || isSpinner}
-            onVote={props.onVote}
-            onReveal={props.onReveal}
+            onChooseTarget={props.onChooseTarget}
+            onSubmitRps={props.onSubmitRps}
             onContinue={props.onContinue}
           />
         )}
@@ -372,77 +382,139 @@ function PromptCard({ round, isMyTurn, onAction }) {
   );
 }
 
-function VotingCard({ round, room, youId, canControl, onVote, onReveal, onContinue }) {
-  const [voted, setVoted] = useState(round.voters?.includes(youId));
-  const connected = room.players.filter((p) => p.connected);
+const RPS = [
+  ['pedra', '✊'],
+  ['papel', '✋'],
+  ['tesoura', '✌️'],
+];
 
-  if (round.revealed) {
-    const tally = round.tally;
-    const maxCount = tally?.counts?.[0]?.count || 1;
+function IntrigasCard({
+  round,
+  room,
+  youId,
+  reason,
+  isAccuser,
+  isAccused,
+  canControl,
+  onChooseTarget,
+  onSubmitRps,
+  onContinue,
+}) {
+  const connected = room.players.filter((p) => p.connected);
+  const iSubmitted = round.rpsSubmitted?.includes(youId);
+  const inDuel = isAccuser || isAccused;
+
+  // Passo 1 — o acusador escolhe quem
+  if (round.substate === 'choosing') {
+    if (isAccuser) {
+      return (
+        <CardShell typeKey="intrigas">
+          <p className="text-lg leading-snug">{reason || '…'}</p>
+          <p className="text-xs text-white/50">
+            Quem é mais provável? A pessoa não vai saber porquê 😏
+          </p>
+          <div className="flex flex-wrap gap-2 justify-center">
+            {connected
+              .filter((p) => p.id !== youId)
+              .map((p) => (
+                <button
+                  key={p.id}
+                  onClick={() => {
+                    sfx.click();
+                    onChooseTarget(p.id);
+                  }}
+                  className="fd-chip"
+                >
+                  {p.name}
+                </button>
+              ))}
+          </div>
+        </CardShell>
+      );
+    }
     return (
       <CardShell typeKey="intrigas">
-        <p className="text-base text-white/80">{round.prompt?.text}</p>
-        <div className="flex flex-col gap-2 mt-1">
-          {tally?.counts?.map((c) => {
-            const isDrinker = tally.drinkers.some((d) => d.id === c.id);
-            return (
-              <div key={c.id} className="text-left">
-                <div className="flex justify-between text-sm mb-1">
-                  <span className={isDrinker ? 'font-bold text-amber-300' : ''}>
-                    {c.name} {isDrinker && '🍺'}
-                  </span>
-                  <span className="text-white/50">{c.count}</span>
-                </div>
-                <div className="h-2 rounded-full bg-white/10 overflow-hidden">
-                  <motion.div
-                    initial={{ width: 0 }}
-                    animate={{ width: `${(c.count / maxCount) * 100}%` }}
-                    className="h-full rounded-full"
-                    style={{ background: isDrinker ? '#ffb020' : '#9b5cff' }}
-                  />
-                </div>
-              </div>
-            );
-          })}
-        </div>
-        <p className="text-sm font-semibold text-amber-300">
-          {tally?.drinkers?.map((d) => d.name).join(', ')} bebe{tally?.drinkers?.length > 1 ? 'm' : ''}! 🍺
+        <p className="text-base text-white/70">
+          🤫 <b>{round.currentPlayerName}</b> recebeu uma pergunta secreta e está a escolher
+          alguém…
         </p>
-        {canControl && (
-          <button onClick={onContinue} className="fd-btn fd-btn-primary mt-1">
-            Continuar →
-          </button>
+      </CardShell>
+    );
+  }
+
+  // Passo 2 — pedra-papel-tesoura
+  if (round.substate === 'rps') {
+    return (
+      <CardShell typeKey="intrigas">
+        {round.ties > 0 && (
+          <p className="text-xs text-amber-300 font-semibold">Empate! Joguem outra vez ({round.ties}) ✊✋✌️</p>
+        )}
+        {isAccused ? (
+          <p className="text-base">
+            Foste escolhido/a por <b>{round.currentPlayerName}</b>! Ganha o pedra-papel-tesoura para
+            saberes porquê 👀
+          </p>
+        ) : (
+          <>
+            {reason && <p className="text-lg leading-snug">{reason}</p>}
+            <p className="text-sm text-white/60">
+              {round.currentPlayerName} escolheu <b>{round.accusedName}</b>
+            </p>
+          </>
+        )}
+
+        {inDuel ? (
+          iSubmitted ? (
+            <p className="text-sm text-emerald-300 font-semibold">Jogaste! À espera do outro…</p>
+          ) : (
+            <div className="flex gap-3 justify-center">
+              {RPS.map(([m, e]) => (
+                <button
+                  key={m}
+                  onClick={() => {
+                    sfx.click();
+                    onSubmitRps(m);
+                  }}
+                  className="fd-chip text-3xl px-4 py-3"
+                >
+                  {e}
+                </button>
+              ))}
+            </div>
+          )
+        ) : (
+          <p className="text-xs text-white/50">
+            Duelo em curso… {round.rpsSubmitted?.length || 0}/2 jogaram
+          </p>
         )}
       </CardShell>
     );
   }
 
+  // Passo 3 — reveal
+  const r = round.result;
   return (
     <CardShell typeKey="intrigas">
-      <p className="text-lg leading-snug">{round.prompt?.text}</p>
-      <p className="text-xs text-white/50">Vota (anónimo). {round.voters?.length || 0}/{connected.length} votaram</p>
-      {voted ? (
-        <p className="text-sm text-emerald-300 font-semibold">Votaste! ✓ A aguardar os outros…</p>
+      {reason ? (
+        <p className="text-lg leading-snug">{reason}</p>
       ) : (
-        <div className="flex flex-wrap gap-2 justify-center">
-          {connected.map((p) => (
-            <button
-              key={p.id}
-              onClick={() => {
-                sfx.click();
-                setVoted(true);
-                onVote(p.id);
-              }}
-              className="fd-chip"
-            >
-              {p.name}
-            </button>
-          ))}
-        </div>
+        <p className="text-base text-white/50">Pergunta secreta 🤐</p>
+      )}
+      {r?.accusedWon ? (
+        <p className="text-base font-bold text-emerald-300">
+          🎉 {round.accusedName} ganhou e fica a saber!
+        </p>
+      ) : (
+        <p className="text-base font-bold text-amber-300">
+          😈 {round.accusedName} perde, bebe e nunca vai saber porquê!
+        </p>
+      )}
+      {isAccused && r && !r.accusedLearns && (
+        <p className="text-sm text-white/50">Bebe um copo… e boa sorte a descobrir 😏🍺</p>
       )}
       {canControl && (
-        <button onClick={onReveal} className="fd-btn fd-btn-ghost py-2 text-sm mt-1">
-          Revelar resultado
+        <button onClick={onContinue} className="fd-btn fd-btn-primary mt-1">
+          Continuar →
         </button>
       )}
     </CardShell>

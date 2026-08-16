@@ -123,6 +123,13 @@ export function registerSocketHandlers(io) {
         if (round.gameTypeKey === 'segredos' && round.secretAuthorId) {
           io.to(round.secretAuthorId).emit('you_are_author', { roundId: round.id });
         }
+        // Intrigas: a pergunta só vai (privada) para quem girou; o acusado nunca a vê.
+        if (round.gameTypeKey === 'intrigas') {
+          io.to(round.currentPlayerId).emit('intrigas_reason', {
+            roundId: round.id,
+            reason: round.reason,
+          });
+        }
         // Só o tipo (para animações) — o resto vai no room_state já anonimizado.
         io.to(room.code).emit('round_started', { gameTypeKey: round.gameTypeKey });
         broadcastState(io, room.code);
@@ -144,10 +151,34 @@ export function registerSocketHandlers(io) {
       }
     });
 
-    socket.on('cast_vote', ({ targetPlayerId } = {}, ack) => {
+    socket.on('choose_target', ({ accusedPlayerId } = {}, ack) => {
       try {
         const room = requireRoom(socket);
-        game.castVote(room, socket.data.playerId, targetPlayerId);
+        const round = game.chooseTarget(room, socket.data.playerId, accusedPlayerId);
+        // A razão vai (privada) para os espectadores — todos menos acusador e acusado.
+        for (const p of room.players.values()) {
+          if (p.connected && p.id !== round.currentPlayerId && p.id !== round.accusedId) {
+            io.to(p.id).emit('intrigas_reason', { roundId: round.id, reason: round.reason });
+          }
+        }
+        broadcastState(io, room.code);
+        if (typeof ack === 'function') ack({ ok: true });
+      } catch (err) {
+        handleError(socket, ack, err);
+      }
+    });
+
+    socket.on('submit_rps', ({ move } = {}, ack) => {
+      try {
+        const room = requireRoom(socket);
+        const res = game.submitRps(room, socket.data.playerId, move);
+        // Se o acusado ganhou, entrega-lhe agora a razão (privada).
+        if (res.resolved && res.accusedWon) {
+          io.to(res.accusedId).emit('intrigas_reason', {
+            roundId: room.game.round.id,
+            reason: res.reason,
+          });
+        }
         broadcastState(io, room.code);
         if (typeof ack === 'function') ack({ ok: true });
       } catch (err) {

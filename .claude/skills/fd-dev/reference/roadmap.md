@@ -65,7 +65,9 @@ Legenda: ✅ feito · 🚧 em curso · ⬜ por fazer · 🔗 ponto de integraç�
 - [x] Ecrã de fim de jogo com stats + "jogar outra vez"; controlos host (saltar/terminar)
 - [x] 🔗 **Seam de integração pronto** (`repo.js` async, mesma interface do Prisma;
       dados em `content/prompts.data.js` partilhados com o `seed.js`)
-- [x] **Intrigas**: votação anónima ("quem é mais capaz…"); mais votado bebe
+- [x] **Intrigas** (v2, pedido do João): pergunta secreta ao acusador → escolhe
+      alguém (que não sabe a razão) → pedra-papel-tesoura → acusado perde bebe e
+      nunca sabe; ganha e fica a saber. Razão entregue em privado.
 - [x] **Segredos**: submissão anónima na prep + grupo adivinha o autor (aviso
       privado `you_are_author`, autor escondido no payload até ao reveal)
 - [x] **Redesign completo** (tema de festa): fundo animado, cartas glass, botões

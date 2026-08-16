@@ -11,7 +11,7 @@ pós-MVP / v2 · **💡** = ideia nova a validar.
 |---|---|---|---|
 | **Boca Calada** ✅ | P0 | É feita ao jogador da vez uma **pergunta embaraçosa/difícil** (das perguntas que os jogadores escreveram no início, dirigidas uns aos outros). Ele pode dizer **"Boca Calada" e beber**, ou **responder e passar a vez**. | Implementado. Perguntas em memória (`room.game.questions`, por alvo). Fase 'questions' no início. Fallback ao banco seed se um jogador não tiver perguntas. |
 | **Desafio** | P0 | Desafio direto, sem opção de "verdade" | Variantes solo/grupo |
-| **Intrigas** ✅ | P0 | "Quem é mais capaz de…" — o grupo vota (anónimo); mais votado bebe | Implementado. Votos escondidos até ao reveal; auto-revela quando todos votam. |
+| **Intrigas** ✅ | P0 | Pergunta secreta só a quem girou (acusador); escolhe alguém (o acusado NÃO sabe a razão); jogam pedra-papel-tesoura; se o acusado ganhar fica a saber, senão bebe e nunca saberá | Implementado. Razão entregue em **privado** (nunca no broadcast): acusador no spin, espectadores ao escolher, acusado só se ganhar o RPS. Substates choosing/rps/reveal; empate repete. |
 | **Segredos Anónimos** ✅ | P0 | Segredos submetidos na prep (anónimos); grupo adivinha o autor; quem erra bebe (se todos acertam, o autor bebe) | Implementado. Autor nunca no payload; aviso privado `you_are_author` via sala por playerId. |
 
 > Conteúdo guardado como dados estruturados (`game_types` + `prompts`) com
