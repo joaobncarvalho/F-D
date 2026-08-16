@@ -1,0 +1,149 @@
+// F&D — schema Prisma (ponto de partida; o colega valida tipos/índices/normalização)
+// Modelo alinhado com o rascunho do FD §4 e com as estruturas em memória
+// (server/src/rooms.js). Tabelas em snake_case; client em camelCase via @map.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL") // pooled (Supavisor, 6543) — runtime
+  directUrl = env("DIRECT_URL")   // direta (5432) — migrations
+}
+
+enum RoomStatus {
+  lobby
+  playing
+  ended
+}
+
+enum Intensity {
+  leve
+  picante
+}
+
+enum RoundStatus {
+  pending
+  resolved
+  refused
+}
+
+enum LifeEventType {
+  vida_perdida
+  shot
+}
+
+model Room {
+  id           String     @id @default(uuid()) @db.Uuid
+  code         String     @unique
+  hostPlayerId String?    @unique @map("host_player_id") @db.Uuid
+  status       RoomStatus @default(lobby)
+  createdAt    DateTime   @default(now()) @map("created_at")
+  endedAt      DateTime?  @map("ended_at")
+
+  host       Player?       @relation("RoomHost", fields: [hostPlayerId], references: [id], onDelete: SetNull)
+  players    Player[]      @relation("RoomPlayers")
+  messages   ChatMessage[]
+  rounds     GameRound[]
+  lifeEvents LifeEvent[]
+
+  @@index([code])
+  @@map("rooms")
+}
+
+model Player {
+  id        String   @id @default(uuid()) @db.Uuid
+  roomId    String   @map("room_id") @db.Uuid
+  name      String
+  lives     Int      @default(3)
+  isHost    Boolean  @default(false) @map("is_host")
+  connected Boolean  @default(true)
+  joinedAt  DateTime @default(now()) @map("joined_at")
+
+  room       Room          @relation("RoomPlayers", fields: [roomId], references: [id], onDelete: Cascade)
+  hostOf     Room?         @relation("RoomHost")
+  messages   ChatMessage[]
+  rounds     GameRound[]   @relation("RoundCurrentPlayer")
+  lifeEvents LifeEvent[]
+
+  @@unique([roomId, name]) // nome único DENTRO da sala, não globalmente
+  @@index([roomId, name])
+  @@map("players")
+}
+
+model ChatMessage {
+  id        String   @id @default(uuid()) @db.Uuid
+  roomId    String   @map("room_id") @db.Uuid
+  playerId  String   @map("player_id") @db.Uuid
+  text      String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  room   Room   @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  player Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  @@index([roomId])
+  @@map("chat_messages")
+}
+
+model GameType {
+  id     String  @id @default(uuid()) @db.Uuid
+  key    String  @unique // "boca_calada" | "desafio" | "intrigas" | "segredos"
+  label  String
+  active Boolean @default(true)
+
+  prompts Prompt[]
+  rounds  GameRound[]
+
+  @@map("game_types")
+}
+
+model Prompt {
+  id         String    @id @default(uuid()) @db.Uuid
+  gameTypeId String    @map("game_type_id") @db.Uuid
+  text       String
+  intensity  Intensity @default(leve)
+  active     Boolean   @default(true)
+
+  gameType GameType    @relation(fields: [gameTypeId], references: [id], onDelete: Cascade)
+  rounds   GameRound[]
+
+  @@unique([gameTypeId, text]) // permite seed idempotente (upsert)
+  @@index([gameTypeId, intensity, active])
+  @@map("prompts")
+}
+
+model GameRound {
+  id              String      @id @default(uuid()) @db.Uuid
+  roomId          String      @map("room_id") @db.Uuid
+  gameTypeId      String      @map("game_type_id") @db.Uuid
+  currentPlayerId String      @map("current_player_id") @db.Uuid
+  promptId        String?     @map("prompt_id") @db.Uuid
+  status          RoundStatus @default(pending)
+  createdAt       DateTime    @default(now()) @map("created_at")
+
+  room          Room        @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  gameType      GameType    @relation(fields: [gameTypeId], references: [id])
+  currentPlayer Player      @relation("RoundCurrentPlayer", fields: [currentPlayerId], references: [id])
+  prompt        Prompt?     @relation(fields: [promptId], references: [id])
+  lifeEvents    LifeEvent[]
+
+  @@index([roomId])
+  @@map("game_rounds")
+}
+
+model LifeEvent {
+  id        String        @id @default(uuid()) @db.Uuid
+  roomId    String        @map("room_id") @db.Uuid
+  playerId  String        @map("player_id") @db.Uuid
+  roundId   String        @map("round_id") @db.Uuid
+  type      LifeEventType
+  createdAt DateTime      @default(now()) @map("created_at")
+
+  room   Room      @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  player Player    @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  round  GameRound @relation(fields: [roundId], references: [id], onDelete: Cascade)
+
+  @@index([roomId])
+  @@map("life_events")
+}

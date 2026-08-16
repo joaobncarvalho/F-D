@@ -1,0 +1,25 @@
+{
+  "name": "fd-client",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "F&D — frontend mobile-first (Vite + React + Tailwind)",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "framer-motion": "^11.3.19",
+    "qrcode": "^1.5.4",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "socket.io-client": "^4.7.5"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.1.11",
+    "@vitejs/plugin-react": "^4.3.1",
+    "tailwindcss": "^4.1.11",
+    "vite": "^5.4.1"
+  }
+}
