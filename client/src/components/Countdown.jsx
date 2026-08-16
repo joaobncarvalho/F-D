@@ -1,12 +1,10 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { sfx } from '../sfx.js';
+import { haptic } from '../confetti.js';
 
-/**
- * Transição "vamos começar": 3 → 2 → 1 → Vamos! → onDone().
- * Puramente visual (cliente); o servidor já mudou o estado para 'playing'.
- */
 export default function Countdown({ onDone }) {
-  const steps = ['3', '2', '1', 'Vamos!'];
+  const steps = ['3', '2', '1', 'BORA! 🍻'];
   const [i, setI] = useState(0);
 
   useEffect(() => {
@@ -14,7 +12,14 @@ export default function Countdown({ onDone }) {
       const t = setTimeout(onDone, 400);
       return () => clearTimeout(t);
     }
-    const t = setTimeout(() => setI((v) => v + 1), i === steps.length - 1 ? 700 : 900);
+    if (i === steps.length - 1) {
+      sfx.reveal();
+      haptic([30, 40, 30]);
+    } else {
+      sfx.click();
+      haptic(15);
+    }
+    const t = setTimeout(() => setI((v) => v + 1), i === steps.length - 1 ? 800 : 850);
     return () => clearTimeout(t);
   }, [i]);
 
@@ -31,8 +36,8 @@ export default function Countdown({ onDone }) {
           initial={{ scale: 0.3, opacity: 0, rotate: -15 }}
           animate={{ scale: 1, opacity: 1, rotate: 0 }}
           exit={{ scale: 1.8, opacity: 0 }}
-          transition={{ type: 'spring', stiffness: 260, damping: 18 }}
-          className="text-7xl font-black text-pink-500 text-center"
+          transition={{ type: 'spring', stiffness: 260, damping: 16 }}
+          className="fd-title fd-neon text-7xl font-extrabold text-pink-400 text-center"
         >
           {steps[Math.min(i, steps.length - 1)]}
         </motion.div>

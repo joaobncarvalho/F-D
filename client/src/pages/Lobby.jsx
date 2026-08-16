@@ -1,16 +1,9 @@
 import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import QRCode from '../components/QRCode.jsx';
+import { sfx } from '../sfx.js';
 
-export default function Lobby({
-  room,
-  youId,
-  messages,
-  error,
-  onSendMessage,
-  onStart,
-  onLeave,
-}) {
+export default function Lobby({ room, youId, messages, error, onSendMessage, onStart, onLeave }) {
   const [draft, setDraft] = useState('');
   const [showQR, setShowQR] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -41,9 +34,10 @@ export default function Lobby({
     try {
       await navigator.clipboard.writeText(room.code);
       setCopied(true);
+      sfx.click();
       setTimeout(() => setCopied(false), 1500);
     } catch {
-      /* clipboard indisponível — ignora */
+      /* clipboard indisponível */
     }
   }
 
@@ -59,17 +53,19 @@ export default function Lobby({
           ← Sair
         </button>
         <button onClick={copyCode} className="text-center active:scale-95 transition">
-          <p className="text-xs text-white/40">
-            {copied ? 'Copiado!' : 'Código (toca p/ copiar)'}
+          <p className="text-xs text-white/40">{copied ? 'Copiado! ✓' : 'toca p/ copiar'}</p>
+          <p className="fd-title fd-neon text-3xl font-extrabold tracking-[0.25em] text-pink-300">
+            {room.code}
           </p>
-          <p className="text-2xl font-black tracking-[0.3em]">{room.code}</p>
         </button>
         <button
-          onClick={() => setShowQR((v) => !v)}
-          className="text-xl w-10"
-          title="Mostrar QR code"
+          onClick={() => {
+            sfx.click();
+            setShowQR((v) => !v);
+          }}
+          className="fd-card w-10 h-10 grid place-items-center text-lg"
         >
-          {showQR ? '✕' : '⬛'}
+          {showQR ? '✕' : '📷'}
         </button>
       </header>
 
@@ -97,39 +93,33 @@ export default function Lobby({
               <motion.li
                 key={p.id}
                 layout
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
+                initial={{ opacity: 0, scale: 0.9, x: -20 }}
+                animate={{ opacity: 1, scale: 1, x: 0 }}
                 exit={{ opacity: 0, scale: 0.9 }}
-                className={`flex items-center justify-between rounded-xl px-4 py-3 ${
-                  p.connected ? 'bg-white/10' : 'bg-white/5 opacity-50'
+                className={`fd-card flex items-center justify-between px-4 py-3 ${
+                  p.connected ? '' : 'opacity-50'
                 }`}
               >
-                <span className="font-medium">
+                <span className="font-semibold">
+                  {p.isHost && '👑 '}
                   {p.name}
                   {p.id === youId && <span className="text-white/40"> (tu)</span>}
-                  {!p.connected && (
-                    <span className="text-amber-400/70 text-xs"> · offline</span>
-                  )}
+                  {!p.connected && <span className="text-amber-400/70 text-xs"> · offline</span>}
                 </span>
-                <span className="flex items-center gap-2 text-sm">
-                  {p.isHost && <span title="Host">👑</span>}
-                  <span>{'❤️'.repeat(p.lives)}</span>
-                </span>
+                <span className="text-sm">{'❤️'.repeat(p.lives)}</span>
               </motion.li>
             ))}
           </AnimatePresence>
         </ul>
       </section>
 
-      <section className="flex-1 flex flex-col min-h-40">
+      <section className="flex-1 flex flex-col min-h-36">
         <h2 className="text-sm font-semibold text-white/60 mb-2">Chat</h2>
-        <div className="flex-1 overflow-y-auto rounded-xl bg-white/5 p-3 flex flex-col gap-1">
-          {messages.length === 0 && (
-            <p className="text-sm text-white/30">Ainda não há mensagens.</p>
-          )}
+        <div className="fd-card flex-1 overflow-y-auto p-3 flex flex-col gap-1">
+          {messages.length === 0 && <p className="text-sm text-white/30">Ainda não há mensagens.</p>}
           {messages.map((m, i) => (
             <p key={i} className="text-sm">
-              <span className="font-semibold text-pink-400">{m.name}:</span>{' '}
+              <span className="font-bold text-pink-300">{m.name}:</span>{' '}
               <span className="text-white/80">{m.text}</span>
             </p>
           ))}
@@ -141,12 +131,9 @@ export default function Lobby({
             onChange={(e) => setDraft(e.target.value)}
             placeholder="Escreve algo…"
             maxLength={300}
-            className="flex-1 rounded-xl bg-white/10 px-4 py-2 outline-none focus:ring-2 ring-pink-500"
+            className="fd-input flex-1"
           />
-          <button
-            type="submit"
-            className="rounded-xl bg-white/10 px-4 font-semibold active:scale-95 transition"
-          >
+          <button type="submit" className="fd-btn fd-btn-ghost px-4">
             ➤
           </button>
         </form>
@@ -154,17 +141,18 @@ export default function Lobby({
 
       {isHost ? (
         <div className="flex flex-col gap-3">
-          <div className="rounded-xl bg-white/5 p-3 flex flex-col gap-3">
+          <div className="fd-card p-3 flex flex-col gap-3">
             <div className="flex items-center justify-between">
               <span className="text-sm text-white/60">Vidas por jogador</span>
               <div className="flex gap-1">
                 {[1, 2, 3, 4, 5].map((n) => (
                   <button
                     key={n}
-                    onClick={() => setLives(n)}
-                    className={`w-8 h-8 rounded-lg text-sm font-bold transition ${
-                      lives === n ? 'bg-pink-600' : 'bg-white/10'
-                    }`}
+                    onClick={() => {
+                      sfx.click();
+                      setLives(n);
+                    }}
+                    className={`fd-chip w-9 h-9 grid place-items-center ${lives === n ? 'fd-chip-on' : ''}`}
                   >
                     {n}
                   </button>
@@ -175,18 +163,20 @@ export default function Lobby({
               <span className="text-sm text-white/60">Intensidade</span>
               <div className="flex gap-1">
                 <button
-                  onClick={() => setIntensity('leve')}
-                  className={`px-3 h-8 rounded-lg text-sm font-medium transition ${
-                    intensity === 'leve' ? 'bg-emerald-600' : 'bg-white/10'
-                  }`}
+                  onClick={() => {
+                    sfx.click();
+                    setIntensity('leve');
+                  }}
+                  className={`fd-chip ${intensity === 'leve' ? 'fd-chip-on' : ''}`}
                 >
                   🍃 Leve
                 </button>
                 <button
-                  onClick={() => setIntensity('picante')}
-                  className={`px-3 h-8 rounded-lg text-sm font-medium transition ${
-                    intensity === 'picante' ? 'bg-rose-600' : 'bg-white/10'
-                  }`}
+                  onClick={() => {
+                    sfx.click();
+                    setIntensity('picante');
+                  }}
+                  className={`fd-chip ${intensity === 'picante' ? 'fd-chip-on' : ''}`}
                 >
                   🌶️ Picante
                 </button>
@@ -194,11 +184,14 @@ export default function Lobby({
             </div>
           </div>
           <button
-            onClick={() => onStart({ lives, intensity })}
+            onClick={() => {
+              sfx.click();
+              onStart({ lives, intensity });
+            }}
             disabled={!canStart}
-            className="rounded-xl bg-pink-600 py-4 text-lg font-semibold active:scale-95 transition disabled:opacity-40 disabled:active:scale-100"
+            className="fd-btn fd-btn-primary text-lg"
           >
-            {canStart ? 'Começar' : 'Precisas de ≥2 jogadores'}
+            {canStart ? '🎉 Começar' : 'Precisas de ≥2 jogadores'}
           </button>
         </div>
       ) : (
@@ -207,7 +200,7 @@ export default function Lobby({
         </p>
       )}
 
-      {error && <p className="text-center text-sm text-red-400">{error}</p>}
+      {error && <p className="text-center text-sm text-red-300">{error}</p>}
     </motion.div>
   );
 }

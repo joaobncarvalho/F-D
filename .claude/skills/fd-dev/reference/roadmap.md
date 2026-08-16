@@ -65,8 +65,12 @@ Legenda: ✅ feito · 🚧 em curso · ⬜ por fazer · 🔗 ponto de integraç�
 - [x] Ecrã de fim de jogo com stats + "jogar outra vez"; controlos host (saltar/terminar)
 - [x] 🔗 **Seam de integração pronto** (`repo.js` async, mesma interface do Prisma;
       dados em `content/prompts.data.js` partilhados com o `seed.js`)
-- [ ] Mecânicas dedicadas em falta: votação anónima (Intrigas), submissão anónima
-      (Segredos) — hoje usam o loop aceito/recuso genérico. (Boca Calada ✅ feito)
+- [x] **Intrigas**: votação anónima ("quem é mais capaz…"); mais votado bebe
+- [x] **Segredos**: submissão anónima na prep + grupo adivinha o autor (aviso
+      privado `you_are_author`, autor escondido no payload até ao reveal)
+- [x] **Redesign completo** (tema de festa): fundo animado, cartas glass, botões
+      gradiente, fonte display, roda com halo
+- [x] **Som** (Web Audio sintetizado + mute), **confetti** (canvas) e **vibração**
 - [ ] 🔗 Troca final mock→Prisma (só quando a BD tiver strings; muda só `repo.js`)
 
 **Colega (BD)**

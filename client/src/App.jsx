@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { AnimatePresence } from 'framer-motion';
 import { socket } from './socket.js';
+import { sfx } from './sfx.js';
 import Home from './pages/Home.jsx';
 import Lobby from './pages/Lobby.jsx';
 import Game from './pages/Game.jsx';
@@ -17,14 +18,15 @@ function loadSession() {
 }
 
 export default function App() {
-  const [screen, setScreen] = useState('home'); // home | lobby | countdown | game
+  const [screen, setScreen] = useState('home');
   const [room, setRoom] = useState(null);
   const [youId, setYouId] = useState(null);
   const [messages, setMessages] = useState([]);
   const [error, setError] = useState(null);
-  const [conn, setConn] = useState('online'); // online | reconnecting
+  const [conn, setConn] = useState('online');
+  const [authorRoundId, setAuthorRoundId] = useState(null);
+  const [muted, setMuted] = useState(sfx.isMuted());
 
-  // Sessão para reconexão (código + playerId). Persistida para sobreviver a refresh.
   const sessionRef = useRef(loadSession());
 
   function saveSession(s) {
@@ -33,15 +35,21 @@ export default function App() {
     else sessionStorage.removeItem(SESSION_KEY);
   }
 
-  // --- Eventos de domínio (registados uma vez) ---
+  // Desbloqueia o áudio no primeiro toque (política de autoplay dos browsers).
+  useEffect(() => {
+    const unlock = () => sfx.unlock();
+    window.addEventListener('pointerdown', unlock, { once: true });
+    return () => window.removeEventListener('pointerdown', unlock);
+  }, []);
+
   useEffect(() => {
     function onRoomJoined({ room, you }) {
       setRoom(room);
       setYouId(you);
       setError(null);
-      saveSession({ code: room.code, playerId: you, name: room.players.find((p) => p.id === you)?.name });
-      // Se o jogo já começou (ex.: reconexão a meio), vai direto para o jogo.
+      saveSession({ code: room.code, playerId: you });
       setScreen(room.status === 'playing' ? 'game' : 'lobby');
+      sfx.join();
     }
     function onRoomState({ room }) {
       setRoom(room);
@@ -50,10 +58,15 @@ export default function App() {
       setMessages((prev) => [...prev, msg]);
     }
     function onGameStarted() {
+      setAuthorRoundId(null);
       setScreen('countdown');
     }
     function onBackToLobby() {
+      setAuthorRoundId(null);
       setScreen('lobby');
+    }
+    function onYouAreAuthor({ roundId }) {
+      setAuthorRoundId(roundId);
     }
     function onError({ message }) {
       setError(message);
@@ -72,6 +85,7 @@ export default function App() {
     socket.on('chat_message', onChatMessage);
     socket.on('game_started', onGameStarted);
     socket.on('back_to_lobby', onBackToLobby);
+    socket.on('you_are_author', onYouAreAuthor);
     socket.on('error_msg', onError);
     socket.on('session_invalid', onSessionInvalid);
 
@@ -81,16 +95,15 @@ export default function App() {
       socket.off('chat_message', onChatMessage);
       socket.off('game_started', onGameStarted);
       socket.off('back_to_lobby', onBackToLobby);
+      socket.off('you_are_author', onYouAreAuthor);
       socket.off('error_msg', onError);
       socket.off('session_invalid', onSessionInvalid);
     };
   }, []);
 
-  // --- Ciclo de vida da ligação + reconexão ---
   useEffect(() => {
     function onConnect() {
       setConn('online');
-      // Se já tínhamos sessão, isto é uma reconexão → religar à sala.
       if (sessionRef.current) {
         socket.emit('rejoin_room', {
           code: sessionRef.current.code,
@@ -101,16 +114,12 @@ export default function App() {
     function onDisconnect() {
       if (sessionRef.current) setConn('reconnecting');
     }
-
     socket.on('connect', onConnect);
     socket.on('disconnect', onDisconnect);
-
-    // Restaurar sessão após refresh.
     if (sessionRef.current && !socket.connected) {
       setConn('reconnecting');
       socket.connect();
     }
-
     return () => {
       socket.off('connect', onConnect);
       socket.off('disconnect', onDisconnect);
@@ -130,7 +139,6 @@ export default function App() {
     },
     [ensureConnected]
   );
-
   const joinRoom = useCallback(
     (code, name) => {
       setError(null);
@@ -141,21 +149,23 @@ export default function App() {
     [ensureConnected]
   );
 
-  const sendMessage = useCallback((text) => {
-    socket.emit('send_message', { text });
-  }, []);
-
-  const startGame = useCallback((config) => {
-    socket.emit('start_game', config);
-  }, []);
-
+  const sendMessage = useCallback((text) => socket.emit('send_message', { text }), []);
+  const startGame = useCallback((config) => socket.emit('start_game', config), []);
   const addQuestion = useCallback(
     (targetPlayerId, text) => socket.emit('add_question', { targetPlayerId, text }),
     []
   );
+  const addSecret = useCallback((text) => socket.emit('add_secret', { text }), []);
   const beginPlay = useCallback(() => socket.emit('begin_play'), []);
   const spinWheel = useCallback(() => socket.emit('spin_wheel'), []);
   const playerAction = useCallback((action) => socket.emit('player_action', { action }), []);
+  const castVote = useCallback((targetPlayerId) => socket.emit('cast_vote', { targetPlayerId }), []);
+  const castGuess = useCallback(
+    (guessedPlayerId) => socket.emit('cast_guess', { guessedPlayerId }),
+    []
+  );
+  const revealResult = useCallback(() => socket.emit('reveal_result'), []);
+  const continueRound = useCallback(() => socket.emit('continue_round'), []);
   const skipTurn = useCallback(() => socket.emit('skip_turn'), []);
   const endGame = useCallback(() => socket.emit('end_game'), []);
   const resetGame = useCallback(() => socket.emit('reset_game'), []);
@@ -167,11 +177,24 @@ export default function App() {
     setYouId(null);
     setMessages([]);
     setError(null);
+    setAuthorRoundId(null);
     setScreen('home');
   }, []);
 
+  function toggleMute() {
+    setMuted(sfx.toggleMute());
+  }
+
   return (
-    <div className="min-h-full mx-auto max-w-md px-5 py-6 flex flex-col">
+    <div className="min-h-full mx-auto max-w-md px-5 py-6 flex flex-col relative">
+      <button
+        onClick={toggleMute}
+        className="fixed top-3 right-3 z-40 fd-card w-10 h-10 grid place-items-center text-lg"
+        title={muted ? 'Ligar som' : 'Silenciar'}
+      >
+        {muted ? '🔇' : '🔊'}
+      </button>
+
       {conn === 'reconnecting' && screen !== 'home' && (
         <div className="mb-3 rounded-lg bg-amber-500/15 text-amber-300 text-center text-sm py-2">
           A religar…
@@ -194,18 +217,22 @@ export default function App() {
             onLeave={leaveRoom}
           />
         )}
-        {screen === 'countdown' && (
-          <Countdown key="countdown" onDone={() => setScreen('game')} />
-        )}
+        {screen === 'countdown' && <Countdown key="countdown" onDone={() => setScreen('game')} />}
         {screen === 'game' && (
           <Game
             key="game"
             room={room}
             youId={youId}
+            authorRoundId={authorRoundId}
             onAddQuestion={addQuestion}
+            onAddSecret={addSecret}
             onBeginPlay={beginPlay}
             onSpin={spinWheel}
             onAction={playerAction}
+            onVote={castVote}
+            onGuess={castGuess}
+            onReveal={revealResult}
+            onContinue={continueRound}
             onSkip={skipTurn}
             onEnd={endGame}
             onReset={resetGame}

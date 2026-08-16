@@ -1,4 +1,8 @@
 import { randomUUID } from 'node:crypto';
+import { AppError } from './errors.js';
+import { serializeGame } from './game.js';
+
+export { AppError }; // re-exportado para compatibilidade (socket.js importa daqui)
 
 /**
  * Gestor de estado de salas EM MEMÓRIA.
@@ -166,29 +170,11 @@ export function serializeRoom(room) {
         isHost: p.isHost,
         connected: p.connected,
       })),
-    // Estado de jogo (null enquanto no lobby). Ver game.js.
-    game: room.game
-      ? {
-          phase: room.game.phase,
-          intensity: room.game.intensity,
-          startingLives: room.game.startingLives,
-          roundCount: room.game.roundCount,
-          round: room.game.round,
-          currentPlayerId: room.game.currentPlayerId,
-          finalStats: room.game.finalStats,
-          // Só contagens (o texto das perguntas nunca é exposto antes de calhar).
-          questionCount: (room.game.questions || []).length,
-          questionsByTarget: (room.game.questions || []).reduce((m, q) => {
-            m[q.targetPlayerId] = (m[q.targetPlayerId] || 0) + 1;
-            return m;
-          }, {}),
-        }
-      : null,
+    // Estado de jogo (null enquanto no lobby). Serialização/anonimização em game.js.
+    game: serializeGame(room),
   };
 }
 
 function normalizeName(name) {
   return String(name || '').trim().slice(0, 20);
 }
-
-export class AppError extends Error {}

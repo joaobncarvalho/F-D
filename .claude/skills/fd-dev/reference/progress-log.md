@@ -5,6 +5,40 @@
 
 ---
 
+## 2026-08-16 — Intrigas + Segredos + grande redesign (tema festa)
+
+Fecha os 4 tipos de jogo e dá um upgrade visual/sensorial completo.
+
+**Mecânicas novas (servidor)**
+- **Intrigas** (fase `voting`): todos votam anonimamente ("quem é mais capaz…");
+  votos escondidos até ao reveal; auto-revela quando todos votam; mais votado bebe.
+- **Segredos** (fase `guessing`): segredos submetidos na prep (anónimos); grupo
+  adivinha o autor; quem erra bebe (se todos acertam, o autor bebe). Autor **nunca**
+  no payload; aviso **privado** `you_are_author` via sala Socket.io por playerId.
+- Fase `prep` agora tem perguntas **e** segredos. `AppError` movido para `errors.js`
+  (quebra ciclo rooms↔game). Serialização anonimizada em `serializeRound`.
+- Novos eventos: add_secret, cast_vote, cast_guess, reveal_result, continue_round.
+
+**Redesign (cliente)**
+- Sistema de design em `index.css`: fundo de "luzes de festa" animado, cartas glass,
+  botões gradiente, fonte display (Fredoka/Baloo), roda com halo.
+- `sfx.js`: efeitos sonoros **sintetizados** (Web Audio, sem ficheiros) + mute
+  persistente. `confetti.js`: confetti em canvas + `haptic()` (vibração).
+- Todos os ecrãs redesenhados (Home, Lobby, Countdown, Game). Game ganhou
+  `PrepPhase` (perguntas+segredos), `VotingCard`, `GuessingCard`.
+
+**Verificação**
+- E2E full (3 jogadores): prep, **Intrigas** (mais votado bebe), **Segredos** (aviso
+  privado ao autor ✓, autor escondido pré-reveal ✓, quem erra bebe), game_over ✓
+- Smoke test do motor Intrigas/Segredos + anonimização do payload ✓
+- `npm run build` → 500 módulos, sem erros ✓
+
+**A seguir**
+- Playtest no browser (agora com som/confetti/vibração).
+- BD quando o João abrir o chat da Supabase; depois deploy.
+
+---
+
 ## 2026-08-16 — Boca Calada dedicado + perguntas dos jogadores + spin pela vez
 
 Pedidos do João sobre o Boca Calada e o fluxo da roda.

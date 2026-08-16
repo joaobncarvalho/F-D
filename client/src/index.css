@@ -2,6 +2,11 @@
 
 :root {
   color-scheme: dark;
+  --fd-pink: #ff3d8b;
+  --fd-purple: #9b5cff;
+  --fd-amber: #ffb020;
+  --fd-teal: #1fd3b6;
+  --fd-bg: #0b0b12;
 }
 
 html,
@@ -12,8 +17,130 @@ body,
 
 body {
   margin: 0;
-  background: #0f0f14;
+  background: var(--fd-bg);
   color: #f5f5f7;
-  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  font-family: 'Fredoka', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   -webkit-tap-highlight-color: transparent;
+  overflow-x: hidden;
 }
+
+/* Fundo de "luzes de festa" — blobs coloridos que flutuam devagar */
+body::before,
+body::after {
+  content: '';
+  position: fixed;
+  inset: -20% -20% auto -20%;
+  height: 80vh;
+  z-index: -2;
+  filter: blur(90px);
+  opacity: 0.55;
+  pointer-events: none;
+}
+body::before {
+  background:
+    radial-gradient(40% 50% at 20% 20%, var(--fd-pink) 0%, transparent 70%),
+    radial-gradient(45% 55% at 80% 10%, var(--fd-purple) 0%, transparent 70%);
+  animation: fd-float1 18s ease-in-out infinite alternate;
+}
+body::after {
+  top: auto;
+  bottom: -20%;
+  background:
+    radial-gradient(45% 55% at 75% 85%, var(--fd-amber) 0%, transparent 70%),
+    radial-gradient(40% 50% at 15% 90%, var(--fd-teal) 0%, transparent 70%);
+  animation: fd-float2 22s ease-in-out infinite alternate;
+}
+
+@keyframes fd-float1 {
+  from { transform: translate3d(-4%, -3%, 0) scale(1); }
+  to { transform: translate3d(6%, 4%, 0) scale(1.15); }
+}
+@keyframes fd-float2 {
+  from { transform: translate3d(3%, 4%, 0) scale(1.1); }
+  to { transform: translate3d(-5%, -3%, 0) scale(1); }
+}
+
+h1, h2, h3 {
+  font-family: 'Baloo 2', 'Fredoka', system-ui, sans-serif;
+  letter-spacing: -0.01em;
+}
+
+/* --- Componentes reutilizáveis --- */
+.fd-title {
+  font-family: 'Baloo 2', sans-serif;
+  font-weight: 800;
+}
+
+.fd-neon {
+  text-shadow:
+    0 0 12px rgba(255, 61, 139, 0.65),
+    0 0 30px rgba(155, 92, 255, 0.45);
+}
+
+.fd-card {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 1.25rem;
+  backdrop-filter: blur(12px);
+  box-shadow: 0 10px 30px -12px rgba(0, 0, 0, 0.6);
+}
+
+.fd-btn {
+  border-radius: 0.9rem;
+  font-weight: 700;
+  padding: 0.9rem 1rem;
+  transition: transform 0.12s ease, filter 0.12s ease, box-shadow 0.12s ease;
+  cursor: pointer;
+  border: none;
+  color: white;
+}
+.fd-btn:active { transform: scale(0.96); }
+.fd-btn:disabled { opacity: 0.4; cursor: default; transform: none; }
+
+.fd-btn-primary {
+  background: linear-gradient(135deg, var(--fd-pink), var(--fd-purple));
+  box-shadow: 0 8px 24px -8px rgba(255, 61, 139, 0.7);
+}
+.fd-btn-success { background: linear-gradient(135deg, #14b884, #0e9c8a); }
+.fd-btn-danger { background: linear-gradient(135deg, #ff4d6d, #d61f5c); }
+.fd-btn-amber { background: linear-gradient(135deg, #ffb020, #ff7a00); color: #201400; }
+.fd-btn-ghost {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.fd-input {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 0.9rem;
+  padding: 0.8rem 1rem;
+  color: #fff;
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  width: 100%;
+}
+.fd-input:focus {
+  border-color: var(--fd-pink);
+  box-shadow: 0 0 0 3px rgba(255, 61, 139, 0.25);
+}
+.fd-input::placeholder { color: rgba(255, 255, 255, 0.35); }
+
+.fd-chip {
+  border-radius: 0.7rem;
+  padding: 0.5rem 0.8rem;
+  font-weight: 600;
+  font-size: 0.9rem;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  transition: transform 0.1s ease, background 0.15s ease;
+  cursor: pointer;
+}
+.fd-chip:active { transform: scale(0.95); }
+.fd-chip-on {
+  background: linear-gradient(135deg, var(--fd-pink), var(--fd-purple));
+  border-color: transparent;
+}
+
+/* Scrollbars discretas */
+*::-webkit-scrollbar { width: 6px; height: 6px; }
+*::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.15); border-radius: 3px; }

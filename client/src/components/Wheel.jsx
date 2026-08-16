@@ -33,22 +33,34 @@ export default function Wheel({ segments, targetKey, spinning, onDone }) {
 
   return (
     <div className="relative mx-auto" style={{ width: 260, height: 260 }}>
+      {/* Halo com brilho */}
+      <div
+        className="absolute inset-[-10px] rounded-full"
+        style={{
+          zIndex: 0,
+          background:
+            'conic-gradient(from 0deg, #ff3d8b, #9b5cff, #ffb020, #1fd3b6, #ff3d8b)',
+          filter: 'blur(14px)',
+          opacity: 0.5,
+        }}
+      />
       {/* Ponteiro fixo no topo */}
       <div
-        className="absolute left-1/2 -translate-x-1/2 -top-1 z-10"
+        className="absolute left-1/2 -translate-x-1/2 -top-2 z-10"
         style={{
           width: 0,
           height: 0,
-          borderLeft: '12px solid transparent',
-          borderRight: '12px solid transparent',
-          borderTop: '20px solid #f5f5f7',
+          borderLeft: '13px solid transparent',
+          borderRight: '13px solid transparent',
+          borderTop: '22px solid #ffffff',
+          filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.5))',
         }}
       />
       <motion.div
         animate={{ rotate: rot }}
         transition={{ duration: spinning ? 3.4 : 0, ease: [0.16, 1, 0.3, 1] }}
         onAnimationComplete={() => spinning && onDone?.()}
-        style={{ width: 260, height: 260, transformOrigin: 'center' }}
+        style={{ position: 'relative', zIndex: 1, width: 260, height: 260, transformOrigin: 'center' }}
       >
         <svg viewBox="0 0 200 200" width="260" height="260">
           {segments.map((s, i) => {

@@ -27,8 +27,9 @@ fd/
 │   └── src/
 │       ├── index.js            # Express + http + Socket.io bootstrap, /health, CORS
 │       ├── socket.js           # handlers de eventos (contrato abaixo)
-│       ├── rooms.js            # RoomManager em memória + serializeRoom + AppError
-│       ├── game.js             # motor de jogo (roda, rondas, vidas, stats)
+│       ├── errors.js           # AppError (módulo próprio; quebra ciclo rooms↔game)
+│       ├── rooms.js            # RoomManager em memória + serializeRoom
+│       ├── game.js             # motor: roda, rondas, vidas, Intrigas, Segredos, stats
 │       ├── repo.js             # SEAM: conteúdo de prompts (memória → Prisma)
 │       └── content/
 │           └── prompts.data.js # dados dos prompts (fonte única: repo + seed)
@@ -37,7 +38,9 @@ fd/
 │       ├── main.jsx            # bootstrap React
 │       ├── App.jsx             # orquestra socket + máquina de ecrãs + reconexão
 │       ├── socket.js           # cliente Socket.io (singleton, autoConnect:false)
-│       ├── index.css           # Tailwind v4 (@import 'tailwindcss') + base dark
+│       ├── sfx.js              # efeitos sonoros sintetizados (Web Audio) + mute
+│       ├── confetti.js         # confetti em canvas + haptic (vibração)
+│       ├── index.css           # Tailwind v4 + design system (fd-card, fd-btn, fundo)
 │       ├── pages/
 │       │   ├── Home.jsx        # criar / juntar (aceita ?join=CÓDIGO)
 │       │   ├── Lobby.jsx       # jogadores realtime + chat + QR + config host + start
@@ -110,8 +113,13 @@ Objetivo: a app nunca fala Prisma diretamente nos handlers. Introduzir um
 | `join_room` | `{ code, name }` | Valida nome único na sala; junta. Ack + `room_joined`. |
 | `rejoin_room` | `{ code, playerId }` | Reconexão após queda; marca `connected=true`. Ack + `room_joined`, ou `session_invalid` se a sala/jogador já não existe. |
 | `start_game` | `{ lives, intensity }` | Só host, ≥2 ligados. Aplica config, `initGame` → fase `questions`, emite `game_started`. |
-| `add_question` | `{ targetPlayerId, text }` | Fase `questions`. Escreve pergunta dirigida a outro (não a si). Alimenta o Boca Calada. |
-| `begin_play` | — | Só host. Fase `questions` → `wheel`; define o 1.º jogador da vez. |
+| `add_question` | `{ targetPlayerId, text }` | Fase `prep`. Pergunta dirigida a outro (não a si) → Boca Calada. |
+| `add_secret` | `{ text }` | Fase `prep`. Segredo anónimo → Segredos. |
+| `begin_play` | — | Só host. Fase `prep` → `wheel`; define o 1.º jogador da vez. |
+| `cast_vote` | `{ targetPlayerId }` | Intrigas (fase `voting`). Voto anónimo; auto-revela quando todos votam. |
+| `cast_guess` | `{ guessedPlayerId }` | Segredos (fase `guessing`). Adivinha o autor (o autor não pode). |
+| `reveal_result` | — | Host ou quem girou força o reveal de Intrigas/Segredos. |
+| `continue_round` | — | Host ou quem girou avança para a próxima vez após reveal. |
 | `spin_wheel` | — | **Só o jogador da vez** (não o host), fase `wheel`. Escolhe o tipo+prompt (a vez já está definida); Boca Calada usa pergunta dirigida; emite `round_started`. |
 | `player_action` | `{ action: 'accept'\|'refuse' }` | Só o jogador da vez. Recusa → vida/shot; emite `action_result`. |
 | `skip_turn` | — | Só host, fase `prompt`. Salta a vez sem penalização. |
@@ -128,6 +136,8 @@ Objetivo: a app nunca fala Prisma diretamente nos handlers. Introduzir um
 | `room_state` | `{ room }` | Broadcast a toda a sala em qualquer mudança de estado. |
 | `chat_message` | `{ playerId, name, text, at }` | Nova mensagem. |
 | `game_started` | `{}` | Dispara a transição de countdown no cliente. |
+| `you_are_author` | `{ roundId }` | **PRIVADO** (só ao autor do segredo, via sala por playerId). |
+| `round_started` | `{ gameTypeKey }` | Só o tipo (para animar a roda); resto vem no room_state. |
 | `round_started` | `{ round }` | Nova ronda; cliente anima a roda até `round.gameTypeKey` e revela o prompt. |
 | `action_result` | `{ effect }` | Feedback da ação (`accepted`/`vida_perdida`/`shot`) para o flash. |
 | `game_over` | `{ stats }` | Fim de jogo; ecrã de estatísticas. |
@@ -138,7 +148,7 @@ Objetivo: a app nunca fala Prisma diretamente nos handlers. Introduzir um
 > `room_state.game` transporta `{ phase, intensity, startingLives, roundCount,
 > round, currentPlayerId, finalStats, questionCount, questionsByTarget }` — é a
 > fonte de verdade que o cliente usa para renderizar o jogo. `phase` ∈
-> `questions | wheel | prompt | gameover`. O **texto** das perguntas nunca vai no
+> `prep | wheel | prompt | voting | guessing | gameover`. O **texto** das perguntas nunca vai no
 > `room_state` (só contagens); só aparece no `round.prompt` quando calha, no Boca
 > Calada. Os eventos acima são gatilhos de animação/feedback pontuais.
 > **Conteúdo dos prompts:** `repo.js` (async, seam de integração) → hoje lê de

@@ -11,8 +11,8 @@ pós-MVP / v2 · **💡** = ideia nova a validar.
 |---|---|---|---|
 | **Boca Calada** ✅ | P0 | É feita ao jogador da vez uma **pergunta embaraçosa/difícil** (das perguntas que os jogadores escreveram no início, dirigidas uns aos outros). Ele pode dizer **"Boca Calada" e beber**, ou **responder e passar a vez**. | Implementado. Perguntas em memória (`room.game.questions`, por alvo). Fase 'questions' no início. Fallback ao banco seed se um jogador não tiver perguntas. |
 | **Desafio** | P0 | Desafio direto, sem opção de "verdade" | Variantes solo/grupo |
-| **Intrigas** | P0 | "Quem é mais capaz de…" — o grupo vota | Precisa de **votação anónima** (mecanismo dedicado) |
-| **Segredos Anónimos** | P0 | Jogadores submetem segredo anónimo; grupo tenta adivinhar de quem é | **Anonimização real** no armazenamento e no payload; reveal manual/opcional |
+| **Intrigas** ✅ | P0 | "Quem é mais capaz de…" — o grupo vota (anónimo); mais votado bebe | Implementado. Votos escondidos até ao reveal; auto-revela quando todos votam. |
+| **Segredos Anónimos** ✅ | P0 | Segredos submetidos na prep (anónimos); grupo adivinha o autor; quem erra bebe (se todos acertam, o autor bebe) | Implementado. Autor nunca no payload; aviso privado `you_are_author` via sala por playerId. |
 
 > Conteúdo guardado como dados estruturados (`game_types` + `prompts`) com
 > categoria e intensidade (leve/picante), para crescer sem tocar em código.
@@ -39,13 +39,14 @@ pós-MVP / v2 · **💡** = ideia nova a validar.
 ## Polish & UX (P1)
 
 - [ ] Countdown 3-2-1 na transição para o jogo
-- [ ] Contadores de vida animados; confetti/flash em eventos
-- [ ] QR code do código de sala (juntar mais rápido numa festa)
-- [ ] Copiar código para clipboard
-- [ ] Estados de reconexão claros ("a religar…", "voltaste!")
-- [ ] Empty states e feedback de erro amigáveis
-- [ ] Música/sons ambiente durante roda e transições (toggle mute)
-- [ ] Vibração (haptics) no telemóvel quando é a tua vez
+- [x] Contadores de vida animados; confetti/flash em eventos
+- [x] QR code do código de sala (juntar mais rápido numa festa)
+- [x] Copiar código para clipboard
+- [x] Estados de reconexão claros ("a religar…")
+- [x] Empty states e feedback de erro amigáveis
+- [x] Som sintetizado (Web Audio) na roda/eventos + toggle mute (`sfx.js`)
+- [x] Vibração (haptics) em eventos-chave (`confetti.js` → haptic)
+- [x] Redesign tema de festa (fundo animado, glass, gradientes, fonte display)
 
 ## Estatísticas & social (P1)
 

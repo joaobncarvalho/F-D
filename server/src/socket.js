@@ -93,6 +93,17 @@ export function registerSocketHandlers(io) {
       }
     });
 
+    socket.on('add_secret', ({ text } = {}, ack) => {
+      try {
+        const room = requireRoom(socket);
+        game.addSecret(room, socket.data.playerId, text);
+        broadcastState(io, room.code);
+        if (typeof ack === 'function') ack({ ok: true });
+      } catch (err) {
+        handleError(socket, ack, err);
+      }
+    });
+
     socket.on('begin_play', (_payload, ack) => {
       try {
         const room = requireRoom(socket);
@@ -108,7 +119,12 @@ export function registerSocketHandlers(io) {
       try {
         const room = requireRoom(socket);
         const round = await game.spinWheel(room, socket.data.playerId);
-        io.to(room.code).emit('round_started', { round });
+        // Aviso PRIVADO ao autor do segredo (nunca vai no broadcast).
+        if (round.gameTypeKey === 'segredos' && round.secretAuthorId) {
+          io.to(round.secretAuthorId).emit('you_are_author', { roundId: round.id });
+        }
+        // Só o tipo (para animações) — o resto vai no room_state já anonimizado.
+        io.to(room.code).emit('round_started', { gameTypeKey: round.gameTypeKey });
         broadcastState(io, room.code);
         if (typeof ack === 'function') ack({ ok: true });
       } catch (err) {
@@ -121,6 +137,50 @@ export function registerSocketHandlers(io) {
         const room = requireRoom(socket);
         const { effect } = game.resolveAction(room, socket.data.playerId, action);
         io.to(room.code).emit('action_result', { effect });
+        broadcastState(io, room.code);
+        if (typeof ack === 'function') ack({ ok: true });
+      } catch (err) {
+        handleError(socket, ack, err);
+      }
+    });
+
+    socket.on('cast_vote', ({ targetPlayerId } = {}, ack) => {
+      try {
+        const room = requireRoom(socket);
+        game.castVote(room, socket.data.playerId, targetPlayerId);
+        broadcastState(io, room.code);
+        if (typeof ack === 'function') ack({ ok: true });
+      } catch (err) {
+        handleError(socket, ack, err);
+      }
+    });
+
+    socket.on('cast_guess', ({ guessedPlayerId } = {}, ack) => {
+      try {
+        const room = requireRoom(socket);
+        game.castGuess(room, socket.data.playerId, guessedPlayerId);
+        broadcastState(io, room.code);
+        if (typeof ack === 'function') ack({ ok: true });
+      } catch (err) {
+        handleError(socket, ack, err);
+      }
+    });
+
+    socket.on('reveal_result', (_payload, ack) => {
+      try {
+        const room = requireRoom(socket);
+        game.revealResult(room, socket.data.playerId);
+        broadcastState(io, room.code);
+        if (typeof ack === 'function') ack({ ok: true });
+      } catch (err) {
+        handleError(socket, ack, err);
+      }
+    });
+
+    socket.on('continue_round', (_payload, ack) => {
+      try {
+        const room = requireRoom(socket);
+        game.continueRound(room, socket.data.playerId);
         broadcastState(io, room.code);
         if (typeof ack === 'function') ack({ ok: true });
       } catch (err) {
@@ -197,6 +257,7 @@ function bindSocketToRoom(socket, code, playerId) {
   socket.data.code = code;
   socket.data.playerId = playerId;
   socket.join(code);
+  socket.join(playerId); // sala privada do jogador (ex.: aviso "és o autor do segredo")
 }
 
 function broadcastState(io, code) {
