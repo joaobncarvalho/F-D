@@ -28,6 +28,7 @@ export default function App() {
   const [authorRoundId, setAuthorRoundId] = useState(null);
   const [intrigasReason, setIntrigasReason] = useState(null); // { roundId, reason }
   const [piramideHand, setPiramideHand] = useState(null); // { roundId, cards } — PRIVADO
+  const [vascoRole, setVascoRole] = useState(null); // { roundId, isImpostor, word } — PRIVADO
   const [muted, setMuted] = useState(sfx.isMuted());
 
   const sessionRef = useRef(loadSession());
@@ -64,12 +65,14 @@ export default function App() {
       setAuthorRoundId(null);
       setIntrigasReason(null);
       setPiramideHand(null);
+      setVascoRole(null);
       setScreen('countdown');
     }
     function onBackToLobby() {
       setAuthorRoundId(null);
       setIntrigasReason(null);
       setPiramideHand(null);
+      setVascoRole(null);
       setScreen('lobby');
     }
     function onYouAreAuthor({ roundId }) {
@@ -80,6 +83,9 @@ export default function App() {
     }
     function onPiramideHand({ roundId, cards }) {
       setPiramideHand({ roundId, cards });
+    }
+    function onVascoRole({ roundId, isImpostor, word }) {
+      setVascoRole({ roundId, isImpostor, word });
     }
     function onError({ message }) {
       setError(message);
@@ -101,6 +107,7 @@ export default function App() {
     socket.on('you_are_author', onYouAreAuthor);
     socket.on('intrigas_reason', onIntrigasReason);
     socket.on('piramide_hand', onPiramideHand);
+    socket.on('vasco_role', onVascoRole);
     socket.on('error_msg', onError);
     socket.on('session_invalid', onSessionInvalid);
 
@@ -113,6 +120,7 @@ export default function App() {
       socket.off('you_are_author', onYouAreAuthor);
       socket.off('intrigas_reason', onIntrigasReason);
       socket.off('piramide_hand', onPiramideHand);
+      socket.off('vasco_role', onVascoRole);
       socket.off('error_msg', onError);
       socket.off('session_invalid', onSessionInvalid);
     };
@@ -193,6 +201,9 @@ export default function App() {
   const piramidePass = useCallback(() => socket.emit('piramide_pass'), []);
   const piramideRespond = useCallback((decision) => socket.emit('piramide_respond', { decision }), []);
   const piramideNext = useCallback(() => socket.emit('piramide_next'), []);
+  const vascoStartClues = useCallback(() => socket.emit('vasco_start_clues'), []);
+  const vascoClueDone = useCallback(() => socket.emit('vasco_clue_done'), []);
+  const vascoGuess = useCallback((word) => socket.emit('vasco_guess', { word }), []);
   const skipTurn = useCallback(() => socket.emit('skip_turn'), []);
   const endGame = useCallback(() => socket.emit('end_game'), []);
   const resetGame = useCallback(() => socket.emit('reset_game'), []);
@@ -207,6 +218,7 @@ export default function App() {
     setAuthorRoundId(null);
     setIntrigasReason(null);
     setPiramideHand(null);
+    setVascoRole(null);
     setScreen('home');
   }, []);
 
@@ -256,6 +268,7 @@ export default function App() {
             authorRoundId={authorRoundId}
             intrigasReason={intrigasReason}
             piramideHand={piramideHand}
+            vascoRole={vascoRole}
             onAddQuestion={addQuestion}
             onAddSecret={addSecret}
             onBeginPlay={beginPlay}
@@ -272,6 +285,9 @@ export default function App() {
             onPiramidePass={piramidePass}
             onPiramideRespond={piramideRespond}
             onPiramideNext={piramideNext}
+            onVascoStartClues={vascoStartClues}
+            onVascoClueDone={vascoClueDone}
+            onVascoGuess={vascoGuess}
             onSkip={skipTurn}
             onEnd={endGame}
             onReset={resetGame}

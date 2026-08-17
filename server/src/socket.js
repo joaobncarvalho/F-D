@@ -64,6 +64,11 @@ export function registerSocketHandlers(io) {
           const cards = game.piramideHand(room, player.id);
           if (cards) socket.emit('piramide_hand', { roundId: room.game.round.id, cards });
         }
+        // Vasco a decorrer: devolve-lhe o papel privado (palavra ou "és o Vasco").
+        if (room.game?.round?.gameTypeKey === 'vasco') {
+          const role = game.vascoRole(room, player.id);
+          if (role) socket.emit('vasco_role', { roundId: room.game.round.id, ...role });
+        }
         broadcastState(io, room.code);
       } catch (err) {
         // Falha de reconexão é terminal: a sessão guardada já não é válida.
@@ -141,6 +146,15 @@ export function registerSocketHandlers(io) {
             if (!p.connected) continue;
             const cards = game.piramideHand(room, p.id);
             if (cards) io.to(p.id).emit('piramide_hand', { roundId: round.id, cards });
+          }
+        }
+        // Vasco: entrega a cada jogador o SEU papel (privado). O grupo recebe a
+        // palavra; o(s) Vasco(s) recebem só "és o Vasco" (word: null).
+        if (round.gameTypeKey === 'vasco') {
+          for (const p of room.players.values()) {
+            if (!p.connected) continue;
+            const role = game.vascoRole(room, p.id);
+            if (role) io.to(p.id).emit('vasco_role', { roundId: round.id, ...role });
           }
         }
         // Só o tipo (para animações) — o resto vai no room_state já anonimizado.
@@ -271,6 +285,41 @@ export function registerSocketHandlers(io) {
       try {
         const room = requireRoom(socket);
         game.piramideRespond(room, socket.data.playerId, decision);
+        broadcastState(io, room.code);
+        if (typeof ack === 'function') ack({ ok: true });
+      } catch (err) {
+        handleError(socket, ack, err);
+      }
+    });
+
+    // ----- Jogo do Vasco (Impostor) -----
+    const vascoNoArg = {
+      vasco_start_clues: (room, pid) => game.vascoStartClues(room, pid),
+      vasco_clue_done: (room, pid) => game.vascoClueDone(room, pid),
+    };
+    for (const [event, fn] of Object.entries(vascoNoArg)) {
+      socket.on(event, (_payload, ack) => {
+        try {
+          const room = requireRoom(socket);
+          fn(room, socket.data.playerId);
+          broadcastState(io, room.code);
+          if (typeof ack === 'function') ack({ ok: true });
+        } catch (err) {
+          handleError(socket, ack, err);
+        }
+      });
+    }
+
+    socket.on('vasco_guess', ({ word } = {}, ack) => {
+      try {
+        const room = requireRoom(socket);
+        const { finalized, winners } = game.vascoGuess(room, socket.data.playerId, word);
+        // Se resolveu, flash de "+1 vida" a cada Vasco que acertou.
+        if (finalized) {
+          for (const w of winners) {
+            io.to(room.code).emit('action_result', { effect: { type: 'vida_extra', playerId: w.id, name: w.name } });
+          }
+        }
         broadcastState(io, room.code);
         if (typeof ack === 'function') ack({ ok: true });
       } catch (err) {

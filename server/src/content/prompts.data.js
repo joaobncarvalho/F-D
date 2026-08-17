@@ -125,4 +125,30 @@ export const GAME_TYPES = [
     label: 'Piramide',
     prompts: [],
   },
+  {
+    // Jogo do Vasco (Impostor) — também dirigido por MECÂNICA. O conteúdo são
+    // QUADROS de palavras (VASCO_BOARDS abaixo), não prompts de texto. Fica aqui
+    // só para entrar na roda e no seed (0 prompts).
+    key: 'vasco',
+    label: 'Jogo do Vasco',
+    prompts: [],
+  },
+];
+
+// Quadros do Jogo do Vasco: cada quadro tem um tema e 9 palavras (grelha 3×3).
+// O grupo recebe uma das palavras como secreta; o(s) Vasco(s) não a sabem e têm
+// de a adivinhar pelas pistas. Palavras neutras (sem intensidade).
+export const VASCO_BOARDS = [
+  { theme: 'Praia', words: ['Mar', 'Areia', 'Sol', 'Toalha', 'Chapéu', 'Onda', 'Barco', 'Concha', 'Bronzeado'] },
+  { theme: 'Cozinha', words: ['Faca', 'Panela', 'Forno', 'Sal', 'Colher', 'Prato', 'Fogão', 'Azeite', 'Frigorífico'] },
+  { theme: 'Festa', words: ['Música', 'Balões', 'Bolo', 'Copos', 'Dança', 'Prenda', 'Convite', 'Vela', 'Confetti'] },
+  { theme: 'Futebol', words: ['Golo', 'Árbitro', 'Bola', 'Relvado', 'Adepto', 'Penálti', 'Camisola', 'Estádio', 'Baliza'] },
+  { theme: 'Cinema', words: ['Pipocas', 'Ecrã', 'Bilhete', 'Realizador', 'Trailer', 'Cadeira', 'Legenda', 'Estreia', 'Ator'] },
+  { theme: 'Viagem', words: ['Mala', 'Avião', 'Passaporte', 'Hotel', 'Mapa', 'Comboio', 'Roteiro', 'Fronteira', 'Câmara'] },
+  { theme: 'Escola', words: ['Caderno', 'Professor', 'Exame', 'Recreio', 'Mochila', 'Quadro', 'Nota', 'Caneta', 'Intervalo'] },
+  { theme: 'Animais', words: ['Cão', 'Gato', 'Leão', 'Elefante', 'Cobra', 'Águia', 'Golfinho', 'Coelho', 'Tubarão'] },
+  { theme: 'Corpo', words: ['Cabeça', 'Mão', 'Joelho', 'Cotovelo', 'Ombro', 'Nariz', 'Tornozelo', 'Dedo', 'Costas'] },
+  { theme: 'Natal', words: ['Presente', 'Pinheiro', 'Presépio', 'Rena', 'Neve', 'Bacalhau', 'Pai Natal', 'Estrela', 'Meia'] },
+  { theme: 'Música', words: ['Guitarra', 'Bateria', 'Palco', 'Microfone', 'Cantor', 'Refrão', 'Concerto', 'Piano', 'Banda'] },
+  { theme: 'Casa', words: ['Sofá', 'Cama', 'Janela', 'Chave', 'Telhado', 'Escada', 'Porta', 'Varanda', 'Garagem'] },
 ];

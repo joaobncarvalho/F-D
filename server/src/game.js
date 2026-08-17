@@ -105,18 +105,17 @@ const PYRAMID_LEVELS = [
 ];
 const PYRAMID_SIZE = PYRAMID_LEVELS.reduce((n, l) => n + l.count, 0); // 15
 
-// Peso de cada tipo na roda. A Piramide é um mini-jogo longo → mais rara.
-// Com 4 tipos normais (peso 3) + piramide (peso 1): piramide ≈ 1/13 ≈ 8%.
-const TYPE_WEIGHTS = { piramide: 1 };
-const DEFAULT_TYPE_WEIGHT = 3;
+// A Piramide é um mini-jogo longo → sai menos vezes. Fica com uma fração-alvo
+// fixa da roda; o resto (90%) é distribuído POR IGUAL pelos outros tipos, seja
+// qual for o número deles. Afina-se só aqui.
+const PIRAMIDE_SHARE = 0.1; // ≈ 10% das voltas
 
 function pickWeightedType(types) {
-  const pool = [];
-  for (const t of types) {
-    const w = TYPE_WEIGHTS[t.key] ?? DEFAULT_TYPE_WEIGHT;
-    for (let i = 0; i < w; i++) pool.push(t);
-  }
-  return pool[Math.floor(Math.random() * pool.length)];
+  const piramide = types.find((t) => t.key === 'piramide');
+  const others = types.filter((t) => t.key !== 'piramide');
+  if (!others.length) return piramide || types[0];
+  if (piramide && Math.random() < PIRAMIDE_SHARE) return piramide;
+  return others[Math.floor(Math.random() * others.length)];
 }
 
 function shuffle(arr) {
@@ -225,6 +224,126 @@ function buildPiramideSummary(room) {
   const winners = maxMade > 0 ? rows.filter((x) => x.made === maxMade).map((x) => ({ id: x.id, name: x.name })) : [];
   r.summary = { rows, winners, maxMade };
   r.substate = 'summary';
+}
+
+// ----- Jogo do Vasco (Impostor) ---------------------------------------------
+//
+// O grupo partilha uma PALAVRA secreta (uma de 9 num quadro visível a todos). O
+// (ou os) "Vasco(s)" são impostores que NÃO sabem qual é e têm de a adivinhar
+// pelas pistas que o resto vai dando à vez. No fim cada Vasco escolhe uma palavra
+// do quadro: acerta → +1 vida; falha → bebe 5 golos. A palavra secreta e QUEM é
+// Vasco nunca vão no broadcast até ao reveal (entrega privada por `vasco_role`).
+
+const VASCO_GOLOS = 5;
+
+async function dealVasco(room, round) {
+  const board = await repo.getRandomVascoBoard();
+  const words = board?.words ? [...board.words] : [];
+  const secret = words[Math.floor(Math.random() * words.length)];
+  const order = connectedOrder(room).map((p) => p.id);
+  const k = order.length >= 6 ? 2 : 1;
+  const nImp = Math.min(k, Math.max(1, order.length - 1)); // pelo menos 1 do grupo não-Vasco
+  const impostorIds = shuffle([...order]).slice(0, nImp);
+
+  round.board = { theme: board?.theme || '—', words }; // PÚBLICO
+  round.secretWord = secret; // PRIVADO (só o grupo)
+  round.impostorIds = impostorIds; // PRIVADO
+  round.clueOrder = order;
+  round.clueIdx = 0;
+  round.guesses = {}; // impostorId -> palavra
+  round.result = null;
+  round.substate = 'reveal';
+}
+
+function requireVasco(room, substates) {
+  const g = room.game;
+  const r = g?.round;
+  if (!g || g.phase !== 'vasco' || !r || r.gameTypeKey !== 'vasco')
+    throw new AppError('Não há Jogo do Vasco ativo.');
+  if (substates && !substates.includes(r.substate)) throw new AppError('Não é altura disso.');
+  return r;
+}
+
+/** Papel PRIVADO de um jogador: é Vasco? qual a palavra (só o grupo a vê)? */
+export function vascoRole(room, playerId) {
+  const r = room.game?.round;
+  if (!r || r.gameTypeKey !== 'vasco') return null;
+  const isImpostor = r.impostorIds.includes(playerId);
+  return { isImpostor, word: isImpostor ? null : r.secretWord };
+}
+
+function skipToConnectedClue(room) {
+  const r = room.game.round;
+  while (r.clueIdx < r.clueOrder.length && !room.players.get(r.clueOrder[r.clueIdx])?.connected) {
+    r.clueIdx += 1;
+  }
+  if (r.clueIdx >= r.clueOrder.length) r.substate = 'guessing';
+}
+
+/** Reveal → começa a ronda de pistas (host ou quem girou). */
+export function vascoStartClues(room, playerId) {
+  const r = requireVasco(room, ['reveal']);
+  const p = room.players.get(playerId);
+  if (!p || (!p.isHost && playerId !== room.game.currentPlayerId))
+    throw new AppError('Só o host ou quem girou pode começar.');
+  r.substate = 'clues';
+  r.clueIdx = 0;
+  skipToConnectedClue(room);
+  return r;
+}
+
+/** O jogador da vez (ou host/quem girou) marca que já deu a sua pista. */
+export function vascoClueDone(room, playerId) {
+  const r = requireVasco(room, ['clues']);
+  const cur = r.clueOrder[r.clueIdx];
+  const p = room.players.get(playerId);
+  if (!p || (playerId !== cur && !p.isHost && playerId !== room.game.currentPlayerId))
+    throw new AppError('Não é a tua vez de dar pista.');
+  r.clueIdx += 1;
+  skipToConnectedClue(room);
+  return r;
+}
+
+/** Um Vasco adivinha uma palavra do quadro. Todos os Vascos ligados adivinharam → resolve. */
+export function vascoGuess(room, playerId, word) {
+  const r = requireVasco(room, ['guessing']);
+  if (!r.impostorIds.includes(playerId)) throw new AppError('Só o Vasco adivinha 🕵️');
+  if (!r.board.words.includes(word)) throw new AppError('Escolhe uma palavra do quadro.');
+  r.guesses[playerId] = word;
+
+  const pending = r.impostorIds.filter(
+    (id) => room.players.get(id)?.connected && r.guesses[id] === undefined
+  );
+  let finalized = false;
+  let winners = [];
+  if (!pending.length) {
+    winners = buildVascoResult(room);
+    finalized = true;
+  }
+  return { round: r, finalized, winners };
+}
+
+function buildVascoResult(room) {
+  const g = room.game;
+  const r = g.round;
+  const impostors = r.impostorIds.map((id) => {
+    const guess = r.guesses[id] ?? null;
+    const correct = guess === r.secretWord;
+    return { id, name: nameOf(room, id), guess, correct };
+  });
+  const winners = [];
+  for (const imp of impostors) {
+    const p = room.players.get(imp.id);
+    if (imp.correct) {
+      if (p) p.lives += 1; // Vasco ganhou → +1 vida
+      winners.push({ id: imp.id, name: imp.name });
+    } else {
+      drink(g, imp.id, 1); // Vasco falhou → bebe 5 golos
+    }
+  }
+  r.result = { secretWord: r.secretWord, theme: r.board.theme, golos: VASCO_GOLOS, impostors };
+  r.substate = 'result';
+  return winners;
 }
 
 // ---------------------------------------------------------------------------
@@ -344,6 +463,10 @@ export async function spinWheel(room, playerId) {
     round.prompt = null;
     dealPiramide(room, round); // dá as mãos (privadas) e monta a pirâmide
     g.phase = 'piramide';
+  } else if (gt.key === 'vasco') {
+    round.prompt = null;
+    await dealVasco(room, round); // escolhe palavra + impostor(es), papéis privados
+    g.phase = 'vasco';
   }
 
   g.round = round;
@@ -495,6 +618,7 @@ export function revealResult(room, playerId) {
   if (!p || (!p.isHost && playerId !== g.currentPlayerId))
     throw new AppError('Só o host ou quem girou pode revelar.');
   if (g.phase === 'guessing' && !g.round.revealed) revealSegredos(room);
+  else if (g.phase === 'vasco' && g.round.substate === 'guessing') buildVascoResult(room);
   else throw new AppError('Nada para revelar.');
   return g.round;
 }
@@ -519,6 +643,15 @@ export function continueRound(room, playerId) {
     g.round = null;
     g.phase = 'wheel';
     return { game: g, rewarded: winners };
+  }
+
+  // Jogo do Vasco: fecha-se no resultado (prémio +1 vida já aplicado no reveal).
+  if (g.phase === 'vasco') {
+    if (g.round?.substate !== 'result') throw new AppError('O Jogo do Vasco ainda não terminou.');
+    advanceTurn(room);
+    g.round = null;
+    g.phase = 'wheel';
+    return { game: g, rewarded: [] };
   }
 
   if (!['intrigas', 'guessing'].includes(g.phase)) throw new AppError('Nada a continuar.');
@@ -766,6 +899,17 @@ function serializeRound(g) {
     // currentPlayerId/Name já refletem o FLIPPER da vez (não o spinner).
     base.currentPlayerId = r.currentPlayerId;
     base.currentPlayerName = r.currentPlayerName;
+  }
+  if (r.gameTypeKey === 'vasco') {
+    base.substate = r.substate; // reveal | clues | guessing | result
+    base.board = r.board; // público (tema + 9 palavras)
+    base.clueOrder = r.clueOrder;
+    base.clueIdx = r.clueIdx;
+    base.clueCurrentId = r.substate === 'clues' ? r.clueOrder[r.clueIdx] || null : null;
+    base.guessers = Object.keys(r.guesses || {}); // quem já adivinhou (não o quê)
+    base.impostorCount = r.impostorIds.length; // quantos Vascos (não quem)
+    base.result = r.substate === 'result' ? r.result : null; // palavra/Vascos só aqui
+    // r.secretWord e r.impostorIds NUNCA vão no broadcast antes do result.
   }
   return base;
 }

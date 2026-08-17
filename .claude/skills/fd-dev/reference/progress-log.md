@@ -5,6 +5,59 @@
 
 ---
 
+## 2026-08-17 — Jogo do Vasco (Impostor): 6.º jogo + roda a ~10% para a Piramide
+
+Segundo jogo novo pedido pelo João + afinação da roda + fix de crash.
+
+**Roda:** seleção reescrita — a Piramide passa a ter uma **fração-alvo fixa**
+(`PIRAMIDE_SHARE = 0.10` ≈ 10%) e os restantes tipos dividem os 90% **por igual**
+(robusto a adicionar/remover tipos). Verificado: piramide ~9.6%, outros ~18%.
+
+**Fix (browser):** `intrigasReason` rebentava (`Cannot read 'reason' of null`) ao
+entrar no jogo sem ronda; guarda por `round` existir. Novo `ErrorBoundary`
+(`client/src/components/ErrorBoundary.jsx`) mostra erros de render num painel com
+**Copiar erro** (mensagem+stack+ecrã) — a envolver os ecrãs no `App.jsx`.
+
+**Jogo do Vasco (Impostor):** mini-jogo de dedução, dirigido por mecânica.
+- Quadro de **9 palavras** (tema) público; o grupo recebe **qual** é a secreta, o(s)
+  **Vasco(s)** não. 1 Vasco (ou 2 se ≥6 jogadores), escolhidos ao acaso.
+- Fases (`round.substate`): `reveal` (papel privado) → `clues` (pistas **à vez**,
+  verbais; o jogador da vez marca "dei a pista") → `guessing` (cada Vasco escolhe
+  uma palavra do quadro) → `result`. Acerta → **+1 vida**; falha → **5 golos**.
+- Palavra secreta e identidade dos Vascos **nunca** no broadcast (entrega privada
+  `vasco_role`, reenviada no `rejoin`). Reveal forçável (host/quem girou) via
+  `reveal_result` se um Vasco ficar AFK.
+
+**Ficheiros**
+- `server/src/content/prompts.data.js` (tipo `vasco` + `VASCO_BOARDS`: 12 quadros)
+- `server/src/repo.js` (`getRandomVascoBoard`)
+- `server/src/game.js` (dealVasco, máquina de estados, papéis, resultado/prémio,
+  serialização anonimizada; `pickWeightedType` reescrito; extensões de
+  `revealResult`/`continueRound`)
+- `server/src/socket.js` (`vasco_start_clues/clue_done/guess`, `vasco_role` privado
+  no spin e no rejoin, flash do prémio)
+- `client/src/App.jsx` (estado+listener `vasco_role`, 3 emitters, props),
+  `client/src/pages/Game.jsx` (6.º segmento, `VascoCard` + `WordBoard`, highlight
+  do turno de pistas)
+
+**Verificação**
+- Smoke do motor (2 cenários): Vasco **acerta → +1 vida**; **falha → 5 golos**;
+  anonimato do round (sem `secretWord`/`impostorIds`); volta à roda ✓
+- **E2E Socket.io real** (3 clientes): papéis privados sem fuga, pistas à vez,
+  todos os Vascos acertam → +1 vida cada + flash `vida_extra`, volta à roda ✓
+- Distribuição da roda (12 000 spins): piramide 9.6%, outros ~18% ✓
+- `client npm run build` → 502 módulos, sem erros ✓
+
+**Notas**
+- BD: `game_types` ganha `vasco` (0 prompts) no seed; o **SQL estático**
+  (`db/02_seed.sql`) precisa da linha quando o colega regerar. Os `VASCO_BOARDS`
+  vivem no código (mecânica), como a Piramide.
+- As pistas são **verbais** (presencial); a app só sequencia as vezes. Um passo
+  seguinte possível: votação para "apanhar o Vasco" (não pedido — o prémio/castigo
+  atual é só sobre o Vasco adivinhar).
+
+---
+
 ## 2026-08-17 — Piramide (Desconfia): 5.º jogo na roda
 
 Novo tipo de jogo pedido pelo João. Mini-jogo completo de bluff com cartas

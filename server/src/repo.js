@@ -22,10 +22,16 @@
 //
 // (As funções são async de propósito, para a troca por Prisma ser drop-in.)
 
-import { GAME_TYPES } from './content/prompts.data.js';
+import { GAME_TYPES, VASCO_BOARDS } from './content/prompts.data.js';
 
 export async function getGameTypes() {
   return GAME_TYPES.map((g) => ({ key: g.key, label: g.label }));
+}
+
+/** Um quadro aleatório do Jogo do Vasco ({ theme, words: [9] }). */
+export async function getRandomVascoBoard() {
+  if (!VASCO_BOARDS.length) return null;
+  return VASCO_BOARDS[Math.floor(Math.random() * VASCO_BOARDS.length)];
 }
 
 export async function getRandomPrompt(gameTypeKey, intensity) {

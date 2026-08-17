@@ -73,7 +73,11 @@ Legenda: ✅ feito · 🚧 em curso · ⬜ por fazer · 🔗 ponto de integraç�
 - [x] **Piramide (Desconfia)** (pedido do João): 5.º tipo na roda — cartas digitais
       privadas (memorizar), pirâmide 15 cartas (golos 2→10), virar+atribuir+desconfiar
       (dobro), prémio +1 vida a quem fez beber mais. Mãos nunca no broadcast
-      (`piramide_hand` privado). E2E socket ✓
+      (`piramide_hand` privado). E2E socket ✓. Peso na roda ~10% (fração-alvo fixa).
+- [x] **Jogo do Vasco (Impostor)** (pedido do João): 6.º tipo na roda — quadro de 9
+      palavras, o grupo sabe a palavra secreta, o(s) Vasco(s) não e adivinham pelas
+      pistas. Acerta → +1 vida; falha → 5 golos. Papel privado (`vasco_role`); palavra
+      e identidade nunca no broadcast. E2E socket ✓
 - [x] **Redesign completo** (tema de festa): fundo animado, cartas glass, botões
       gradiente, fonte display, roda com halo
 - [x] **Som** (Web Audio sintetizado + mute), **confetti** (canvas) e **vibração**
