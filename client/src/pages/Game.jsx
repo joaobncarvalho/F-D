@@ -96,7 +96,7 @@ export default function Game(props) {
     g.phase === 'piramide' && round ? round.currentPlayerId : g.currentPlayerId;
   // Razão do Intrigas, entregue em privado (só a tenho se o servidor ma enviou).
   const intrigasReason =
-    props.intrigasReason?.roundId === round?.id ? props.intrigasReason.reason : null;
+    round && props.intrigasReason?.roundId === round.id ? props.intrigasReason.reason : null;
 
   return (
     <motion.div

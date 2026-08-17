@@ -6,6 +6,7 @@ import Home from './pages/Home.jsx';
 import Lobby from './pages/Lobby.jsx';
 import Game from './pages/Game.jsx';
 import Countdown from './components/Countdown.jsx';
+import ErrorBoundary from './components/ErrorBoundary.jsx';
 
 const SESSION_KEY = 'fd_session';
 
@@ -229,6 +230,7 @@ export default function App() {
         </div>
       )}
 
+      <ErrorBoundary label={screen}>
       <AnimatePresence mode="wait">
         {screen === 'home' && (
           <Home key="home" error={error} onCreate={createRoom} onJoin={joinRoom} />
@@ -277,6 +279,7 @@ export default function App() {
           />
         )}
       </AnimatePresence>
+      </ErrorBoundary>
     </div>
   );
 }
