@@ -62,8 +62,13 @@ export default function Game(props) {
   }, [round?.id, g?.phase]);
 
   // Som + confetti no reveal de Intrigas/Segredos.
+  // (O Vasco usa substate 'reveal' para MOSTRAR O PAPEL — não é clímax; a sua
+  //  celebração é feita no VascoCard, na fase 'result'. Por isso excluímo-lo aqui.)
   useEffect(() => {
-    const isReveal = round && (round.revealed || round.substate === 'reveal');
+    const isReveal =
+      round &&
+      round.gameTypeKey !== 'vasco' &&
+      (round.revealed || round.substate === 'reveal');
     if (isReveal && revealedRef.current !== round.id) {
       revealedRef.current = round.id;
       sfx.reveal();
