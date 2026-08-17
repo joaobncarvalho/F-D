@@ -21,6 +21,9 @@ Telemóveis (browsers)          Backend                    Persistência
 ```
 fd/
 ├── server/
+│   ├── db/                     # scripts SQL standalone (setup direto/Supabase)
+│   │   ├── 01_schema.sql       # estrutura (idempotente); gerado do schema.prisma
+│   │   └── 02_seed.sql         # game_types + 88 prompts (idempotente)
 │   ├── prisma/
 │   │   ├── schema.prisma       # modelos (draft para o colega refinar)
 │   │   └── seed.js             # semeia prompts (usa content/prompts.data.js)

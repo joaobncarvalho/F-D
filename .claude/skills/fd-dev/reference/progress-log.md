@@ -5,6 +5,24 @@
 
 ---
 
+## 2026-08-17 — Scripts SQL standalone da BD
+
+Gerados scripts SQL para inicializar a BD diretamente (Supabase SQL editor / psql),
+sem depender do Prisma — úteis para o colega rever/correr.
+
+- `server/db/01_schema.sql` — enums, tabelas, índices, FKs. Gerado do `schema.prisma`
+  via `prisma migrate diff` (fiel à app) + tornado **idempotente** (IF NOT EXISTS,
+  DO-blocks para enums/FKs).
+- `server/db/02_seed.sql` — game_types (UUIDs fixos) + 88 prompts (gen_random_uuid),
+  idempotente via `ON CONFLICT`. Gerado de `src/content/prompts.data.js`.
+- `server/db/README.md` + secção nova no `db-setup.md`.
+
+**Verificação:** ambos os ficheiros validados com a gramática oficial do PostgreSQL
+(`pg-query-emscripten`): 41 + 7 statements, sem erros de sintaxe. (Sem docker/psql
+na máquina, não corri contra um PG real — falta ainda a instância Supabase.)
+
+---
+
 ## 2026-08-16 — Intrigas v2: pergunta secreta + pedra-papel-tesoura
 
 Redesenho do Intrigas a pedido do João (substitui a votação anónima anterior).

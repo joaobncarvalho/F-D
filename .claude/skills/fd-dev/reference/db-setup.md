@@ -85,6 +85,17 @@ npx prisma db seed
 npx prisma studio
 ```
 
+## Alternativa: scripts SQL standalone (sem Prisma)
+
+Para setup direto / revisão pelo colega, há scripts SQL prontos em `server/db/`:
+- `01_schema.sql` — estrutura (enums, tabelas, índices, FKs), idempotente.
+- `02_seed.sql` — game_types + 88 prompts, idempotente (`ON CONFLICT`).
+
+Correr no SQL editor da Supabase (schema primeiro, depois seed) ou via
+`psql "$DATABASE_URL" -f server/db/01_schema.sql`. Gerados a partir do
+`schema.prisma` (via `prisma migrate diff`) e de `src/content/prompts.data.js`,
+por isso são equivalentes ao fluxo Prisma. Ver `server/db/README.md`.
+
 ## Verificação
 
 - `npx prisma migrate status` → migrations aplicadas.
