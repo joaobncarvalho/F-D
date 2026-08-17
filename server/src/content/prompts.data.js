@@ -117,4 +117,12 @@ export const GAME_TYPES = [
       ['Confessa o segredo que levarias para o túmulo... até agora.', 'picante'],
     ],
   },
+  {
+    // Piramide (Desconfia) — jogo dirigido por MECÂNICA, não por prompts de texto.
+    // As cartas e a pirâmide são geradas no motor (game.js); não há banco de prompts.
+    // Fica em GAME_TYPES só para entrar na roda (repo.getGameTypes) e no seed (0 prompts).
+    key: 'piramide',
+    label: 'Piramide',
+    prompts: [],
+  },
 ];

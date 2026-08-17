@@ -32,7 +32,7 @@ fd/
 │       ├── socket.js           # handlers de eventos (contrato abaixo)
 │       ├── errors.js           # AppError (módulo próprio; quebra ciclo rooms↔game)
 │       ├── rooms.js            # RoomManager em memória + serializeRoom
-│       ├── game.js             # motor: roda, rondas, vidas, Intrigas, Segredos, stats
+│       ├── game.js             # motor: roda, rondas, vidas, Intrigas, Segredos, Piramide, stats
 │       ├── repo.js             # SEAM: conteúdo de prompts (memória → Prisma)
 │       └── content/
 │           └── prompts.data.js # dados dos prompts (fonte única: repo + seed)
@@ -123,9 +123,15 @@ Objetivo: a app nunca fala Prisma diretamente nos handlers. Introduzir um
 | `submit_rps` | `{ move: 'pedra'\|'papel'\|'tesoura' }` | Intrigas (substate `rps`). Acusador e acusado jogam; empate repete; acusado perde → bebe. |
 | `cast_guess` | `{ guessedPlayerId }` | Segredos (fase `guessing`). Adivinha o autor (o autor não pode). |
 | `reveal_result` | — | Host ou quem girou força o reveal do Segredos. |
-| `continue_round` | — | Host ou quem girou avança para a próxima vez após reveal. |
-| `spin_wheel` | — | **Só o jogador da vez** (não o host), fase `wheel`. Escolhe o tipo+prompt (a vez já está definida); Boca Calada usa pergunta dirigida; emite `round_started`. |
+| `continue_round` | — | Host ou quem girou avança para a próxima vez após reveal (Intrigas/Segredos) **ou** fecha a Piramide no `summary` (aplica +1 vida a quem fez beber mais). |
+| `spin_wheel` | — | **Só o jogador da vez** (não o host), fase `wheel`. Escolhe o tipo+prompt (a vez já está definida); Boca Calada usa pergunta dirigida; Piramide dá as mãos privadas; emite `round_started`. |
 | `player_action` | `{ action: 'accept'\|'refuse' }` | Só o jogador da vez. Recusa → vida/shot; emite `action_result`. |
+| `piramide_ready` | — | Piramide (`memorize`). Marca-se pronto; todos os ligados prontos → começa a virar. |
+| `piramide_flip` | — | Piramide (`flipping`). **Só o flipper da vez** vira a carta seguinte. |
+| `piramide_assign` | `{ targetId }` | Piramide (`flipping`, carta virada). Flipper faz outro beber (afirma ter o número). |
+| `piramide_pass` | — | Piramide (`flipping`, carta virada). Flipper passa (ninguém bebe) → carta seguinte. |
+| `piramide_respond` | `{ decision: 'aceitar'\|'desconfiar' }` | Piramide (`challenge`). **Só o alvo**. Aceita (bebe golos) ou desconfia (revela veredicto; erra → bebe o dobro). |
+| `piramide_next` | — | Piramide (`resolved`). Flipper ou host avança para a carta seguinte. |
 | `skip_turn` | — | Só host, fase `prompt`. Salta a vez sem penalização. |
 | `end_game` | — | Só host. Calcula stats, emite `game_over`. |
 | `reset_game` | — | Só host. Volta ao lobby (`game=null`), emite `back_to_lobby`. |
@@ -141,10 +147,11 @@ Objetivo: a app nunca fala Prisma diretamente nos handlers. Introduzir um
 | `chat_message` | `{ playerId, name, text, at }` | Nova mensagem. |
 | `game_started` | `{}` | Dispara a transição de countdown no cliente. |
 | `you_are_author` | `{ roundId }` | **PRIVADO** (só ao autor do segredo, via sala por playerId). |
+| `piramide_hand` | `{ roundId, cards: [{rank,suit}×3] }` | **PRIVADO** (Piramide). A mão de cada jogador, só a ele. **Nunca** em broadcast; reenviada no `rejoin_room`. |
 | `intrigas_reason` | `{ roundId, reason }` | **PRIVADO**. Intrigas: a pergunta secreta. Vai ao acusador (spin), aos espectadores (ao escolher) e ao acusado só se ganhar o RPS. |
 | `round_started` | `{ gameTypeKey }` | Só o tipo (para animar a roda); resto vem no room_state. |
 | `round_started` | `{ round }` | Nova ronda; cliente anima a roda até `round.gameTypeKey` e revela o prompt. |
-| `action_result` | `{ effect }` | Feedback da ação (`accepted`/`vida_perdida`/`shot`) para o flash. |
+| `action_result` | `{ effect }` | Feedback da ação (`accepted`/`vida_perdida`/`shot`/`vida_extra`) para o flash. `vida_extra` = prémio da Piramide. |
 | `game_over` | `{ stats }` | Fim de jogo; ecrã de estatísticas. |
 | `back_to_lobby` | `{}` | Host reiniciou; clientes voltam ao lobby. |
 | `session_invalid` | `{ message }` | Reconexão falhou (terminal); cliente limpa a sessão e volta ao Home. |
@@ -153,10 +160,15 @@ Objetivo: a app nunca fala Prisma diretamente nos handlers. Introduzir um
 > `room_state.game` transporta `{ phase, intensity, startingLives, roundCount,
 > round, currentPlayerId, finalStats, questionCount, questionsByTarget }` — é a
 > fonte de verdade que o cliente usa para renderizar o jogo. `phase` ∈
-> `prep | wheel | prompt | intrigas | guessing | gameover` (Intrigas com
+> `prep | wheel | prompt | intrigas | guessing | piramide | gameover` (Intrigas com
 > `round.substate` = `choosing | rps | reveal`). O **texto** das perguntas nunca vai no
 > `room_state` (só contagens); só aparece no `round.prompt` quando calha, no Boca
 > Calada. Os eventos acima são gatilhos de animação/feedback pontuais.
+> **Piramide** (`phase='piramide'`): `round.substate` ∈ `memorize | flipping |
+> challenge | resolved | summary`; `round.currentPlayerId` é o **flipper** da vez
+> (não o spinner). O `round` leva a pirâmide (só rank/naipe das cartas **já
+> viradas**), a carta virada, a atribuição e o veredicto — mas **nunca as mãos**
+> (essas só via `piramide_hand` privado). Match por número; golos por nível 2→10.
 > **Conteúdo dos prompts:** `repo.js` (async, seam de integração) → hoje lê de
 > `content/prompts.data.js`; trocar por Prisma sem mudar `game.js`/handlers.
 

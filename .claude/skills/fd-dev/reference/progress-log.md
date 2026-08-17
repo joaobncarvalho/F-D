@@ -5,6 +5,54 @@
 
 ---
 
+## 2026-08-17 — Piramide (Desconfia): 5.º jogo na roda
+
+Novo tipo de jogo pedido pelo João. Mini-jogo completo de bluff com cartas
+digitais, arbitrado pelo servidor, que entra na roda como os outros tipos.
+
+**Mecânica**
+- Ao calhar na roda: o servidor dá **3 cartas privadas** a cada jogador (mão nunca
+  vai no broadcast) para **memorizar**, e monta uma **pirâmide de 15 cartas**
+  (base→topo 5/4/3/2/1; golos 2/4/6/8/10). Match por **número** (rank), não naipe.
+- Fases (`round.substate`): `memorize` (todos "já memorizei" → começa) → `flipping`
+  (o flipper da vez **vira** a carta e **atribui** a alguém ou **passa**) →
+  `challenge` (o alvo **aceita** e bebe os golos, ou **desconfia**) → `resolved`
+  (revela **só** o veredicto do número reclamado, não a mão toda) → repete →
+  `summary`. Desconfiança: se o flipper tinha mesmo, o alvo bebe o **dobro**; se
+  era bluff, o flipper bebe o **dobro**.
+- **Prémio:** quem **fez beber mais** ganha **+1 vida** no jogo principal (aplicado
+  ao fechar via `continue_round`; flash `vida_extra`). Golos contam +1 em `drinks`.
+
+**Ficheiros**
+- `server/src/content/prompts.data.js` (tipo `piramide`, 0 prompts — é mecânica)
+- `server/src/game.js` (baralho/deal, máquina de estados, serialização anonimizada,
+  prémio, extensão de `continueRound`; acessor `piramideHand`)
+- `server/src/socket.js` (handlers `piramide_ready/flip/assign/pass/respond/next`,
+  emit privado `piramide_hand` no spin e no `rejoin_room`, flash do prémio)
+- `client/src/App.jsx` (estado+listener `piramide_hand`, 6 emitters, props)
+- `client/src/pages/Game.jsx` (5.º segmento na roda, `PiramideCard` com as 5
+  sub-fases, `PyramidBoard`/`PlayingCard`, highlight do flipper, flash `vida_extra`)
+
+**Verificação**
+- Smoke test do motor (3 jogadores): Piramide na roda, **mãos ausentes do
+  broadcast**, 3 cartas/jogador, memorize→flipping, 15 cartas jogadas, resumo,
+  prémio +1 vida, volta à roda ✓
+- **E2E Socket.io real** (3 clientes): mãos privadas entregues sem fuga, gate de
+  memorização (2/3 mantém, 3/3 avança), fora-da-vez bloqueado, 15 cartas
+  (aceitar/desconfiar), +1 vida aplicado **e** broadcast, flash `vida_extra`,
+  volta à roda ✓
+- `client npm run build` → 500 módulos, sem erros ✓
+
+**Notas / a seguir**
+- BD: `GameType.key` é String livre no Prisma → o seed aceita `piramide` (0
+  prompts). O **SQL standalone** (`db/02_seed.sql`) é estático — o colega deve
+  acrescentar a linha `game_types` do `piramide` quando regerar.
+- Reconexão a meio da Piramide reenvia a mão; se um jogador ficar AFK, o host usa
+  **Saltar vez** para abortar o mini-jogo.
+- Playtest no browser (roda 1/5 → pirâmide) fica para o próximo arranque de `dev`.
+
+---
+
 ## 2026-08-17 — Scripts SQL standalone da BD
 
 Gerados scripts SQL para inicializar a BD diretamente (Supabase SQL editor / psql),

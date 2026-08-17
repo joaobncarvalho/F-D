@@ -26,6 +26,7 @@ export default function App() {
   const [conn, setConn] = useState('online');
   const [authorRoundId, setAuthorRoundId] = useState(null);
   const [intrigasReason, setIntrigasReason] = useState(null); // { roundId, reason }
+  const [piramideHand, setPiramideHand] = useState(null); // { roundId, cards } — PRIVADO
   const [muted, setMuted] = useState(sfx.isMuted());
 
   const sessionRef = useRef(loadSession());
@@ -61,11 +62,13 @@ export default function App() {
     function onGameStarted() {
       setAuthorRoundId(null);
       setIntrigasReason(null);
+      setPiramideHand(null);
       setScreen('countdown');
     }
     function onBackToLobby() {
       setAuthorRoundId(null);
       setIntrigasReason(null);
+      setPiramideHand(null);
       setScreen('lobby');
     }
     function onYouAreAuthor({ roundId }) {
@@ -73,6 +76,9 @@ export default function App() {
     }
     function onIntrigasReason({ roundId, reason }) {
       setIntrigasReason({ roundId, reason });
+    }
+    function onPiramideHand({ roundId, cards }) {
+      setPiramideHand({ roundId, cards });
     }
     function onError({ message }) {
       setError(message);
@@ -93,6 +99,7 @@ export default function App() {
     socket.on('back_to_lobby', onBackToLobby);
     socket.on('you_are_author', onYouAreAuthor);
     socket.on('intrigas_reason', onIntrigasReason);
+    socket.on('piramide_hand', onPiramideHand);
     socket.on('error_msg', onError);
     socket.on('session_invalid', onSessionInvalid);
 
@@ -104,6 +111,7 @@ export default function App() {
       socket.off('back_to_lobby', onBackToLobby);
       socket.off('you_are_author', onYouAreAuthor);
       socket.off('intrigas_reason', onIntrigasReason);
+      socket.off('piramide_hand', onPiramideHand);
       socket.off('error_msg', onError);
       socket.off('session_invalid', onSessionInvalid);
     };
@@ -178,6 +186,12 @@ export default function App() {
   );
   const revealResult = useCallback(() => socket.emit('reveal_result'), []);
   const continueRound = useCallback(() => socket.emit('continue_round'), []);
+  const piramideReady = useCallback(() => socket.emit('piramide_ready'), []);
+  const piramideFlip = useCallback(() => socket.emit('piramide_flip'), []);
+  const piramideAssign = useCallback((targetId) => socket.emit('piramide_assign', { targetId }), []);
+  const piramidePass = useCallback(() => socket.emit('piramide_pass'), []);
+  const piramideRespond = useCallback((decision) => socket.emit('piramide_respond', { decision }), []);
+  const piramideNext = useCallback(() => socket.emit('piramide_next'), []);
   const skipTurn = useCallback(() => socket.emit('skip_turn'), []);
   const endGame = useCallback(() => socket.emit('end_game'), []);
   const resetGame = useCallback(() => socket.emit('reset_game'), []);
@@ -191,6 +205,7 @@ export default function App() {
     setError(null);
     setAuthorRoundId(null);
     setIntrigasReason(null);
+    setPiramideHand(null);
     setScreen('home');
   }, []);
 
@@ -238,6 +253,7 @@ export default function App() {
             youId={youId}
             authorRoundId={authorRoundId}
             intrigasReason={intrigasReason}
+            piramideHand={piramideHand}
             onAddQuestion={addQuestion}
             onAddSecret={addSecret}
             onBeginPlay={beginPlay}
@@ -248,6 +264,12 @@ export default function App() {
             onGuess={castGuess}
             onReveal={revealResult}
             onContinue={continueRound}
+            onPiramideReady={piramideReady}
+            onPiramideFlip={piramideFlip}
+            onPiramideAssign={piramideAssign}
+            onPiramidePass={piramidePass}
+            onPiramideRespond={piramideRespond}
+            onPiramideNext={piramideNext}
             onSkip={skipTurn}
             onEnd={endGame}
             onReset={resetGame}

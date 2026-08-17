@@ -70,6 +70,10 @@ Legenda: ✅ feito · 🚧 em curso · ⬜ por fazer · 🔗 ponto de integraç�
       nunca sabe; ganha e fica a saber. Razão entregue em privado.
 - [x] **Segredos**: submissão anónima na prep + grupo adivinha o autor (aviso
       privado `you_are_author`, autor escondido no payload até ao reveal)
+- [x] **Piramide (Desconfia)** (pedido do João): 5.º tipo na roda — cartas digitais
+      privadas (memorizar), pirâmide 15 cartas (golos 2→10), virar+atribuir+desconfiar
+      (dobro), prémio +1 vida a quem fez beber mais. Mãos nunca no broadcast
+      (`piramide_hand` privado). E2E socket ✓
 - [x] **Redesign completo** (tema de festa): fundo animado, cartas glass, botões
       gradiente, fonte display, roda com halo
 - [x] **Som** (Web Audio sintetizado + mute), **confetti** (canvas) e **vibração**

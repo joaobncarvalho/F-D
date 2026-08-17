@@ -59,6 +59,11 @@ export function registerSocketHandlers(io) {
           room: serializeRoom(room),
           you: player.id,
         });
+        // Piramide a decorrer: devolve-lhe a mão privada (perdida na queda).
+        if (room.game?.round?.gameTypeKey === 'piramide') {
+          const cards = game.piramideHand(room, player.id);
+          if (cards) socket.emit('piramide_hand', { roundId: room.game.round.id, cards });
+        }
         broadcastState(io, room.code);
       } catch (err) {
         // Falha de reconexão é terminal: a sessão guardada já não é válida.
@@ -129,6 +134,14 @@ export function registerSocketHandlers(io) {
             roundId: round.id,
             reason: round.reason,
           });
+        }
+        // Piramide: entrega a cada jogador a SUA mão (privada, nunca em broadcast).
+        if (round.gameTypeKey === 'piramide') {
+          for (const p of room.players.values()) {
+            if (!p.connected) continue;
+            const cards = game.piramideHand(room, p.id);
+            if (cards) io.to(p.id).emit('piramide_hand', { roundId: round.id, cards });
+          }
         }
         // Só o tipo (para animações) — o resto vai no room_state já anonimizado.
         io.to(room.code).emit('round_started', { gameTypeKey: round.gameTypeKey });
@@ -211,7 +224,53 @@ export function registerSocketHandlers(io) {
     socket.on('continue_round', (_payload, ack) => {
       try {
         const room = requireRoom(socket);
-        game.continueRound(room, socket.data.playerId);
+        const { rewarded } = game.continueRound(room, socket.data.playerId);
+        // Piramide: flash de "+1 vida" a quem fez beber mais.
+        for (const w of rewarded || []) {
+          io.to(room.code).emit('action_result', { effect: { type: 'vida_extra', playerId: w.id, name: w.name } });
+        }
+        broadcastState(io, room.code);
+        if (typeof ack === 'function') ack({ ok: true });
+      } catch (err) {
+        handleError(socket, ack, err);
+      }
+    });
+
+    // ----- Piramide (Desconfia) -----
+    const piramideEvents = {
+      piramide_ready: (room, pid) => game.piramideReady(room, pid),
+      piramide_flip: (room, pid) => game.piramideFlip(room, pid),
+      piramide_pass: (room, pid) => game.piramidePass(room, pid),
+      piramide_next: (room, pid) => game.piramideNext(room, pid),
+    };
+    for (const [event, fn] of Object.entries(piramideEvents)) {
+      socket.on(event, (_payload, ack) => {
+        try {
+          const room = requireRoom(socket);
+          fn(room, socket.data.playerId);
+          broadcastState(io, room.code);
+          if (typeof ack === 'function') ack({ ok: true });
+        } catch (err) {
+          handleError(socket, ack, err);
+        }
+      });
+    }
+
+    socket.on('piramide_assign', ({ targetId } = {}, ack) => {
+      try {
+        const room = requireRoom(socket);
+        game.piramideAssign(room, socket.data.playerId, targetId);
+        broadcastState(io, room.code);
+        if (typeof ack === 'function') ack({ ok: true });
+      } catch (err) {
+        handleError(socket, ack, err);
+      }
+    });
+
+    socket.on('piramide_respond', ({ decision } = {}, ack) => {
+      try {
+        const room = requireRoom(socket);
+        game.piramideRespond(room, socket.data.playerId, decision);
         broadcastState(io, room.code);
         if (typeof ack === 'function') ack({ ok: true });
       } catch (err) {
