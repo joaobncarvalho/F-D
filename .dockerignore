@@ -1,0 +1,12 @@
+# Não enviar para o contexto de build (mais rápido e imagem mais limpa)
+**/node_modules
+**/dist
+**/.vite
+**/.env
+**/.env.local
+**/*.log
+.git
+.claude
+*.md
+server/prisma
+server/db
