@@ -18,6 +18,8 @@ import { AppError } from './errors.js';
 const DEFAULT_LIVES = 3;
 const MIN_LIVES = 1;
 const MAX_LIVES = 5;
+// Leve · Picante (+18/festa) · Hardcore (mesmo embaraçoso, pior que picante).
+const INTENSITIES = ['leve', 'picante', 'hardcore'];
 
 function connectedOrder(room) {
   return [...room.players.values()]
@@ -360,7 +362,7 @@ export function initGame(room, { lives = DEFAULT_LIVES, intensity = 'leve' } = {
 
   room.game = {
     phase: 'prep',
-    intensity: intensity === 'picante' ? 'picante' : 'leve',
+    intensity: INTENSITIES.includes(intensity) ? intensity : 'leve',
     startingLives: n,
     questions: [], // { id, targetPlayerId, authorPlayerId, text, used }
     secrets: [], // { id, authorPlayerId, text, used }

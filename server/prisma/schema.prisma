@@ -21,6 +21,7 @@ enum RoomStatus {
 enum Intensity {
   leve
   picante
+  hardcore
 }
 
 enum RoundStatus {

@@ -120,7 +120,8 @@ export default function Game(props) {
       <div className="flex items-center justify-between text-xs text-white/40">
         <span>Ronda {g.roundCount || 0}</span>
         <span className="uppercase tracking-wide">
-          {g.intensity === 'picante' ? '🌶️ Picante' : '🍃 Leve'}
+          {{ leve: '🍃 Leve', picante: '🌶️ Picante +18', hardcore: '🔥 Hardcore' }[g.intensity] ||
+            '🍃 Leve'}
         </span>
       </div>
 

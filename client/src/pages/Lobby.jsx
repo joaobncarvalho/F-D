@@ -159,28 +159,29 @@ export default function Lobby({ room, youId, messages, error, onSendMessage, onS
                 ))}
               </div>
             </div>
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col gap-2">
               <span className="text-sm text-white/60">Intensidade</span>
-              <div className="flex gap-1">
-                <button
-                  onClick={() => {
-                    sfx.click();
-                    setIntensity('leve');
-                  }}
-                  className={`fd-chip ${intensity === 'leve' ? 'fd-chip-on' : ''}`}
-                >
-                  🍃 Leve
-                </button>
-                <button
-                  onClick={() => {
-                    sfx.click();
-                    setIntensity('picante');
-                  }}
-                  className={`fd-chip ${intensity === 'picante' ? 'fd-chip-on' : ''}`}
-                >
-                  🌶️ Picante
-                </button>
+              <div className="flex gap-1 flex-wrap">
+                {[
+                  { key: 'leve', label: '🍃 Leve' },
+                  { key: 'picante', label: '🌶️ Picante +18' },
+                  { key: 'hardcore', label: '🔥 Hardcore' },
+                ].map((it) => (
+                  <button
+                    key={it.key}
+                    onClick={() => {
+                      sfx.click();
+                      setIntensity(it.key);
+                    }}
+                    className={`fd-chip ${intensity === it.key ? 'fd-chip-on' : ''}`}
+                  >
+                    {it.label}
+                  </button>
+                ))}
               </div>
+              {intensity === 'hardcore' && (
+                <p className="text-xs text-rose-300/80">🔥 Mesmo embaraçoso e sem filtros — só para grupos à vontade.</p>
+              )}
             </div>
           </div>
           <button
