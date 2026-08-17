@@ -15,6 +15,13 @@ body,
   height: 100%;
 }
 
+/* Mobile-first: sobe a base tipográfica no telemóvel (tudo em rem escala junto). */
+@media (max-width: 480px) {
+  html {
+    font-size: 17.5px;
+  }
+}
+
 body {
   margin: 0;
   background: var(--fd-bg);

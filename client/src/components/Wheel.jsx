@@ -5,6 +5,9 @@ import { motion } from 'framer-motion';
  * Roda de seleção do tipo de jogo (SVG animado).
  * O servidor é a autoridade: recebe `targetKey` e a roda anima até lá parar.
  *
+ * Tamanho RESPONSIVO: acompanha a largura do ecrã (min(86vw, 400px)) — a SVG
+ * usa viewBox fixo (0..200), por isso escala sem distorcer.
+ *
  * props:
  *   segments  [{ key, label, color, emoji }]  (ordem estável!)
  *   targetKey string | null   — tipo escolhido pelo servidor
@@ -32,27 +35,27 @@ export default function Wheel({ segments, targetKey, spinning, onDone }) {
   }, [spinning, targetKey]);
 
   return (
-    <div className="relative mx-auto" style={{ width: 260, height: 260 }}>
+    <div className="relative mx-auto" style={{ width: 'min(86vw, 400px)', aspectRatio: '1 / 1' }}>
       {/* Halo com brilho */}
       <div
-        className="absolute inset-[-10px] rounded-full"
+        className="absolute inset-[-12px] rounded-full"
         style={{
           zIndex: 0,
           background:
             'conic-gradient(from 0deg, #ff3d8b, #9b5cff, #ffb020, #1fd3b6, #ff3d8b)',
-          filter: 'blur(14px)',
+          filter: 'blur(16px)',
           opacity: 0.5,
         }}
       />
       {/* Ponteiro fixo no topo */}
       <div
-        className="absolute left-1/2 -translate-x-1/2 -top-2 z-10"
+        className="absolute left-1/2 -translate-x-1/2 -top-1 z-10"
         style={{
           width: 0,
           height: 0,
-          borderLeft: '13px solid transparent',
-          borderRight: '13px solid transparent',
-          borderTop: '22px solid #ffffff',
+          borderLeft: '15px solid transparent',
+          borderRight: '15px solid transparent',
+          borderTop: '26px solid #ffffff',
           filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.5))',
         }}
       />
@@ -60,9 +63,9 @@ export default function Wheel({ segments, targetKey, spinning, onDone }) {
         animate={{ rotate: rot }}
         transition={{ duration: spinning ? 3.4 : 0, ease: [0.16, 1, 0.3, 1] }}
         onAnimationComplete={() => spinning && onDone?.()}
-        style={{ position: 'relative', zIndex: 1, width: 260, height: 260, transformOrigin: 'center' }}
+        style={{ position: 'relative', zIndex: 1, width: '100%', height: '100%', transformOrigin: 'center' }}
       >
-        <svg viewBox="0 0 200 200" width="260" height="260">
+        <svg viewBox="0 0 200 200" width="100%" height="100%" style={{ display: 'block' }}>
           {segments.map((s, i) => {
             const a0 = (-90 + i * seg) * (Math.PI / 180);
             const a1 = (-90 + (i + 1) * seg) * (Math.PI / 180);
@@ -86,7 +89,7 @@ export default function Wheel({ segments, targetKey, spinning, onDone }) {
                   x={lx}
                   y={ly}
                   fill="#0f0f14"
-                  fontSize="9"
+                  fontSize="10"
                   fontWeight="700"
                   textAnchor="middle"
                   dominantBaseline="middle"
@@ -97,7 +100,7 @@ export default function Wheel({ segments, targetKey, spinning, onDone }) {
               </g>
             );
           })}
-          <circle cx={C} cy={C} r="14" fill="#0f0f14" stroke="#f5f5f7" strokeWidth="2" />
+          <circle cx={C} cy={C} r="15" fill="#0f0f14" stroke="#f5f5f7" strokeWidth="2" />
         </svg>
       </motion.div>
     </div>

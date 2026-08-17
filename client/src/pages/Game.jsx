@@ -120,34 +120,36 @@ export default function Game(props) {
       </div>
 
       {(g.phase === 'wheel' || spinning) && (
-        <Wheel
-          segments={TYPES}
-          targetKey={round?.gameTypeKey}
-          spinning={spinning}
-          onDone={() => setAnimatedRoundId(round.id)}
-        />
-      )}
+        <div className="flex-1 flex flex-col items-center justify-center gap-5 py-2">
+          <Wheel
+            segments={TYPES}
+            targetKey={round?.gameTypeKey}
+            spinning={spinning}
+            onDone={() => setAnimatedRoundId(round.id)}
+          />
 
-      {g.phase === 'wheel' && !spinning && (
-        <div className="flex flex-col gap-3">
-          {isSpinner ? (
-            <>
-              <p className="text-center text-lg font-semibold">É a tua vez! 🎉</p>
-              <button
-                onClick={() => {
-                  sfx.click();
-                  props.onSpin();
-                }}
-                className="fd-btn fd-btn-primary text-lg"
-              >
-                🎡 Girar a roda
-              </button>
-            </>
-          ) : (
-            <p className="text-center text-white/50 py-4">
-              Vez de <span className="font-bold text-white">{currentPlayer?.name}</span> — à espera
-              que gire a roda…
-            </p>
+          {g.phase === 'wheel' && !spinning && (
+            <div className="flex flex-col gap-3 w-full">
+              {isSpinner ? (
+                <>
+                  <p className="text-center text-2xl font-extrabold">É a tua vez! 🎉</p>
+                  <button
+                    onClick={() => {
+                      sfx.click();
+                      props.onSpin();
+                    }}
+                    className="fd-btn fd-btn-primary text-xl py-4"
+                  >
+                    🎡 Girar a roda
+                  </button>
+                </>
+              ) : (
+                <p className="text-center text-white/60 py-2 text-lg">
+                  Vez de <span className="font-bold text-white">{currentPlayer?.name}</span> — à
+                  espera que gire a roda…
+                </p>
+              )}
+            </div>
           )}
         </div>
       )}
