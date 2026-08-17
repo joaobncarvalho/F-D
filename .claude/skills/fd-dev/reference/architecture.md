@@ -134,7 +134,7 @@ Objetivo: a app nunca fala Prisma diretamente nos handlers. Introduzir um
 | `piramide_next` | — | Piramide (`resolved`). Flipper ou host avança para a carta seguinte. |
 | `vasco_start_clues` | — | Jogo do Vasco (`reveal`). Host ou quem girou arranca a ronda de pistas. |
 | `vasco_clue_done` | — | Vasco (`clues`). Quem está à vez (ou host/quem girou) marca que já deu a pista. |
-| `vasco_guess` | `{ word }` | Vasco (`guessing`). **Só um Vasco**. Adivinha uma palavra do quadro; todos os Vascos adivinharam → resolve. |
+| `vasco_judge` | `{ impostorId, correct }` | Vasco (`guessing`). **Host ou quem girou** marca se cada Vasco (revelado nesta fase) acertou o palpite (dito em voz alta). Todos marcados → resolve. |
 | `skip_turn` | — | Só host, fase `prompt`. Salta a vez sem penalização. |
 | `end_game` | — | Só host. Calcula stats, emite `game_over`. |
 | `reset_game` | — | Só host. Volta ao lobby (`game=null`), emite `back_to_lobby`. |
@@ -174,10 +174,12 @@ Objetivo: a app nunca fala Prisma diretamente nos handlers. Introduzir um
 > viradas**), a carta virada, a atribuição e o veredicto — mas **nunca as mãos**
 > (essas só via `piramide_hand` privado). Match por número; golos por nível 2→10.
 > **Vasco** (`phase='vasco'`): `round.substate` ∈ `reveal | clues | guessing |
-> result`. O `round` leva o **quadro** (tema + 9 palavras, público), o turno de
-> pistas (`clueCurrentId`), contagens (`guessers`, `impostorCount`) e o `result`
-> só no fim — mas **nunca** a palavra secreta (`secretWord`) nem quem é Vasco
-> (`impostorIds`); isso só via `vasco_role` privado. Acerta → +1 vida; falha → 5 golos.
+> result`. Público: só o **tema** (`theme`) — a única pista do Vasco; as 9
+> palavras **nunca** vão na rede. O grupo recebe a palavra por `vasco_role`
+> privado (Vasco recebe `word:null`). Identidade dos Vascos escondida em
+> `reveal/clues` (só `impostorCount`) e **revelada em `guessing`** (`impostors`)
+> para o host marcar. O Vasco palpita **em voz alta** e o host marca via
+> `vasco_judge`. Acerta → +1 vida; falha → 5 golos.
 > **Conteúdo dos prompts:** `repo.js` (async, seam de integração) → hoje lê de
 > `content/prompts.data.js`; trocar por Prisma sem mudar `game.js`/handlers.
 

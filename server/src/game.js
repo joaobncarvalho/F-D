@@ -245,12 +245,13 @@ async function dealVasco(room, round) {
   const nImp = Math.min(k, Math.max(1, order.length - 1)); // pelo menos 1 do grupo não-Vasco
   const impostorIds = shuffle([...order]).slice(0, nImp);
 
-  round.board = { theme: board?.theme || '—', words }; // PÚBLICO
-  round.secretWord = secret; // PRIVADO (só o grupo)
-  round.impostorIds = impostorIds; // PRIVADO
+  round.board = { theme: board?.theme || '—', words }; // só o TEMA é público; words fica no servidor
+  round.secretWord = secret; // PRIVADO (só o grupo o recebe por vasco_role)
+  round.impostorIds = impostorIds; // PRIVADO durante reveal/clues
+  round.impostorInfo = impostorIds.map((id) => ({ id, name: nameOf(room, id) })); // revelado no guessing
   round.clueOrder = order;
   round.clueIdx = 0;
-  round.guesses = {}; // impostorId -> palavra
+  round.judged = {}; // impostorId -> boolean (o host marcou "acertou"?)
   round.result = null;
   round.substate = 'reveal';
 }
@@ -304,15 +305,20 @@ export function vascoClueDone(room, playerId) {
   return r;
 }
 
-/** Um Vasco adivinha uma palavra do quadro. Todos os Vascos ligados adivinharam → resolve. */
-export function vascoGuess(room, playerId, word) {
+/**
+ * O Vasco diz o palpite EM VOZ ALTA; o host (ou quem girou) marca se acertou.
+ * Quando todos os Vascos ligados estiverem marcados, resolve.
+ */
+export function vascoJudge(room, judgeId, impostorId, correct) {
   const r = requireVasco(room, ['guessing']);
-  if (!r.impostorIds.includes(playerId)) throw new AppError('Só o Vasco adivinha 🕵️');
-  if (!r.board.words.includes(word)) throw new AppError('Escolhe uma palavra do quadro.');
-  r.guesses[playerId] = word;
+  const judge = room.players.get(judgeId);
+  if (!judge || (!judge.isHost && judgeId !== room.game.currentPlayerId))
+    throw new AppError('Só o host ou quem girou pode marcar.');
+  if (!r.impostorIds.includes(impostorId)) throw new AppError('Esse jogador não é Vasco.');
+  r.judged[impostorId] = !!correct;
 
   const pending = r.impostorIds.filter(
-    (id) => room.players.get(id)?.connected && r.guesses[id] === undefined
+    (id) => room.players.get(id)?.connected && r.judged[id] === undefined
   );
   let finalized = false;
   let winners = [];
@@ -326,16 +332,16 @@ export function vascoGuess(room, playerId, word) {
 function buildVascoResult(room) {
   const g = room.game;
   const r = g.round;
-  const impostors = r.impostorIds.map((id) => {
-    const guess = r.guesses[id] ?? null;
-    const correct = guess === r.secretWord;
-    return { id, name: nameOf(room, id), guess, correct };
-  });
+  const impostors = r.impostorIds.map((id) => ({
+    id,
+    name: nameOf(room, id),
+    correct: r.judged[id] === true, // não marcado → falhou
+  }));
   const winners = [];
   for (const imp of impostors) {
     const p = room.players.get(imp.id);
     if (imp.correct) {
-      if (p) p.lives += 1; // Vasco ganhou → +1 vida
+      if (p) p.lives += 1; // Vasco acertou → +1 vida
       winners.push({ id: imp.id, name: imp.name });
     } else {
       drink(g, imp.id, 1); // Vasco falhou → bebe 5 golos
@@ -902,14 +908,16 @@ function serializeRound(g) {
   }
   if (r.gameTypeKey === 'vasco') {
     base.substate = r.substate; // reveal | clues | guessing | result
-    base.board = r.board; // público (tema + 9 palavras)
+    base.theme = r.board.theme; // só o TEMA é público (a pista do Vasco); as 9 palavras NÃO vão
     base.clueOrder = r.clueOrder;
     base.clueIdx = r.clueIdx;
     base.clueCurrentId = r.substate === 'clues' ? r.clueOrder[r.clueIdx] || null : null;
-    base.guessers = Object.keys(r.guesses || {}); // quem já adivinhou (não o quê)
-    base.impostorCount = r.impostorIds.length; // quantos Vascos (não quem)
-    base.result = r.substate === 'result' ? r.result : null; // palavra/Vascos só aqui
-    // r.secretWord e r.impostorIds NUNCA vão no broadcast antes do result.
+    base.judgedIds = Object.keys(r.judged || {}); // Vascos já marcados pelo host
+    base.impostorCount = r.impostorIds.length; // quantos Vascos (não quem) — em reveal/clues
+    // A identidade dos Vascos só é revelada a partir da fase de palpite (guessing).
+    base.impostors = ['guessing', 'result'].includes(r.substate) ? r.impostorInfo : null;
+    base.result = r.substate === 'result' ? r.result : null; // palavra só aqui
+    // r.secretWord e r.board.words NUNCA vão no broadcast antes do result.
   }
   return base;
 }

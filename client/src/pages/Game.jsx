@@ -223,7 +223,7 @@ export default function Game(props) {
             canControl={isHost || isSpinner}
             onStartClues={props.onVascoStartClues}
             onClueDone={props.onVascoClueDone}
-            onGuess={props.onVascoGuess}
+            onJudge={props.onVascoJudge}
             onReveal={props.onReveal}
             onContinue={props.onContinue}
           />
@@ -961,28 +961,8 @@ function PiramideCard({
 
 /* ---------------- Jogo do Vasco (Impostor) ---------------- */
 
-function WordBoard({ board, secret }) {
-  return (
-    <div>
-      <p className="text-[11px] uppercase tracking-wide text-white/40 mb-1">📋 {board.theme}</p>
-      <div className="grid grid-cols-3 gap-1.5">
-        {board.words.map((w) => (
-          <div
-            key={w}
-            className={`rounded-lg px-2 py-2 text-center text-sm ${
-              w === secret ? 'bg-teal-500/30 ring-2 ring-teal-400 font-bold text-teal-200' : 'bg-white/5'
-            }`}
-          >
-            {w}
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function VascoCard({ round, room, youId, role, canControl, onStartClues, onClueDone, onGuess, onReveal, onContinue }) {
-  const board = round.board;
+function VascoCard({ round, room, youId, role, canControl, onStartClues, onClueDone, onJudge, onContinue }) {
+  const theme = round.theme;
   const isImpostor = role?.isImpostor;
   const secretWord = role?.word || null; // só o grupo tem a palavra
   const sub = round.substate;
@@ -1008,22 +988,29 @@ function VascoCard({ round, room, youId, role, canControl, onStartClues, onClueD
               <p className="text-4xl">🕵️</p>
               <p className="text-xl font-extrabold text-orange-300">És o VASCO!</p>
               <p className="text-sm text-white/60">
-                Ninguém pode saber. Ouve as pistas dos outros e descobre a palavra do grupo.
+                Não sabes a palavra. A tua única pista é o tema — ouve as pistas dos outros e
+                descobre-a.
+              </p>
+              <p className="text-lg">
+                Tema: <b className="text-teal-300">{theme}</b>
               </p>
             </>
           ) : (
             <>
               <p className="text-sm text-white/60">A palavra do grupo é:</p>
-              <p className="text-2xl font-extrabold text-teal-300">{secretWord}</p>
+              <p className="text-3xl font-extrabold text-teal-300">{secretWord}</p>
+              <p className="text-sm">
+                Tema (o Vasco só sabe isto): <b className="text-teal-300">{theme}</b>
+              </p>
               <p className="text-xs text-white/50">
-                Há {round.impostorCount} Vasco(s) infiltrado(s) 🕵️ — dá pistas sem entregar a palavra!
+                Há {round.impostorCount} Vasco(s) infiltrado(s) 🕵️ — dá pistas sem entregar a
+                palavra!
               </p>
             </>
           )
         ) : (
           <p className="text-sm text-white/40">A receber o teu papel…</p>
         )}
-        <WordBoard board={board} secret={secretWord} />
         {canControl && (
           <button onClick={onStartClues} className="fd-btn fd-btn-primary mt-1">
             Toca a dar pistas →
@@ -1039,8 +1026,15 @@ function VascoCard({ round, room, youId, role, canControl, onStartClues, onClueD
     const isMyTurn = round.clueCurrentId === youId;
     return (
       <CardShell typeKey="vasco">
-        <WordBoard board={board} secret={secretWord} />
         <p className="text-base">
+          Tema: <b className="text-teal-300">{theme}</b>
+        </p>
+        {!isImpostor && secretWord && (
+          <p className="text-sm text-white/60">
+            Palavra: <b className="text-teal-300">{secretWord}</b>
+          </p>
+        )}
+        <p className="text-base mt-1">
           Pista de <b className="text-white">{cur?.name || '…'}</b>
           {isMyTurn && <span className="text-orange-300"> (és tu!)</span>}
         </p>
@@ -1062,44 +1056,62 @@ function VascoCard({ round, room, youId, role, canControl, onStartClues, onClueD
     );
   }
 
-  // --- Adivinha ---
+  // --- Palpite: os Vascos são revelados, dizem em voz alta, o host marca ---
   if (sub === 'guessing') {
-    const iGuessed = round.guessers?.includes(youId);
-    if (isImpostor) {
-      return (
-        <CardShell typeKey="vasco">
-          <p className="text-lg font-bold text-orange-300">🕵️ Qual é a palavra do grupo?</p>
-          {iGuessed ? (
-            <p className="text-sm text-emerald-300 font-semibold">Escolheste! À espera dos outros Vascos…</p>
-          ) : (
-            <div className="grid grid-cols-3 gap-1.5">
-              {board.words.map((w) => (
-                <button
-                  key={w}
-                  onClick={() => {
-                    sfx.click();
-                    onGuess(w);
-                  }}
-                  className="rounded-lg px-2 py-2 text-center text-sm bg-white/5 hover:bg-white/15 active:scale-95 transition"
-                >
-                  {w}
-                </button>
-              ))}
-            </div>
-          )}
-        </CardShell>
-      );
-    }
+    const impostors = round.impostors || [];
+    const judged = round.judgedIds || [];
+    const iAmVasco = impostors.some((i) => i.id === youId);
     return (
       <CardShell typeKey="vasco">
-        <WordBoard board={board} secret={secretWord} />
+        <p className="text-lg font-bold text-orange-300">🕵️ Hora do palpite!</p>
         <p className="text-sm text-white/60">
-          Os Vascos estão a adivinhar… {round.guessers?.length || 0}/{round.impostorCount} 🕵️
+          {impostors.length > 1 ? 'Os Vascos dizem' : 'O Vasco diz'} a palavra em voz alta. Tema:{' '}
+          <b className="text-teal-300">{theme}</b>.
         </p>
-        {canControl && (
-          <button onClick={onReveal} className="fd-btn fd-btn-ghost py-2 text-sm">
-            Revelar já
-          </button>
+        {iAmVasco && (
+          <p className="text-sm text-orange-300 font-semibold">És o Vasco — diz o teu palpite! 🗣️</p>
+        )}
+        {canControl ? (
+          <div className="flex flex-col gap-2 mt-1">
+            <p className="text-xs text-white/50">Marca cada Vasco:</p>
+            {impostors.map((imp) => {
+              const done = judged.includes(imp.id);
+              return (
+                <div key={imp.id} className="flex items-center justify-between gap-2 fd-card px-3 py-2">
+                  <span className="font-semibold">
+                    🕵️ {imp.name}
+                    {done && ' ✓'}
+                  </span>
+                  <span className="flex gap-2">
+                    <button
+                      disabled={done}
+                      onClick={() => {
+                        sfx.click();
+                        onJudge(imp.id, true);
+                      }}
+                      className="fd-btn fd-btn-success py-1.5 px-3 text-sm"
+                    >
+                      Acertou
+                    </button>
+                    <button
+                      disabled={done}
+                      onClick={() => {
+                        sfx.click();
+                        onJudge(imp.id, false);
+                      }}
+                      className="fd-btn fd-btn-danger py-1.5 px-3 text-sm"
+                    >
+                      Falhou
+                    </button>
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <p className="text-sm text-white/50 mt-1">
+            O host confirma quem acertou… {judged.length}/{impostors.length}
+          </p>
         )}
       </CardShell>
     );
@@ -1110,11 +1122,11 @@ function VascoCard({ round, room, youId, role, canControl, onStartClues, onClueD
   return (
     <CardShell typeKey="vasco">
       <p className="text-sm text-white/60">A palavra era:</p>
-      <p className="text-2xl font-extrabold text-teal-300">{r?.secretWord}</p>
+      <p className="text-3xl font-extrabold text-teal-300">{r?.secretWord}</p>
       <ul className="flex flex-col gap-1 text-sm mt-1">
         {r?.impostors?.map((imp) => (
           <li key={imp.id} className={imp.correct ? 'text-emerald-300 font-semibold' : 'text-amber-300'}>
-            🕵️ <b>{imp.name}</b> disse “{imp.guess || '—'}” —{' '}
+            🕵️ <b>{imp.name}</b> —{' '}
             {imp.correct ? 'acertou! +1 vida 💚' : `falhou, bebe ${r.golos} golos 🍺`}
           </li>
         ))}

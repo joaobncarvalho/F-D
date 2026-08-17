@@ -310,10 +310,10 @@ export function registerSocketHandlers(io) {
       });
     }
 
-    socket.on('vasco_guess', ({ word } = {}, ack) => {
+    socket.on('vasco_judge', ({ impostorId, correct } = {}, ack) => {
       try {
         const room = requireRoom(socket);
-        const { finalized, winners } = game.vascoGuess(room, socket.data.playerId, word);
+        const { finalized, winners } = game.vascoJudge(room, socket.data.playerId, impostorId, correct);
         // Se resolveu, flash de "+1 vida" a cada Vasco que acertou.
         if (finalized) {
           for (const w of winners) {

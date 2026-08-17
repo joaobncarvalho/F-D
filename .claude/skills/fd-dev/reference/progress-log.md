@@ -5,6 +5,35 @@
 
 ---
 
+## 2026-08-17 — Vasco v2 (só o tema, host marca) + fixes de animação/mobile
+
+**Fix animação (reportado):** o efeito de reveal (confetti+som) disparava para
+qualquer `substate === 'reveal'`; o Vasco usa 'reveal' para MOSTRAR O PAPEL →
+confetti por cima do ecrã ao calhar o Vasco. Excluído o vasco desse efeito
+(celebração do Vasco é no `result`). `client/src/pages/Game.jsx`.
+
+**Mobile (reportado "tudo pequeno"):** roda passou de 260px fixos para
+`min(86vw, 400px)` (responsiva, centrada H+V na fase da roda), ponteiro/labels
+maiores; botão Girar e textos aumentados; base tipográfica 17.5px em ≤480px.
+
+**Vasco v2 (pedido do João):** o Vasco deixa de ver as 9 palavras — a sua única
+pista passa a ser o **tema** (ex.: 'Animais'). Palpita **em voz alta** e o **host
+marca** acertou/falhou (`vasco_judge`), em vez de escolher no quadro. A identidade
+dos Vascos fica escondida em reveal/clues e é **revelada na fase de palpite** para
+o host poder marcar. Palavra secreta e 9 palavras nunca no broadcast (tema é
+público). Acerta → +1 vida; falha → 5 golos. Ficheiros: `game.js` (dealVasco +
+impostorInfo, vascoJudge substitui vascoGuess, serialização por tema), `socket.js`
+(`vasco_judge`), `App.jsx`/`Game.jsx` (VascoCard reescrito, WordBoard removido).
+Smoke test (acerta/falha, anonimato por fase, não-host bloqueado) ✓.
+
+**A seguir (decidido, ainda por fazer):**
+- **Intensidade** Leve · Picante(+18/festa) · **Hardcore** (novo, pior): falta
+  enum/UI/filtragem + conteúdo.
+- **Página de admin** para escrever desafios (Boca Calada/Intrigas/Desafios) →
+  **precisa das connection strings da Supabase** (BD do colega). Bloqueado até lá.
+
+---
+
 ## 2026-08-17 — Deploy (Railway) + fix: sala fechava ao partilhar o código
 
 **Deploy:** imagem única no Railway — o Express passa a servir `client/dist`
