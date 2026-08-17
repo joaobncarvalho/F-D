@@ -28,16 +28,18 @@ export default function Countdown({ onDone }) {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="flex-1 flex items-center justify-center"
+      className="flex-1 flex items-center justify-center relative"
     >
-      <AnimatePresence mode="wait">
+      {/* Sem mode="wait": os passos cruzam-se (crossfade) e nenhum número é
+          saltado; posição absoluta para não haver salto de layout na sobreposição. */}
+      <AnimatePresence>
         <motion.div
           key={i}
           initial={{ scale: 0.3, opacity: 0, rotate: -15 }}
           animate={{ scale: 1, opacity: 1, rotate: 0 }}
           exit={{ scale: 1.8, opacity: 0 }}
-          transition={{ type: 'spring', stiffness: 260, damping: 16 }}
-          className="fd-title fd-neon text-7xl font-extrabold text-pink-400 text-center"
+          transition={{ type: 'spring', stiffness: 260, damping: 16, opacity: { duration: 0.35 } }}
+          className="absolute inset-0 flex items-center justify-center fd-title fd-neon text-7xl font-extrabold text-pink-400 text-center"
         >
           {steps[Math.min(i, steps.length - 1)]}
         </motion.div>
