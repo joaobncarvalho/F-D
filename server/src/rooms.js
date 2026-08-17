@@ -19,6 +19,9 @@ export { AppError }; // re-exportado para compatibilidade (socket.js importa daq
 const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const CODE_LENGTH = 4;
 const DEFAULT_LIVES = 3;
+// Tempo que uma sala VAZIA (ninguém ligado) sobrevive antes de ser apagada.
+// Cobre o caso comum: criar sala → sair da app para partilhar o código → voltar.
+const EMPTY_ROOM_GRACE_MS = Number(process.env.EMPTY_ROOM_GRACE_MS) || 120_000;
 
 export class RoomManager {
   constructor() {
@@ -78,6 +81,7 @@ export class RoomManager {
     );
     if (taken) throw new AppError('Esse nome já está a ser usado nesta sala.');
 
+    this.#cancelCleanup(room); // alguém entrou → cancela remoção pendente
     const player = this.#addPlayer(room, name, /* isHost */ false);
     return { room, player };
   }
@@ -109,10 +113,33 @@ export class RoomManager {
 
     const anyoneConnected = [...room.players.values()].some((p) => p.connected);
     if (!anyoneConnected) {
-      this.rooms.delete(room.code);
-      return { room: null, removed: true };
+      // Não apagar já: dar um período de graça (ex.: o host saiu para partilhar
+      // o código). Se ninguém voltar/entrar a tempo, a sala é removida no timer.
+      this.#scheduleCleanup(room);
+      return { room, removed: false, empty: true };
     }
     return { room, removed: false };
+  }
+
+  /** Agenda a remoção de uma sala vazia; cancelável se alguém (re)entrar. */
+  #scheduleCleanup(room) {
+    if (room.cleanupTimer) return; // já agendado
+    room.cleanupTimer = setTimeout(() => {
+      const cur = this.rooms.get(room.code);
+      if (!cur) return;
+      cur.cleanupTimer = null;
+      const stillEmpty = ![...cur.players.values()].some((p) => p.connected);
+      if (stillEmpty) this.rooms.delete(cur.code);
+    }, EMPTY_ROOM_GRACE_MS);
+    room.cleanupTimer.unref?.(); // não segurar o processo por causa deste timer
+  }
+
+  /** Cancela a remoção agendada (alguém voltou ou entrou). */
+  #cancelCleanup(room) {
+    if (room?.cleanupTimer) {
+      clearTimeout(room.cleanupTimer);
+      room.cleanupTimer = null;
+    }
   }
 
   /** Arranca o jogo (só host, ≥2 ligados, ainda no lobby). */
@@ -134,6 +161,7 @@ export class RoomManager {
     if (!room) throw new AppError('A sala já não existe.');
     const player = room.players.get(playerId);
     if (!player) throw new AppError('Já não fazes parte desta sala.');
+    this.#cancelCleanup(room); // o jogador voltou → cancela remoção pendente
     player.connected = true;
     return { room, player };
   }

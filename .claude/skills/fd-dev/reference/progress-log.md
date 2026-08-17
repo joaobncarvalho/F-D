@@ -5,6 +5,29 @@
 
 ---
 
+## 2026-08-17 — Deploy (Railway) + fix: sala fechava ao partilhar o código
+
+**Deploy:** imagem única no Railway — o Express passa a servir `client/dist`
+(fallback SPA; Socket.io intercepta `/socket.io/` antes, por isso o catch-all não
+lhe mexe). CORS aceita `*` se `CLIENT_ORIGIN` não estiver definido, ou lista por
+vírgulas. Cliente liga à própria origem em produção (sem `VITE_SERVER_URL`) e
+mantém `localhost:3001` em dev; fallback de `polling`. `Dockerfile` multi-stage +
+`.dockerignore`. **No ar:** https://f-d.up.railway.app (health/SPA/handshake ✓).
+
+**Fix (reportado pelo João):** criar sala → sair da app para partilhar o código →
+ao voltar, a sala tinha fechado. Causa: o host ficava sozinho; ao suspender o
+separador o WebSocket caía e `handleDisconnect` apagava a sala **imediatamente**
+(ninguém ligado). Agora as salas vazias têm um **período de graça**
+(`EMPTY_ROOM_GRACE_MS`, 120 s) antes de serem removidas; `reconnect`/`joinRoom`
+cancelam a remoção pendente. Ficheiro: `server/src/rooms.js` (scheduleCleanup/
+cancelCleanup). Smoke test: sobrevive+recupera na graça · apagada se ninguém
+voltar · sobrevive se alguém entrar ✓.
+> Nota: cobre o caso "background → voltar" (a sessão fica em `sessionStorage`,
+> que sobrevive ao background). Se o browser **matar** o separador, a sessão
+> perde-se — endurecer com `localStorage` fica como melhoria futura.
+
+---
+
 ## 2026-08-17 — Jogo do Vasco (Impostor): 6.º jogo + roda a ~10% para a Piramide
 
 Segundo jogo novo pedido pelo João + afinação da roda + fix de crash.
