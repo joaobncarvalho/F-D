@@ -193,7 +193,9 @@
         { key: "picante", label: "🌶️ Picante +18" },
         { key: "hardcore", label: "🔥 Hardcore" },
       ];
-      let pass = sessionStorage.getItem("fd_admin_pass") || "";
+      // A password NÃO é persistida (sem localStorage/sessionStorage): fica só em
+      // memória enquanto a página está aberta → cada abertura/refresh exige login.
+      let pass = "";
       let types = [];
       let cache = []; // prompts do tipo filtrado (todas intensidades)
       let intFilter = "all";
@@ -314,9 +316,9 @@
       }
 
       // Eventos
-      $("enter").onclick = () => { pass = $("pass").value.trim(); sessionStorage.setItem("fd_admin_pass", pass); boot(); };
+      $("enter").onclick = () => { pass = $("pass").value.trim(); boot(); };
       $("pass").addEventListener("keydown", (e) => { if (e.key === "Enter") $("enter").click(); });
-      $("logout").onclick = () => { sessionStorage.removeItem("fd_admin_pass"); pass = ""; location.reload(); };
+      $("logout").onclick = () => { pass = ""; location.reload(); };
       $("filterType").onchange = load;
       $("add").onclick = async () => {
         $("addErr").textContent = "";
