@@ -205,10 +205,8 @@ export default function App() {
   const piramideNext = useCallback(() => socket.emit('piramide_next'), []);
   const vascoStartClues = useCallback(() => socket.emit('vasco_start_clues'), []);
   const vascoClueDone = useCallback(() => socket.emit('vasco_clue_done'), []);
-  const vascoJudge = useCallback(
-    (impostorId, correct) => socket.emit('vasco_judge', { impostorId, correct }),
-    []
-  );
+  const vascoVote = useCallback((suspectId) => socket.emit('vasco_vote', { suspectId }), []);
+  const vascoRedeem = useCallback((word) => socket.emit('vasco_redeem', { word }), []);
   const skipTurn = useCallback(() => socket.emit('skip_turn'), []);
   const endGame = useCallback(() => socket.emit('end_game'), []);
   const resetGame = useCallback(() => socket.emit('reset_game'), []);
@@ -294,7 +292,8 @@ export default function App() {
             onPiramideNext={piramideNext}
             onVascoStartClues={vascoStartClues}
             onVascoClueDone={vascoClueDone}
-            onVascoJudge={vascoJudge}
+            onVascoVote={vascoVote}
+            onVascoRedeem={vascoRedeem}
             onSkip={skipTurn}
             onEnd={endGame}
             onReset={resetGame}

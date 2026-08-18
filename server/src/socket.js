@@ -332,15 +332,28 @@ export function registerSocketHandlers(io) {
       });
     }
 
-    socket.on('vasco_judge', ({ impostorId, correct } = {}, ack) => {
+    socket.on('vasco_vote', ({ suspectId } = {}, ack) => {
       try {
         const room = requireRoom(socket);
-        const { finalized, winners } = game.vascoJudge(room, socket.data.playerId, impostorId, correct);
-        // Se resolveu, flash de "+1 vida" a cada Vasco que acertou.
+        const { finalized, winners } = game.vascoVote(room, socket.data.playerId, suspectId);
         if (finalized) {
           for (const w of winners) {
             io.to(room.code).emit('action_result', { effect: { type: 'vida_extra', playerId: w.id, name: w.name } });
           }
+        }
+        broadcastState(io, room.code);
+        if (typeof ack === 'function') ack({ ok: true });
+      } catch (err) {
+        handleError(socket, ack, err);
+      }
+    });
+
+    socket.on('vasco_redeem', ({ word } = {}, ack) => {
+      try {
+        const room = requireRoom(socket);
+        const { winners } = game.vascoRedeem(room, socket.data.playerId, word);
+        for (const w of winners) {
+          io.to(room.code).emit('action_result', { effect: { type: 'vida_extra', playerId: w.id, name: w.name } });
         }
         broadcastState(io, room.code);
         if (typeof ack === 'function') ack({ ok: true });

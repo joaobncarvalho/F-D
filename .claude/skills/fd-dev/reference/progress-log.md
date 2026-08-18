@@ -5,6 +5,34 @@
 
 ---
 
+## 2026-08-18 — Vasco v3 (votação + redenção) + fixes (flash, roda) + sugestões
+
+**Vasco v3** (pedido do João — o host tinha responsabilidades a mais, sobretudo
+sendo ele o Vasco): substitui o host-arbitra por **votação do grupo**.
+Fluxo: papéis → pistas → **`voting`** (todos votam quem é o Vasco, `vasco_vote`;
+ninguém arbitra) → apura; se o mais votado for Vasco → **`redemption`**
+(`vasco_redeem`: o Vasco apanhado escolhe a palavra do quadro para se safar) →
+`result`. Escapou ou redimiu certo → +1 vida; apanhado e falhou → 5 golos; empate
+na votação → Vascos escapam. Identidades só no `result`. Removido `vasco_judge`.
+Ficheiros: `game.js` (vascoVote/tally/vascoRedeem/buildVascoResult, serialização),
+`socket.js`, `App.jsx`, `Game.jsx` (VascoCard: voting/redemption/result).
+Smoke (apanha+certo/errado, escapa) + **e2e socket** ✓.
+
+**Fix flash −1/+1 vida:** estava centrado a tapar a roda no fim da ronda. Passa a
+aparecer no **topo** (sobre os corações), com spring, fora da roda.
+
+**Fix roda (mobile):** com 7 tipos os nomes transbordavam as fatias → a roda passa
+a mostrar **só o ícone** (maior, centrado); o nome aparece no cartão quando para.
+
+**Sugestões na preparação (💡 Sugerir):** banco curado de perguntas/segredos
+(offline, sem chave) que preenche o campo — para os indecisos. Trocável por
+geração com a API da Anthropic quando houver `ANTHROPIC_API_KEY`.
+
+**Decidido, por fazer:** votação de **intensidade** no início (maioria; empate →
+randomizer interativo) — próximo passo.
+
+---
+
 ## 2026-08-18 — Isto ou Aquilo + Buddy + Regras com duração + intensidade Caos
 
 Três mecânicas novas (pedido do João) + 4.º nível de intensidade.

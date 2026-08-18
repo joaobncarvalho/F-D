@@ -271,7 +271,10 @@ async function dealVasco(room, round) {
   round.impostorInfo = impostorIds.map((id) => ({ id, name: nameOf(room, id) })); // revelado no guessing
   round.clueOrder = order;
   round.clueIdx = 0;
-  round.judged = {}; // impostorId -> boolean (o host marcou "acertou"?)
+  round.votes = {}; // voterId -> suspectId (votação de quem é o Vasco)
+  round.accusedId = null; // mais votado (definido no tally)
+  round.accusedName = null;
+  round.redemption = null; // { by:{id,name}, word, correct } se o Vasco apanhado tentar a palavra
   round.result = null;
   round.substate = 'reveal';
 }
@@ -298,7 +301,7 @@ function skipToConnectedClue(room) {
   while (r.clueIdx < r.clueOrder.length && !room.players.get(r.clueOrder[r.clueIdx])?.connected) {
     r.clueIdx += 1;
   }
-  if (r.clueIdx >= r.clueOrder.length) r.substate = 'guessing';
+  if (r.clueIdx >= r.clueOrder.length) r.substate = 'voting'; // fim das pistas → votação
 }
 
 /** Reveal → começa a ronda de pistas (host ou quem girou). */
@@ -325,49 +328,84 @@ export function vascoClueDone(room, playerId) {
   return r;
 }
 
-/**
- * O Vasco diz o palpite EM VOZ ALTA; o host (ou quem girou) marca se acertou.
- * Quando todos os Vascos ligados estiverem marcados, resolve.
- */
-export function vascoJudge(room, judgeId, impostorId, correct) {
-  const r = requireVasco(room, ['guessing']);
-  const judge = room.players.get(judgeId);
-  if (!judge || (!judge.isHost && judgeId !== room.game.currentPlayerId))
-    throw new AppError('Só o host ou quem girou pode marcar.');
-  if (!r.impostorIds.includes(impostorId)) throw new AppError('Esse jogador não é Vasco.');
-  r.judged[impostorId] = !!correct;
+/** Votação: cada jogador vota em quem acha que é o Vasco (não em si). Todos → tally. */
+export function vascoVote(room, voterId, suspectId) {
+  const r = requireVasco(room, ['voting']);
+  const voter = room.players.get(voterId);
+  if (!voter || !voter.connected) throw new AppError('Jogador inválido.');
+  if (suspectId === voterId) throw new AppError('Não podes votar em ti próprio.');
+  if (!room.players.get(suspectId)) throw new AppError('Escolhe um jogador válido.');
+  r.votes[voterId] = suspectId;
 
-  const pending = r.impostorIds.filter(
-    (id) => room.players.get(id)?.connected && r.judged[id] === undefined
-  );
-  let finalized = false;
-  let winners = [];
-  if (!pending.length) {
-    winners = buildVascoResult(room);
-    finalized = true;
+  const allVoted = connectedOrder(room).every((p) => r.votes[p.id] !== undefined);
+  if (allVoted) return tallyVascoVotes(room);
+  return { round: r, finalized: false, winners: [] };
+}
+
+/** Apura os votos. Se o mais votado for Vasco → redenção; senão → resolve (Vascos escapam). */
+function tallyVascoVotes(room) {
+  const r = room.game.round;
+  const tally = {};
+  for (const s of Object.values(r.votes)) tally[s] = (tally[s] || 0) + 1;
+  const max = Object.values(tally).reduce((m, n) => Math.max(m, n), 0);
+  const top = Object.keys(tally).filter((id) => tally[id] === max);
+  r.accusedId = top.length === 1 ? top[0] : null; // empate → sem acusado claro
+  r.accusedName = r.accusedId ? nameOf(room, r.accusedId) : null;
+
+  if (r.accusedId && r.impostorIds.includes(r.accusedId)) {
+    r.substate = 'redemption'; // Vasco apanhado → última hipótese (adivinhar a palavra)
+    return { round: r, finalized: false, winners: [] };
   }
-  return { round: r, finalized, winners };
+  const winners = buildVascoResult(room); // ninguém apanhado → Vascos escapam
+  return { round: r, finalized: true, winners };
+}
+
+/** Redenção: o Vasco apanhado escolhe a palavra do quadro. Acerta → safa-se (+1 vida). */
+export function vascoRedeem(room, playerId, word) {
+  const r = requireVasco(room, ['redemption']);
+  if (playerId !== r.accusedId) throw new AppError('Só o Vasco apanhado pode adivinhar.');
+  if (!r.board.words.includes(word)) throw new AppError('Escolhe uma palavra do quadro.');
+  r.redemption = { by: { id: playerId, name: nameOf(room, playerId) }, word, correct: word === r.secretWord };
+  const winners = buildVascoResult(room);
+  return { round: r, finalized: true, winners };
 }
 
 function buildVascoResult(room) {
   const g = room.game;
   const r = g.round;
-  const impostors = r.impostorIds.map((id) => ({
-    id,
-    name: nameOf(room, id),
-    correct: r.judged[id] === true, // não marcado → falhou
-  }));
+  const impostors = r.impostorIds.map((id) => {
+    const caught = id === r.accusedId; // o acusado (se for Vasco)
+    // Escapou → +1 vida. Apanhado → redenção: acerta = +1 vida, falha = 5 golos.
+    const correct = caught ? !!(r.redemption && r.redemption.correct) : false;
+    const outcome = !caught || correct ? 'vida' : 'golos';
+    return { id, name: nameOf(room, id), caught, correct, outcome, golos: outcome === 'golos' ? VASCO_GOLOS : 0 };
+  });
   const winners = [];
   for (const imp of impostors) {
     const p = room.players.get(imp.id);
-    if (imp.correct) {
-      if (p) p.lives += 1; // Vasco acertou → +1 vida
+    if (imp.outcome === 'vida') {
+      if (p) p.lives += 1;
       winners.push({ id: imp.id, name: imp.name });
     } else {
-      drink(g, imp.id, 1); // Vasco falhou → bebe 5 golos
+      drink(g, imp.id, 1); // 5 golos
     }
   }
-  r.result = { secretWord: r.secretWord, theme: r.board.theme, golos: VASCO_GOLOS, impostors };
+  const voteTally = Object.entries(
+    Object.values(r.votes).reduce((m, s) => ((m[s] = (m[s] || 0) + 1), m), {})
+  )
+    .map(([id, n]) => ({ id, name: nameOf(room, id), votes: n }))
+    .sort((a, b) => b.votes - a.votes);
+
+  r.result = {
+    secretWord: r.secretWord,
+    theme: r.board.theme,
+    golos: VASCO_GOLOS,
+    accusedId: r.accusedId,
+    accusedName: r.accusedName,
+    redemption: r.redemption,
+    voteTally,
+    impostors,
+  };
   r.substate = 'result';
   return winners;
 }
@@ -694,7 +732,8 @@ export function revealResult(room, playerId) {
   if (!p || (!p.isHost && playerId !== g.currentPlayerId))
     throw new AppError('Só o host ou quem girou pode revelar.');
   if (g.phase === 'guessing' && !g.round.revealed) revealSegredos(room);
-  else if (g.phase === 'vasco' && g.round.substate === 'guessing') buildVascoResult(room);
+  else if (g.phase === 'vasco' && g.round.substate === 'voting') tallyVascoVotes(room);
+  else if (g.phase === 'vasco' && g.round.substate === 'redemption') buildVascoResult(room); // força: sem redenção → falha
   else throw new AppError('Nada para revelar.');
   return g.round;
 }
@@ -993,17 +1032,20 @@ function serializeRound(g) {
     base.currentPlayerName = r.currentPlayerName;
   }
   if (r.gameTypeKey === 'vasco') {
-    base.substate = r.substate; // reveal | clues | guessing | result
-    base.theme = r.board.theme; // só o TEMA é público (a pista do Vasco); as 9 palavras NÃO vão
+    base.substate = r.substate; // reveal | clues | voting | redemption | result
+    base.theme = r.board.theme; // só o TEMA é público (a pista do Vasco); as 9 palavras NÃO vão em clues
     base.clueOrder = r.clueOrder;
     base.clueIdx = r.clueIdx;
     base.clueCurrentId = r.substate === 'clues' ? r.clueOrder[r.clueIdx] || null : null;
-    base.judgedIds = Object.keys(r.judged || {}); // Vascos já marcados pelo host
-    base.impostorCount = r.impostorIds.length; // quantos Vascos (não quem) — em reveal/clues
-    // A identidade dos Vascos só é revelada a partir da fase de palpite (guessing).
-    base.impostors = ['guessing', 'result'].includes(r.substate) ? r.impostorInfo : null;
-    base.result = r.substate === 'result' ? r.result : null; // palavra só aqui
-    // r.secretWord e r.board.words NUNCA vão no broadcast antes do result.
+    base.impostorCount = r.impostorIds.length; // quantos Vascos (não quem)
+    base.voterIds = Object.keys(r.votes || {}); // quem já votou (não em quem)
+    // O acusado só é revelado a partir da redenção; identidades no result.
+    base.accused =
+      ['redemption', 'result'].includes(r.substate) && r.accusedId
+        ? { id: r.accusedId, name: r.accusedName }
+        : null;
+    base.boardWords = ['redemption', 'result'].includes(r.substate) ? r.board.words : null; // p/ a redenção
+    base.result = r.substate === 'result' ? r.result : null; // palavra/Vascos/votos só aqui
   }
   return base;
 }

@@ -289,7 +289,8 @@ export default function Game(props) {
             canControl={isHost || isSpinner}
             onStartClues={props.onVascoStartClues}
             onClueDone={props.onVascoClueDone}
-            onJudge={props.onVascoJudge}
+            onVote={props.onVascoVote}
+            onRedeem={props.onVascoRedeem}
             onReveal={props.onReveal}
             onContinue={props.onContinue}
           />
@@ -1151,11 +1152,12 @@ function PiramideCard({
 
 /* ---------------- Jogo do Vasco (Impostor) ---------------- */
 
-function VascoCard({ round, room, youId, role, canControl, onStartClues, onClueDone, onJudge, onContinue }) {
+function VascoCard({ round, room, youId, role, canControl, onStartClues, onClueDone, onVote, onRedeem, onReveal, onContinue }) {
   const theme = round.theme;
   const isImpostor = role?.isImpostor;
   const secretWord = role?.word || null; // só o grupo tem a palavra
   const sub = round.substate;
+  const connectedCount = room.players.filter((p) => p.connected).length;
 
   // Som no resultado.
   const doneRef = useRef(null);
@@ -1246,62 +1248,76 @@ function VascoCard({ round, room, youId, role, canControl, onStartClues, onClueD
     );
   }
 
-  // --- Palpite: os Vascos são revelados, dizem em voz alta, o host marca ---
-  if (sub === 'guessing') {
-    const impostors = round.impostors || [];
-    const judged = round.judgedIds || [];
-    const iAmVasco = impostors.some((i) => i.id === youId);
+  // --- Votação: quem é o Vasco? (todos votam; o host não arbitra) ---
+  if (sub === 'voting') {
+    const voted = round.voterIds?.includes(youId);
+    const others = room.players.filter((p) => p.connected && p.id !== youId);
     return (
       <CardShell typeKey="vasco">
-        <p className="text-lg font-bold text-orange-300">🕵️ Hora do palpite!</p>
+        <p className="text-lg font-bold text-orange-300">🗳️ Quem é o Vasco?</p>
         <p className="text-sm text-white/60">
-          {impostors.length > 1 ? 'Os Vascos dizem' : 'O Vasco diz'} a palavra em voz alta. Tema:{' '}
-          <b className="text-teal-300">{theme}</b>.
+          Tema: <b className="text-teal-300">{theme}</b> — votem no infiltrado que não sabia a palavra.
         </p>
-        {iAmVasco && (
-          <p className="text-sm text-orange-300 font-semibold">És o Vasco — diz o teu palpite! 🗣️</p>
+        {voted ? (
+          <p className="text-sm text-emerald-300 font-semibold">
+            Votaste! À espera dos outros… {round.voterIds.length}/{connectedCount}
+          </p>
+        ) : (
+          <div className="flex flex-wrap gap-2 justify-center">
+            {others.map((p) => (
+              <button
+                key={p.id}
+                onClick={() => {
+                  sfx.click();
+                  onVote(p.id);
+                }}
+                className="fd-chip"
+              >
+                {p.name}
+              </button>
+            ))}
+          </div>
         )}
-        {canControl ? (
-          <div className="flex flex-col gap-2 mt-1">
-            <p className="text-xs text-white/50">Marca cada Vasco:</p>
-            {impostors.map((imp) => {
-              const done = judged.includes(imp.id);
-              return (
-                <div key={imp.id} className="flex items-center justify-between gap-2 fd-card px-3 py-2">
-                  <span className="font-semibold">
-                    🕵️ {imp.name}
-                    {done && ' ✓'}
-                  </span>
-                  <span className="flex gap-2">
-                    <button
-                      disabled={done}
-                      onClick={() => {
-                        sfx.click();
-                        onJudge(imp.id, true);
-                      }}
-                      className="fd-btn fd-btn-success py-1.5 px-3 text-sm"
-                    >
-                      Acertou
-                    </button>
-                    <button
-                      disabled={done}
-                      onClick={() => {
-                        sfx.click();
-                        onJudge(imp.id, false);
-                      }}
-                      className="fd-btn fd-btn-danger py-1.5 px-3 text-sm"
-                    >
-                      Falhou
-                    </button>
-                  </span>
-                </div>
-              );
-            })}
+        {canControl && (
+          <button onClick={onReveal} className="fd-btn fd-btn-ghost py-2 text-sm">
+            Fechar votação
+          </button>
+        )}
+      </CardShell>
+    );
+  }
+
+  // --- Redenção: o Vasco apanhado tenta adivinhar a palavra ---
+  if (sub === 'redemption') {
+    const accused = round.accused;
+    const iAmAccused = accused?.id === youId;
+    const words = round.boardWords || [];
+    return (
+      <CardShell typeKey="vasco">
+        <p className="text-lg font-bold text-orange-300">🎯 Apanhado!</p>
+        <p className="text-base">
+          <b>{accused?.name}</b> é o Vasco! Última hipótese para se safar: adivinhar a palavra do grupo.
+        </p>
+        <p className="text-sm">
+          Tema: <b className="text-teal-300">{theme}</b>
+        </p>
+        {iAmAccused ? (
+          <div className="grid grid-cols-3 gap-1.5">
+            {words.map((w) => (
+              <button
+                key={w}
+                onClick={() => {
+                  sfx.click();
+                  onRedeem(w);
+                }}
+                className="rounded-lg px-2 py-2 text-center text-sm bg-white/5 hover:bg-white/15 active:scale-95 transition"
+              >
+                {w}
+              </button>
+            ))}
           </div>
         ) : (
-          <p className="text-sm text-white/50 mt-1">
-            O host confirma quem acertou… {judged.length}/{impostors.length}
-          </p>
+          <p className="text-sm text-white/50">{accused?.name} está a tentar adivinhar… 👀</p>
         )}
       </CardShell>
     );
@@ -1309,15 +1325,33 @@ function VascoCard({ round, room, youId, role, canControl, onStartClues, onClueD
 
   // --- Resultado ---
   const r = round.result;
+  const caughtRight = r?.accusedId && r.impostors?.some((i) => i.id === r.accusedId);
   return (
     <CardShell typeKey="vasco">
       <p className="text-sm text-white/60">A palavra era:</p>
       <p className="text-3xl font-extrabold text-teal-300">{r?.secretWord}</p>
+      {r?.accusedName ? (
+        <p className="text-sm text-white/70">
+          O grupo acusou <b>{r.accusedName}</b> {caughtRight ? '— e acertou! 🎯' : '— mas falhou 🙈'}
+        </p>
+      ) : (
+        <p className="text-sm text-white/70">O grupo não chegou a acordo (empate).</p>
+      )}
+      {r?.redemption && (
+        <p className="text-sm text-white/70">
+          Redenção: {r.redemption.by.name} disse “{r.redemption.word}” —{' '}
+          {r.redemption.correct ? 'acertou e safou-se! 😎' : 'falhou 😖'}
+        </p>
+      )}
       <ul className="flex flex-col gap-1 text-sm mt-1">
         {r?.impostors?.map((imp) => (
-          <li key={imp.id} className={imp.correct ? 'text-emerald-300 font-semibold' : 'text-amber-300'}>
+          <li key={imp.id} className={imp.outcome === 'vida' ? 'text-emerald-300 font-semibold' : 'text-amber-300'}>
             🕵️ <b>{imp.name}</b> —{' '}
-            {imp.correct ? 'acertou! +1 vida 💚' : `falhou, bebe ${r.golos} golos 🍺`}
+            {imp.outcome === 'vida'
+              ? imp.caught
+                ? 'safou-se! +1 vida 💚'
+                : 'escapou! +1 vida 💚'
+              : `apanhado, bebe ${r.golos} golos 🍺`}
           </li>
         ))}
       </ul>
@@ -1366,12 +1400,18 @@ function FlashOverlay({ effect }) {
   const f = map[effect.type] || { text: '', color: '' };
   return (
     <motion.div
-      initial={{ opacity: 0, scale: 0.4 }}
-      animate={{ opacity: 1, scale: 1 }}
-      exit={{ opacity: 0, scale: 1.6 }}
-      className="fixed inset-0 flex items-center justify-center pointer-events-none z-50"
+      initial={{ opacity: 0, y: -20, scale: 0.7 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, y: -14, scale: 0.9 }}
+      transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+      className="fixed inset-x-0 top-[12vh] flex justify-center pointer-events-none z-50 px-4"
     >
-      <span className={`fd-title text-6xl font-extrabold ${f.color} drop-shadow-lg`}>{f.text}</span>
+      <span
+        className={`fd-title text-4xl sm:text-5xl font-extrabold ${f.color} drop-shadow-lg text-center`}
+        style={{ textShadow: '0 2px 18px rgba(0,0,0,0.7)' }}
+      >
+        {f.text}
+      </span>
     </motion.div>
   );
 }
