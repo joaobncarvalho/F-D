@@ -75,8 +75,8 @@ export default function Wheel({ segments, targetKey, spinning, onDone }) {
             const y1 = C + R * Math.sin(a1);
             const large = seg > 180 ? 1 : 0;
             const mid = (-90 + i * seg + seg / 2) * (Math.PI / 180);
-            const lx = C + R * 0.62 * Math.cos(mid);
-            const ly = C + R * 0.62 * Math.sin(mid);
+            const lx = C + R * 0.66 * Math.cos(mid);
+            const ly = C + R * 0.66 * Math.sin(mid);
             return (
               <g key={s.key}>
                 <path
@@ -85,17 +85,9 @@ export default function Wheel({ segments, targetKey, spinning, onDone }) {
                   stroke="#0f0f14"
                   strokeWidth="1.5"
                 />
-                <text
-                  x={lx}
-                  y={ly}
-                  fill="#0f0f14"
-                  fontSize="10"
-                  fontWeight="700"
-                  textAnchor="middle"
-                  dominantBaseline="middle"
-                  transform={`rotate(${-90 + i * seg + seg / 2 + 90} ${lx} ${ly})`}
-                >
-                  {s.emoji} {s.label}
+                {/* Só o ícone (maior, centrado): com 7+ fatias os nomes transbordavam. */}
+                <text x={lx} y={ly} fontSize="17" textAnchor="middle" dominantBaseline="central">
+                  {s.emoji}
                 </text>
               </g>
             );
