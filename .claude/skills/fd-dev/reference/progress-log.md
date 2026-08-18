@@ -5,6 +5,29 @@
 
 ---
 
+## 2026-08-18 — Eliminação: telemóvel partido + espectador + último de pé
+
+Pedido do João: quem fica sem vidas é **eliminado** (o jogo acaba para essa
+pessoa) e passa a **espectador** com uma animação de **telemóvel partido**.
+
+- **Servidor:** `player.eliminated` (novo campo, serializado). Na recusa fatal
+  (Boca Calada/Desafio) lives→0 → `eliminated=true` (efeito `eliminated`, +1 shot
+  nas stats). `connectedOrder` passa a contar só **ativos** (ligados e não
+  eliminados) → eliminados saem da rotação e das votações (guards em
+  chooseTarget/vascoVote/castGuess). **Auto-fim:** ao restar ≤1 ativo, o jogo
+  termina e `finalStats.survivor` = último de pé (`game_over`). `initGame` limpa a
+  eliminação (rematch).
+- **Cliente:** `BrokenScreen.jsx` (vidro estilhaçado em SVG, shatter+tremor,
+  pointer-events-none — vê através das fissuras) mostrado quando `you.eliminated`.
+  Flash `💀 Sem vidas!`. Vote/guess do Vasco/Segredos escondidos para eliminados
+  ("Estás fora — só a ver 🍿"). `GameOver` mostra o **🏆 sobrevivente**. Barra de
+  jogadores esbate os eliminados.
+- **Verificação:** smoke do motor (2 eliminações → auto-fim + survivor) + **e2e
+  socket** (recusas até ao fim, `eliminated` no room_state, `game_over` com
+  survivor) ✓. Client build ✓.
+
+---
+
 ## 2026-08-18 — Vasco v3 (votação + redenção) + fixes (flash, roda) + sugestões
 
 **Vasco v3** (pedido do João — o host tinha responsabilidades a mais, sobretudo

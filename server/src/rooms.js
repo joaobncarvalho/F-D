@@ -187,6 +187,7 @@ export class RoomManager {
       lives: DEFAULT_LIVES,
       isHost,
       connected: true,
+      eliminated: false, // sem vidas → espectador (telemóvel partido)
       joinedAt: new Date().toISOString(),
     };
     room.players.set(player.id, player);
@@ -210,6 +211,7 @@ export function serializeRoom(room) {
         lives: p.lives,
         isHost: p.isHost,
         connected: p.connected,
+        eliminated: p.eliminated,
       })),
     intensityVotes: room.intensityVotes || {}, // votos no lobby (playerId -> intensidade)
     // Estado de jogo (null enquanto no lobby). Serialização/anonimização em game.js.

@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Wheel from '../components/Wheel.jsx';
+import BrokenScreen from '../components/BrokenScreen.jsx';
 import { socket } from '../socket.js';
 import { sfx } from '../sfx.js';
 import { confetti, haptic } from '../confetti.js';
@@ -76,6 +77,9 @@ export default function Game(props) {
         sfx.win();
         confetti({ count: 60, power: 12 });
         haptic([30, 40, 30]);
+      } else if (effect.type === 'eliminated') {
+        sfx.shot();
+        haptic([80, 50, 80, 50, 140]);
       } else {
         sfx.reveal();
       }
@@ -312,6 +316,7 @@ export default function Game(props) {
       )}
 
       <AnimatePresence>{flash && <FlashOverlay key={flash.nonce} effect={flash} />}</AnimatePresence>
+      {you?.eliminated && <BrokenScreen />}
     </motion.div>
   );
 }
@@ -766,8 +771,9 @@ function IntrigasCard({
 
 function GuessingCard({ round, room, youId, isAuthor, canControl, onGuess, onReveal, onContinue }) {
   const [guessed, setGuessed] = useState(round.guessers?.includes(youId));
-  const connected = room.players.filter((p) => p.connected);
+  const connected = room.players.filter((p) => p.connected && !p.eliminated);
   const eligible = connected.length - (round.hasAuthor ? 1 : 0);
+  const youElim = room.players.find((p) => p.id === youId)?.eliminated;
 
   if (round.revealed) {
     const r = round.result;
@@ -805,7 +811,9 @@ function GuessingCard({ round, room, youId, isAuthor, canControl, onGuess, onRev
           <p className="text-xs text-white/50">
             De quem é? {round.guessers?.length || 0}/{eligible} adivinharam
           </p>
-          {guessed ? (
+          {youElim ? (
+            <p className="text-sm text-white/50">Estás fora — só a ver 🍿</p>
+          ) : guessed ? (
             <p className="text-sm text-emerald-300 font-semibold">Adivinhaste! ✓ A aguardar…</p>
           ) : (
             <div className="flex flex-wrap gap-2 justify-center">
@@ -1157,7 +1165,8 @@ function VascoCard({ round, room, youId, role, canControl, onStartClues, onClueD
   const isImpostor = role?.isImpostor;
   const secretWord = role?.word || null; // só o grupo tem a palavra
   const sub = round.substate;
-  const connectedCount = room.players.filter((p) => p.connected).length;
+  const activeCount = room.players.filter((p) => p.connected && !p.eliminated).length;
+  const youElim = room.players.find((p) => p.id === youId)?.eliminated;
 
   // Som no resultado.
   const doneRef = useRef(null);
@@ -1251,16 +1260,18 @@ function VascoCard({ round, room, youId, role, canControl, onStartClues, onClueD
   // --- Votação: quem é o Vasco? (todos votam; o host não arbitra) ---
   if (sub === 'voting') {
     const voted = round.voterIds?.includes(youId);
-    const others = room.players.filter((p) => p.connected && p.id !== youId);
+    const others = room.players.filter((p) => p.connected && !p.eliminated && p.id !== youId);
     return (
       <CardShell typeKey="vasco">
         <p className="text-lg font-bold text-orange-300">🗳️ Quem é o Vasco?</p>
         <p className="text-sm text-white/60">
           Tema: <b className="text-teal-300">{theme}</b> — votem no infiltrado que não sabia a palavra.
         </p>
-        {voted ? (
+        {youElim ? (
+          <p className="text-sm text-white/50">Estás fora — só a ver 🍿 ({round.voterIds.length}/{activeCount})</p>
+        ) : voted ? (
           <p className="text-sm text-emerald-300 font-semibold">
-            Votaste! À espera dos outros… {round.voterIds.length}/{connectedCount}
+            Votaste! À espera dos outros… {round.voterIds.length}/{activeCount}
           </p>
         ) : (
           <div className="flex flex-wrap gap-2 justify-center">
@@ -1373,7 +1384,7 @@ function PlayersStrip({ room, youId, currentId }) {
         <div
           key={p.id}
           className={`flex-shrink-0 fd-card px-3 py-2 text-center ${
-            p.connected ? '' : 'opacity-50'
+            p.connected && !p.eliminated ? '' : 'opacity-45'
           } ${currentId === p.id ? 'ring-2 ring-pink-500' : ''}`}
         >
           <p className="text-xs font-semibold whitespace-nowrap">
@@ -1396,6 +1407,7 @@ function FlashOverlay({ effect }) {
     vida_perdida: { text: '🍺 -1 vida!', color: 'text-rose-300' },
     shot: { text: '🥃 SHOT!', color: 'text-amber-300' },
     vida_extra: { text: '💚 +1 vida!', color: 'text-emerald-300' },
+    eliminated: { text: '💀 Sem vidas!', color: 'text-rose-400' },
   };
   const f = map[effect.type] || { text: '', color: '' };
   return (
@@ -1430,6 +1442,13 @@ function GameOver({ room, isHost, onReset, onLeave }) {
     >
       <h1 className="fd-title fd-neon text-3xl font-extrabold text-center mt-2">Fim de jogo! 🏁</h1>
       <p className="text-center text-white/50 text-sm">{stats?.roundCount || 0} rondas jogadas</p>
+
+      {stats?.survivor && (
+        <div className="fd-card p-3 text-center" style={{ background: 'rgba(31,211,182,0.12)' }}>
+          <p className="text-sm text-white/60">🏆 Último de pé</p>
+          <p className="text-2xl font-extrabold text-emerald-300">{stats.survivor.name}</p>
+        </div>
+      )}
 
       <div className="grid grid-cols-2 gap-3">
         <Award title="Bebeu mais" emoji="🍺" who={stats?.mostDrinks} metric="drinks" unit="copos" />

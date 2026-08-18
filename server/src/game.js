@@ -21,9 +21,11 @@ const MAX_LIVES = 5;
 // Leve · Picante (+18/festa) · Hardcore (mesmo embaraçoso) · Caos (expose/drama).
 const INTENSITIES = ['leve', 'picante', 'hardcore', 'caos'];
 
+// Jogadores ATIVOS (ligados e não eliminados) por ordem de entrada. É a base das
+// vezes, votações e distribuições — eliminados (sem vidas) ficam a ver.
 function connectedOrder(room) {
   return [...room.players.values()]
-    .filter((p) => p.connected)
+    .filter((p) => p.connected && !p.eliminated)
     .sort((a, b) => a.joinedAt.localeCompare(b.joinedAt));
 }
 
@@ -333,6 +335,7 @@ export function vascoVote(room, voterId, suspectId) {
   const r = requireVasco(room, ['voting']);
   const voter = room.players.get(voterId);
   if (!voter || !voter.connected) throw new AppError('Jogador inválido.');
+  if (voter.eliminated) throw new AppError('Estás fora — só a ver.');
   if (suspectId === voterId) throw new AppError('Não podes votar em ti próprio.');
   if (!room.players.get(suspectId)) throw new AppError('Escolhe um jogador válido.');
   r.votes[voterId] = suspectId;
@@ -431,7 +434,10 @@ export function tallyIntensity(room) {
 
 export function initGame(room, { lives = DEFAULT_LIVES, intensity = 'leve' } = {}) {
   const n = Math.max(MIN_LIVES, Math.min(MAX_LIVES, Number(lives) || DEFAULT_LIVES));
-  for (const p of room.players.values()) p.lives = n;
+  for (const p of room.players.values()) {
+    p.lives = n;
+    p.eliminated = false; // novo jogo → todos voltam a jogar
+  }
 
   room.game = {
     phase: 'prep',
@@ -585,12 +591,13 @@ export function resolveAction(room, playerId, action) {
   if (action === 'refuse') {
     st.refusals += 1;
     st.drinks += 1;
-    if (player.lives > 0) {
-      player.lives -= 1;
-      effect = { type: 'vida_perdida', playerId, lives: player.lives };
+    player.lives = Math.max(0, player.lives - 1);
+    if (player.lives === 0) {
+      player.eliminated = true; // sem vidas → fora (telemóvel partido)
+      st.shots += 1; // o "shot" fatal
+      effect = { type: 'eliminated', playerId };
     } else {
-      st.shots += 1;
-      effect = { type: 'shot', playerId, lives: 0 };
+      effect = { type: 'vida_perdida', playerId, lives: player.lives };
     }
     g.round.status = 'refused';
   } else {
@@ -601,10 +608,19 @@ export function resolveAction(room, playerId, action) {
   // Aceitar um desafio com duração → passa a regra ativa (N jogadas).
   const dur = action !== 'refuse' ? g.round.ruleDuration : null;
   const ruleText = g.round.prompt?.text;
-  advanceTurn(room); // decrementa regras existentes...
+  advanceTurn(room); // decrementa regras existentes... (já salta o eliminado)
   if (dur && ruleText) addRule(room, playerId, ruleText, dur); // ...e adiciona a nova com duração cheia
   g.phase = 'wheel';
-  return { round: g.round, effect };
+
+  // Auto-fim: se sobrar ≤1 jogador ativo, o último de pé vence.
+  let gameOver = null;
+  if (player.eliminated && connectedOrder(room).length <= 1) {
+    gameOver = buildStats(room);
+    g.finalStats = gameOver;
+    g.phase = 'gameover';
+    room.status = 'ended';
+  }
+  return { round: g.round, effect, gameOver };
 }
 
 /** Buddy: quem tem o desafio escolhe outro jogador que "bebe junto". */
@@ -646,7 +662,7 @@ export function chooseTarget(room, accuserId, accusedId) {
   if (g.round.substate !== 'choosing') throw new AppError('Já escolheste.');
   if (accuserId !== g.round.currentPlayerId) throw new AppError('Só quem girou pode escolher.');
   const accused = room.players.get(accusedId);
-  if (!accused || !accused.connected) throw new AppError('Escolhe um jogador válido.');
+  if (!accused || !accused.connected || accused.eliminated) throw new AppError('Escolhe um jogador válido.');
   if (accusedId === accuserId) throw new AppError('Escolhe outra pessoa.');
 
   g.round.accusedId = accusedId;
@@ -702,6 +718,7 @@ export function castGuess(room, guesserId, guessedId) {
   const guesser = room.players.get(guesserId);
   const guessed = room.players.get(guessedId);
   if (!guesser || !guessed) throw new AppError('Escolhe um jogador válido.');
+  if (guesser.eliminated) throw new AppError('Estás fora — só a ver.');
 
   g.round.guesses[guesserId] = guessedId;
 
@@ -984,11 +1001,21 @@ function buildStats(room) {
     .sort((a, b) => a.joinedAt.localeCompare(b.joinedAt))
     .map((p) => {
       const s = g.stats[p.id] || { drinks: 0, refusals: 0, shots: 0 };
-      return { id: p.id, name: p.name, lives: p.lives, drinks: s.drinks, refusals: s.refusals, shots: s.shots };
+      return {
+        id: p.id,
+        name: p.name,
+        lives: p.lives,
+        eliminated: p.eliminated,
+        drinks: s.drinks,
+        refusals: s.refusals,
+        shots: s.shots,
+      };
     });
   const top = (key) =>
     rows.reduce((best, r) => (r[key] > (best?.[key] ?? -1) && r[key] > 0 ? r : best), null);
-  return { rows, roundCount: g.roundCount, mostDrinks: top('drinks'), mostRefusals: top('refusals') };
+  const alive = rows.filter((r) => !r.eliminated);
+  const survivor = alive.length === 1 ? alive[0] : null; // último de pé
+  return { rows, roundCount: g.roundCount, mostDrinks: top('drinks'), mostRefusals: top('refusals'), survivor };
 }
 
 /** Serializa a ronda para a rede — anonimiza votos/segredos até ao reveal. */

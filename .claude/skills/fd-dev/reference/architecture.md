@@ -159,7 +159,7 @@ Objetivo: a app nunca fala Prisma diretamente nos handlers. Introduzir um
 | `intrigas_reason` | `{ roundId, reason }` | **PRIVADO**. Intrigas: a pergunta secreta. Vai ao acusador (spin), aos espectadores (ao escolher) e ao acusado só se ganhar o RPS. |
 | `round_started` | `{ gameTypeKey }` | Só o tipo (para animar a roda); resto vem no room_state. |
 | `round_started` | `{ round }` | Nova ronda; cliente anima a roda até `round.gameTypeKey` e revela o prompt. |
-| `action_result` | `{ effect }` | Feedback da ação (`accepted`/`vida_perdida`/`shot`/`vida_extra`) para o flash. `vida_extra` = prémio da Piramide. |
+| `action_result` | `{ effect }` | Feedback da ação (`accepted`/`vida_perdida`/`vida_extra`/`eliminated`) para o flash. `eliminated` = ficou sem vidas (→ ecrã de telemóvel partido). |
 | `game_over` | `{ stats }` | Fim de jogo; ecrã de estatísticas. |
 | `back_to_lobby` | `{}` | Host reiniciou; clientes voltam ao lobby. |
 | `session_invalid` | `{ message }` | Reconexão falhou (terminal); cliente limpa a sessão e volta ao Home. |
@@ -189,8 +189,15 @@ Objetivo: a app nunca fala Prisma diretamente nos handlers. Introduzir um
 > `content/prompts.data.js`; trocar por Prisma sem mudar `game.js`/handlers.
 
 `room` serializado por `serializeRoom()`: `{ id, code, status, hostPlayerId,
-createdAt, players: [{ id, name, lives, isHost, connected }] }` (players ordenados
-por `joinedAt`).
+createdAt, intensityVotes, players: [{ id, name, lives, isHost, connected,
+eliminated }] }` (players ordenados por `joinedAt`).
+
+**Eliminação:** ao ficar com 0 vidas (recusa fatal em Boca Calada/Desafio) o
+jogador fica `eliminated` — sai da rotação e das votações (`connectedOrder` só
+conta ativos) e o cliente mostra um **overlay de telemóvel partido**
+(`BrokenScreen`), continuando a ver. Quando resta **≤1 jogador ativo**, o
+`resolveAction` termina o jogo (último de pé = `finalStats.survivor`) e emite
+`game_over`.
 
 ### A adicionar (Semana 3 — motor de jogo) — proposta
 

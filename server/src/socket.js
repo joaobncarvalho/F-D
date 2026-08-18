@@ -182,8 +182,9 @@ export function registerSocketHandlers(io) {
     socket.on('player_action', ({ action } = {}, ack) => {
       try {
         const room = requireRoom(socket);
-        const { effect } = game.resolveAction(room, socket.data.playerId, action);
+        const { effect, gameOver } = game.resolveAction(room, socket.data.playerId, action);
         io.to(room.code).emit('action_result', { effect });
+        if (gameOver) io.to(room.code).emit('game_over', { stats: gameOver }); // último de pé
         broadcastState(io, room.code);
         if (typeof ack === 'function') ack({ ok: true });
       } catch (err) {
