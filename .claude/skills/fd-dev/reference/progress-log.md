@@ -24,9 +24,16 @@ Novo modo à parte da roda (spec em `reference/board-mode.md`). Fundação:
   dado, prisão por abuso salta a vez, volta = vitória) ✓. Modo dormente (a roda não
   muda) até haver UI.
 
-**A seguir (Fase 1 cliente):** seletor de modo no lobby + ecrã do tabuleiro (peões,
-dado da ordem, avançar, render do anel, vitória). Depois Fase 2 (mini-jogo/??/
-Gamble) e Fase 3 (cartas/traits).
+**Fase 1 cliente (feita a seguir):** seletor de modo no lobby (host: 🎡 Roda / 🎲
+Tabuleiro), `client/src/pages/Board.jsx` (fases pawn/order/playing/over: grelha de
+peões, dado da ordem, pista scrollável de 45 casas com peões, classificação,
+controlos avançar 1/2/3, feedback de prisão, ecrã de fim com vencedor + "bebeu
+mais"). `App.jsx` liga o ecrã `board` e os emitters. **Tabuleiro jogável
+ponta-a-ponta.** Verificação: **e2e socket** (modo→peões→dado→corrida→vitória) ✓,
+client build ✓.
+
+**A seguir:** Fase 2 (resolver casas: mini-jogo reusa o motor / ?? / Gamble) e
+Fase 3 (cartas/traits + bancos na admin).
 
 ---
 

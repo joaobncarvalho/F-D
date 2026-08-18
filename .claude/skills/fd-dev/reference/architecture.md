@@ -116,6 +116,10 @@ Objetivo: a app nunca fala Prisma diretamente nos handlers. Introduzir um
 | `join_room` | `{ code, name }` | Valida nome único na sala; junta. Ack + `room_joined`. |
 | `rejoin_room` | `{ code, playerId }` | Reconexão após queda; marca `connected=true`. Ack + `room_joined`, ou `session_invalid` se a sala/jogador já não existe. |
 | `vote_intensity` | `{ intensity }` | Lobby, **qualquer jogador**. Vota a intensidade (leve/picante/hardcore/caos). Contagens em `room.intensityVotes`. |
+| `set_mode` | `{ mode: 'wheel'\|'board' }` | Lobby, **só host**. Escolhe o modo (roda ou tabuleiro). Em `room.mode`. |
+| `board_pick_pawn` | `{ pawn }` | Tabuleiro (`pawn`). Escolhe o peão (único). Todos escolheram → `order`. |
+| `board_roll` | — | Tabuleiro (`order`). Lança o dado da ordem. Todos lançaram → `playing`. |
+| `board_advance` | `{ squares: 1\|2\|3 }` | Tabuleiro (`playing`). Só a vez. Bebe 2/4/6 golos e anda; volta = vitória; 3× andar 1 → prisão. |
 | `start_game` | `{ lives }` | Só host, ≥2 ligados. A **intensidade vem da votação** (`tallyIntensity`: maioria; empate → sorteio). `initGame` → fase `prep`, emite `game_started`. |
 | `add_question` | `{ targetPlayerId, text }` | Fase `prep`. Pergunta dirigida a outro (não a si) → Boca Calada. |
 | `add_secret` | `{ text }` | Fase `prep`. Segredo anónimo → Segredos. |

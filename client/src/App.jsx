@@ -7,6 +7,7 @@ import Lobby from './pages/Lobby.jsx';
 import Game from './pages/Game.jsx';
 import Countdown from './components/Countdown.jsx';
 import IntensityReveal from './components/IntensityReveal.jsx';
+import Board from './pages/Board.jsx';
 import ErrorBoundary from './components/ErrorBoundary.jsx';
 
 const SESSION_KEY = 'fd_session';
@@ -63,13 +64,14 @@ export default function App() {
     function onChatMessage(msg) {
       setMessages((prev) => [...prev, msg]);
     }
-    function onGameStarted({ intensityResult } = {}) {
+    function onGameStarted({ mode, intensityResult } = {}) {
       setAuthorRoundId(null);
       setIntrigasReason(null);
       setPiramideHand(null);
       setVascoRole(null);
       setIntensityResult(intensityResult || null);
-      setScreen('intensity_reveal');
+      // Tabuleiro vai direto ao ecrã do jogo; a roda passa pela roleta + countdown.
+      setScreen(mode === 'board' ? 'board' : 'intensity_reveal');
     }
     function onBackToLobby() {
       setAuthorRoundId(null);
@@ -180,6 +182,10 @@ export default function App() {
   const sendMessage = useCallback((text) => socket.emit('send_message', { text }), []);
   const startGame = useCallback((config) => socket.emit('start_game', config), []);
   const voteIntensity = useCallback((intensity) => socket.emit('vote_intensity', { intensity }), []);
+  const setMode = useCallback((mode) => socket.emit('set_mode', { mode }), []);
+  const boardPickPawn = useCallback((pawn) => socket.emit('board_pick_pawn', { pawn }), []);
+  const boardRoll = useCallback(() => socket.emit('board_roll'), []);
+  const boardAdvance = useCallback((squares) => socket.emit('board_advance', { squares }), []);
   const addQuestion = useCallback(
     (targetPlayerId, text) => socket.emit('add_question', { targetPlayerId, text }),
     []
@@ -264,6 +270,19 @@ export default function App() {
             onSendMessage={sendMessage}
             onStart={startGame}
             onVoteIntensity={voteIntensity}
+            onSetMode={setMode}
+            onLeave={leaveRoom}
+          />
+        )}
+        {screen === 'board' && (
+          <Board
+            key="board"
+            room={room}
+            youId={youId}
+            onPickPawn={boardPickPawn}
+            onRoll={boardRoll}
+            onAdvance={boardAdvance}
+            onReset={resetGame}
             onLeave={leaveRoom}
           />
         )}

@@ -10,7 +10,7 @@ const INTENSITY_OPTS = [
   { key: 'caos', label: '💥 Caos' },
 ];
 
-export default function Lobby({ room, youId, messages, error, onSendMessage, onStart, onVoteIntensity, onLeave }) {
+export default function Lobby({ room, youId, messages, error, onSendMessage, onStart, onVoteIntensity, onSetMode, onLeave }) {
   const [draft, setDraft] = useState('');
   const [showQR, setShowQR] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -144,6 +144,37 @@ export default function Lobby({ room, youId, messages, error, onSendMessage, onS
           </button>
         </form>
       </section>
+
+      {/* Modo de jogo — só o host escolhe; todos veem. */}
+      <div className="fd-card p-3 flex flex-col gap-2">
+        <span className="text-sm text-white/60">🎮 Modo de jogo</span>
+        <div className="flex gap-2">
+          {[
+            { key: 'wheel', label: '🎡 Roda' },
+            { key: 'board', label: '🎲 Tabuleiro' },
+          ].map((m) => (
+            <button
+              key={m.key}
+              disabled={!isHost}
+              onClick={() => {
+                sfx.click();
+                onSetMode(m.key);
+              }}
+              className={`fd-chip flex-1 ${(room.mode || 'wheel') === m.key ? 'fd-chip-on' : ''} ${
+                !isHost ? 'opacity-60' : ''
+              }`}
+            >
+              {m.label}
+            </button>
+          ))}
+        </div>
+        {room.mode === 'board' && (
+          <p className="text-xs text-emerald-300/80">
+            🎲 Tabuleiro: corrida de bebida (dás a volta = ganhas). Sem vidas. <b>beta</b>
+          </p>
+        )}
+        {!isHost && <p className="text-xs text-white/40">Só o host escolhe o modo.</p>}
+      </div>
 
       {/* Votação da intensidade — TODOS votam (maioria; empate → randomizer). */}
       {(() => {
