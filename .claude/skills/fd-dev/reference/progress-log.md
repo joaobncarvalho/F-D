@@ -5,6 +5,44 @@
 
 ---
 
+## 2026-08-18 — Isto ou Aquilo + Buddy + Regras com duração + intensidade Caos
+
+Três mecânicas novas (pedido do João) + 4.º nível de intensidade.
+
+**Intensidade Caos** (💥, expose/drama entre quem está à mesa): 4.º nível a seguir
+ao hardcore. Enum Prisma + Supabase, 24 prompts caos (6×4 tipos), lobby/jogo/admin.
+
+**Isto ou Aquilo** (`isto_ou_aquilo`, fase `choice`): dilema com 2 opções; o da vez
+toca numa (`choose_option`), depois `continue_round`. Conteúdo = `"A||B"` no `text`
+(split no motor). 7.º tipo na roda. Admin com 2 campos (A/B) que juntam com `||`.
+
+**Buddy** (`buddy` no prompt): quem tem o desafio escolhe (`choose_buddy`) um
+jogador que "bebe junto"; mostra-se 🤝 Buddy: X e bloqueia a ação até escolher.
+Sem efeito automático em vidas (overlay social).
+
+**Regras com duração** (`duration` no prompt): aceitar um desafio com duração cria
+uma **regra ativa** N jogadas (`game.activeRules`, decrementa em `advanceTurn`),
+com **banner persistente** no ecrã ("🎵 Regras ativas: X — resta N"). Ex.: "até às
+próximas 2 jogadas rimas ou bebes".
+
+**Modelo:** `prompts` ganha `buddy Boolean` + `duration Int?` (db push). Formato do
+conteúdo em código passa a `[texto, intensidade, { buddy?, duration? }]`; `seed.js`
+e `repo.js` atualizados. Admin (`admin.{html,js}`) com checkbox buddy, input duração
+e os 2 campos do isto_ou_aquilo. Seed: **155 prompts, 7 tipos** na Supabase.
+
+**Ficheiros:** `game.js` (chooseOption/chooseBuddy, activeRules, isto_ou_aquilo,
+serialização), `socket.js` (choose_option/choose_buddy), `repo.js`/`seed.js`
+(buddy/duration), `content/prompts.data.js`, `schema.prisma`, `admin.{html,js}`,
+`client/src/App.jsx` (emitters), `pages/Game.jsx` (ChoiceCard, BuddyBlock, banner
+de regras, 7.º segmento), `pages/Lobby.jsx`.
+
+**Verificação:** smoke do motor (isto_ou_aquilo, buddy bloqueia/define, regra
+decrementa e expira a 2 jogadas) ✓ · e2e socket do isto_ou_aquilo (opções no
+room_state, escolha propagada, activeRules no payload) ✓ · flags na BD (2 buddy,
+4 duração, split `||`) ✓ · client build ✓.
+
+---
+
 ## 2026-08-18 — BD ligada (Supabase/Prisma) + página de admin de conteúdo
 
 **Integração da BD (o seam da Semana 3 concretizado):** o `repo.js` passa a ler de

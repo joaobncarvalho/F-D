@@ -40,18 +40,32 @@ export function createAdminRouter() {
     res.json(await repo.adminListPrompts(req.query.type || undefined));
   }));
 
+  const cleanDuration = (d) => {
+    if (d === '' || d === null || d === undefined) return null;
+    const n = parseInt(d, 10);
+    return Number.isFinite(n) && n >= 1 ? Math.min(10, n) : null;
+  };
+
   router.post('/api/prompts', wrap(async (req, res) => {
-    const { gameTypeKey, text, intensity } = req.body || {};
+    const { gameTypeKey, text, intensity, buddy, duration } = req.body || {};
     const clean = String(text || '').trim();
     if (!gameTypeKey) return res.status(400).json({ error: 'Escolhe o tipo de jogo.' });
     if (clean.length < 3) return res.status(400).json({ error: 'Texto demasiado curto.' });
     if (!['leve', 'picante', 'hardcore', 'caos'].includes(intensity))
       return res.status(400).json({ error: 'Intensidade inválida.' });
-    res.json(await repo.adminCreatePrompt({ gameTypeKey, text: clean.slice(0, 300), intensity }));
+    res.json(
+      await repo.adminCreatePrompt({
+        gameTypeKey,
+        text: clean.slice(0, 300),
+        intensity,
+        buddy: !!buddy,
+        duration: cleanDuration(duration),
+      })
+    );
   }));
 
   router.patch('/api/prompts/:id', wrap(async (req, res) => {
-    const { text, intensity, active } = req.body || {};
+    const { text, intensity, active, buddy, duration } = req.body || {};
     const data = {};
     if (text !== undefined) data.text = String(text).trim().slice(0, 300);
     if (intensity !== undefined) {
@@ -60,6 +74,8 @@ export function createAdminRouter() {
       data.intensity = intensity;
     }
     if (active !== undefined) data.active = !!active;
+    if (buddy !== undefined) data.buddy = !!buddy;
+    if (duration !== undefined) data.duration = cleanDuration(duration);
     res.json(await repo.adminUpdatePrompt(req.params.id, data));
   }));
 

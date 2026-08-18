@@ -106,6 +106,8 @@ model Prompt {
   text       String
   intensity  Intensity @default(leve)
   active     Boolean   @default(true)
+  buddy      Boolean   @default(false) // dispara a escolha de "buddy" (bebe junto)
+  duration   Int?      // se >0: regra que dura N jogadas (aviso persistente no ecrã)
 
   gameType GameType    @relation(fields: [gameTypeId], references: [id], onDelete: Cascade)
   rounds   GameRound[]

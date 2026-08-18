@@ -65,7 +65,7 @@ export async function getRandomPrompt(gameTypeKey, intensity) {
           take: 1,
           skip: Math.floor(Math.random() * n),
         });
-        if (p) return { text: p.text, intensity: p.intensity };
+        if (p) return { text: p.text, intensity: p.intensity, buddy: p.buddy, duration: p.duration };
       }
       return null;
     } catch (e) {
@@ -81,8 +81,8 @@ export async function getRandomPrompt(gameTypeKey, intensity) {
     if (filtered.length) pool = filtered;
   }
   if (!pool.length) return null;
-  const [text, inten] = pool[Math.floor(Math.random() * pool.length)];
-  return { text, intensity: inten };
+  const [text, inten, opts = {}] = pool[Math.floor(Math.random() * pool.length)];
+  return { text, intensity: inten, buddy: !!opts.buddy, duration: opts.duration ?? null };
 }
 
 /** Quadros do Jogo do Vasco — mecânica, sempre do código (não estão na BD). */
@@ -102,37 +102,45 @@ export async function adminGameTypes() {
   });
 }
 
+const PROMPT_SELECT = {
+  id: true,
+  text: true,
+  intensity: true,
+  active: true,
+  buddy: true,
+  duration: true,
+  gameType: { select: { key: true, label: true } },
+};
+
 export async function adminListPrompts(gameTypeKey) {
   const prisma = await requirePrisma();
   const where = gameTypeKey ? { gameType: { key: gameTypeKey } } : {};
   return prisma.prompt.findMany({
     where,
     orderBy: [{ gameType: { key: 'asc' } }, { intensity: 'asc' }],
-    select: { id: true, text: true, intensity: true, active: true, gameType: { select: { key: true, label: true } } },
+    select: PROMPT_SELECT,
   });
 }
 
-export async function adminCreatePrompt({ gameTypeKey, text, intensity = 'leve' }) {
+export async function adminCreatePrompt({ gameTypeKey, text, intensity = 'leve', buddy = false, duration = null }) {
   const prisma = await requirePrisma();
   const gt = await prisma.gameType.findUnique({ where: { key: gameTypeKey } });
   if (!gt) throw new Error('Tipo de jogo inválido.');
   return prisma.prompt.create({
-    data: { gameTypeId: gt.id, text, intensity, active: true },
-    select: { id: true, text: true, intensity: true, active: true, gameType: { select: { key: true, label: true } } },
+    data: { gameTypeId: gt.id, text, intensity, active: true, buddy, duration },
+    select: PROMPT_SELECT,
   });
 }
 
-export async function adminUpdatePrompt(id, { text, intensity, active }) {
+export async function adminUpdatePrompt(id, { text, intensity, active, buddy, duration }) {
   const prisma = await requirePrisma();
   const data = {};
   if (text !== undefined) data.text = text;
   if (intensity !== undefined) data.intensity = intensity;
   if (active !== undefined) data.active = active;
-  return prisma.prompt.update({
-    where: { id },
-    data,
-    select: { id: true, text: true, intensity: true, active: true, gameType: { select: { key: true, label: true } } },
-  });
+  if (buddy !== undefined) data.buddy = buddy;
+  if (duration !== undefined) data.duration = duration;
+  return prisma.prompt.update({ where: { id }, data, select: PROMPT_SELECT });
 }
 
 export async function adminDeletePrompt(id) {

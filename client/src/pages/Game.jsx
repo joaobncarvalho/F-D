@@ -12,8 +12,9 @@ const TYPES = [
   { key: 'segredos', label: 'Segredos', color: '#1fd3b6', emoji: '🤫' },
   { key: 'piramide', label: 'Piramide', color: '#5b8cff', emoji: '🔺' },
   { key: 'vasco', label: 'Vasco', color: '#ff8c42', emoji: '🕵️' },
+  { key: 'isto_ou_aquilo', label: 'Isto/Aquilo', color: '#4ade80', emoji: '⚖️' },
 ];
-const SPIN_PHASES = ['prompt', 'intrigas', 'guessing', 'piramide', 'vasco'];
+const SPIN_PHASES = ['prompt', 'intrigas', 'guessing', 'piramide', 'vasco', 'choice'];
 
 export default function Game(props) {
   const { room, youId, authorRoundId } = props;
@@ -126,6 +127,20 @@ export default function Game(props) {
         </span>
       </div>
 
+      {g.activeRules?.length > 0 && (
+        <div className="fd-card p-2.5 flex flex-col gap-1">
+          <p className="text-xs font-bold text-amber-300">🎵 Regras ativas</p>
+          {g.activeRules.map((r) => (
+            <p key={r.id} className="text-xs text-white/70 leading-snug">
+              <b className="text-white">{r.playerName}</b>: {r.text}{' '}
+              <span className="text-amber-300 whitespace-nowrap">
+                · resta{r.remaining > 1 ? 'm' : ''} {r.remaining}
+              </span>
+            </p>
+          ))}
+        </div>
+      )}
+
       {(g.phase === 'wheel' || spinning) && (
         <div className="flex-1 flex flex-col items-center justify-center gap-5 py-2">
           <Wheel
@@ -166,8 +181,23 @@ export default function Game(props) {
           <PromptCard
             key={round.id}
             round={round}
+            room={room}
+            youId={youId}
             isMyTurn={round.currentPlayerId === youId}
             onAction={props.onAction}
+            onChooseBuddy={props.onChooseBuddy}
+          />
+        )}
+        {revealed && g.phase === 'choice' && (
+          <ChoiceCard
+            key={round.id}
+            round={round}
+            room={room}
+            youId={youId}
+            canControl={isHost || isSpinner}
+            onChooseBuddy={props.onChooseBuddy}
+            onChooseOption={props.onChooseOption}
+            onContinue={props.onContinue}
           />
         )}
         {revealed && g.phase === 'intrigas' && (
@@ -399,8 +429,44 @@ function CardShell({ children, typeKey }) {
   );
 }
 
-function PromptCard({ round, isMyTurn, onAction }) {
+// Passo/badge do Buddy — partilhado pelo PromptCard e ChoiceCard.
+function BuddyBlock({ round, room, youId, isMyTurn, onChooseBuddy }) {
+  if (!round.needsBuddy) return null;
+  if (round.buddyId) {
+    return (
+      <p className="text-sm font-bold text-cyan-300">
+        🤝 Buddy: {round.buddyName} — bebe sempre que {round.currentPlayerName} beber!
+      </p>
+    );
+  }
+  if (isMyTurn) {
+    const others = room.players.filter((p) => p.connected && p.id !== youId);
+    return (
+      <div className="flex flex-col gap-2">
+        <p className="text-sm text-cyan-300 font-semibold">🤝 Escolhe o teu Buddy (bebe sempre que tu bebes):</p>
+        <div className="flex flex-wrap gap-2 justify-center">
+          {others.map((p) => (
+            <button
+              key={p.id}
+              onClick={() => {
+                sfx.click();
+                onChooseBuddy(p.id);
+              }}
+              className="fd-chip"
+            >
+              {p.name}
+            </button>
+          ))}
+        </div>
+      </div>
+    );
+  }
+  return <p className="text-sm text-white/50">🤝 {round.currentPlayerName} está a escolher o buddy…</p>;
+}
+
+function PromptCard({ round, room, youId, isMyTurn, onAction, onChooseBuddy }) {
   const isBoca = round.gameTypeKey === 'boca_calada';
+  const buddyPending = round.needsBuddy && !round.buddyId;
   return (
     <CardShell typeKey={round.gameTypeKey}>
       <p className="text-lg leading-snug">{round.prompt?.text || '—'}</p>
@@ -408,7 +474,8 @@ function PromptCard({ round, isMyTurn, onAction }) {
         {isBoca ? 'Pergunta para ' : 'Vez de '}
         <span className="font-bold text-white">{round.currentPlayerName}</span>
       </p>
-      {isMyTurn ? (
+      <BuddyBlock round={round} room={room} youId={youId} isMyTurn={isMyTurn} onChooseBuddy={onChooseBuddy} />
+      {isMyTurn && !buddyPending ? (
         <div className="flex gap-3 mt-1">
           <button
             onClick={() => {
@@ -429,9 +496,70 @@ function PromptCard({ round, isMyTurn, onAction }) {
             {isBoca ? '🤐 Boca Calada' : '🍺 Recuso'}
           </button>
         </div>
-      ) : (
+      ) : !isMyTurn ? (
         <p className="text-sm text-white/40 mt-1">A aguardar {round.currentPlayerName}…</p>
-      )}
+      ) : null}
+    </CardShell>
+  );
+}
+
+function ChoiceCard({ round, room, youId, canControl, onChooseBuddy, onChooseOption, onContinue }) {
+  const isMyTurn = round.currentPlayerId === youId;
+  const buddyPending = round.needsBuddy && !round.buddyId;
+  const resolved = round.status === 'resolved' && round.chosen != null;
+  const opts = round.options || [];
+  return (
+    <CardShell typeKey="isto_ou_aquilo">
+      <p className="text-sm text-white/50">
+        Vez de <span className="font-bold text-white">{round.currentPlayerName}</span> — Isto ou Aquilo?
+      </p>
+      <BuddyBlock round={round} room={room} youId={youId} isMyTurn={isMyTurn} onChooseBuddy={onChooseBuddy} />
+      <div className="flex flex-col gap-2 mt-1">
+        {opts.map((o, i) => {
+          const arrow = i === 0 ? '👈 ' : '👉 ';
+          if (isMyTurn && !resolved && !buddyPending) {
+            return (
+              <button
+                key={i}
+                onClick={() => {
+                  sfx.click();
+                  onChooseOption(i);
+                }}
+                className="fd-btn fd-btn-ghost text-left py-3"
+              >
+                {arrow}
+                {o}
+              </button>
+            );
+          }
+          const chosen = resolved && round.chosen === i;
+          const dim = resolved && round.chosen !== i;
+          return (
+            <div
+              key={i}
+              className={`fd-card p-3 text-left text-sm ${
+                chosen ? 'ring-2 ring-emerald-400 text-emerald-200 font-semibold' : dim ? 'opacity-40' : ''
+              }`}
+            >
+              {arrow}
+              {o}
+              {chosen ? ' ✓' : ''}
+            </div>
+          );
+        })}
+      </div>
+      {resolved ? (
+        <>
+          <p className="text-sm font-bold text-emerald-300">{round.currentPlayerName} escolheu! 🎉</p>
+          {canControl && (
+            <button onClick={onContinue} className="fd-btn fd-btn-primary mt-1">
+              Continuar →
+            </button>
+          )}
+        </>
+      ) : !isMyTurn && !buddyPending ? (
+        <p className="text-sm text-white/40">A aguardar a escolha de {round.currentPlayerName}…</p>
+      ) : null}
     </CardShell>
   );
 }

@@ -74,6 +74,10 @@ Legenda: ✅ feito · 🚧 em curso · ⬜ por fazer · 🔗 ponto de integraç�
       privadas (memorizar), pirâmide 15 cartas (golos 2→10), virar+atribuir+desconfiar
       (dobro), prémio +1 vida a quem fez beber mais. Mãos nunca no broadcast
       (`piramide_hand` privado). E2E socket ✓. Peso na roda ~10% (fração-alvo fixa).
+- [x] **Isto ou Aquilo** (7.º tipo na roda): dilema 2 opções (`A||B`), o da vez escolhe.
+- [x] **Buddy** (flag no prompt): quem tem o desafio escolhe alguém que "bebe junto" 🤝.
+- [x] **Regras com duração**: aceitar → regra ativa N jogadas + banner persistente.
+- [x] **Intensidade Caos** (💥 expose) + admin com buddy/duração/opções.
 - [x] **Jogo do Vasco (Impostor)** (pedido do João): 6.º tipo na roda — quadro de 9
       palavras, o grupo sabe a palavra secreta, o(s) Vasco(s) não e adivinham pelas
       pistas. Acerta → +1 vida; falha → 5 golos. Papel privado (`vasco_role`); palavra

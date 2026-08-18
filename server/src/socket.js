@@ -178,6 +178,28 @@ export function registerSocketHandlers(io) {
       }
     });
 
+    socket.on('choose_buddy', ({ buddyId } = {}, ack) => {
+      try {
+        const room = requireRoom(socket);
+        game.chooseBuddy(room, socket.data.playerId, buddyId);
+        broadcastState(io, room.code);
+        if (typeof ack === 'function') ack({ ok: true });
+      } catch (err) {
+        handleError(socket, ack, err);
+      }
+    });
+
+    socket.on('choose_option', ({ index } = {}, ack) => {
+      try {
+        const room = requireRoom(socket);
+        game.chooseOption(room, socket.data.playerId, index);
+        broadcastState(io, room.code);
+        if (typeof ack === 'function') ack({ ok: true });
+      } catch (err) {
+        handleError(socket, ack, err);
+      }
+    });
+
     socket.on('choose_target', ({ accusedPlayerId } = {}, ack) => {
       try {
         const room = requireRoom(socket);

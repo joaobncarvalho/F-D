@@ -125,7 +125,9 @@ Objetivo: a app nunca fala Prisma diretamente nos handlers. Introduzir um
 | `reveal_result` | — | Host ou quem girou força o reveal do Segredos **ou** do Jogo do Vasco (`guessing` → resultado). |
 | `continue_round` | — | Host ou quem girou avança para a próxima vez após reveal (Intrigas/Segredos), fecha a Piramide no `summary` (+1 vida a quem fez beber mais) **ou** fecha o Jogo do Vasco no `result`. |
 | `spin_wheel` | — | **Só o jogador da vez** (não o host), fase `wheel`. Escolhe o tipo+prompt (a vez já está definida); Boca Calada usa pergunta dirigida; Piramide dá as mãos privadas; emite `round_started`. |
-| `player_action` | `{ action: 'accept'\|'refuse' }` | Só o jogador da vez. Recusa → vida/shot; emite `action_result`. |
+| `player_action` | `{ action: 'accept'\|'refuse' }` | Só o jogador da vez. Recusa → vida/shot; emite `action_result`. Se o prompt tiver `duration`, aceitar cria uma **regra ativa** N jogadas. |
+| `choose_buddy` | `{ buddyId }` | Prompt com `buddy`. Só o jogador da vez escolhe quem "bebe junto"; mostra-se 🤝 Buddy: X (bloqueia a ação até escolher). |
+| `choose_option` | `{ index: 0\|1 }` | Isto ou Aquilo (fase `choice`). Só o jogador da vez escolhe uma das 2 opções; depois `continue_round`. |
 | `piramide_ready` | — | Piramide (`memorize`). Marca-se pronto; todos os ligados prontos → começa a virar. |
 | `piramide_flip` | — | Piramide (`flipping`). **Só o flipper da vez** vira a carta seguinte. |
 | `piramide_assign` | `{ targetId }` | Piramide (`flipping`, carta virada). Flipper faz outro beber (afirma ter o número). |

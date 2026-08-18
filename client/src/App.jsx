@@ -184,6 +184,8 @@ export default function App() {
   const beginPlay = useCallback(() => socket.emit('begin_play'), []);
   const spinWheel = useCallback(() => socket.emit('spin_wheel'), []);
   const playerAction = useCallback((action) => socket.emit('player_action', { action }), []);
+  const chooseBuddy = useCallback((buddyId) => socket.emit('choose_buddy', { buddyId }), []);
+  const chooseOption = useCallback((index) => socket.emit('choose_option', { index }), []);
   const chooseTarget = useCallback(
     (accusedPlayerId) => socket.emit('choose_target', { accusedPlayerId }),
     []
@@ -277,6 +279,8 @@ export default function App() {
             onBeginPlay={beginPlay}
             onSpin={spinWheel}
             onAction={playerAction}
+            onChooseBuddy={chooseBuddy}
+            onChooseOption={chooseOption}
             onChooseTarget={chooseTarget}
             onSubmitRps={submitRps}
             onGuess={castGuess}

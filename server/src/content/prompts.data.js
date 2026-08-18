@@ -2,7 +2,11 @@
 // Módulo PURO (sem efeitos) partilhado por:
 //   - server/prisma/seed.js        (semeia a BD)
 //   - server/src/repo.js           (repositório em memória, pré-BD)
-// Assim o seed e o jogo nunca divergem. Cada prompt: [texto, intensidade].
+// Assim o seed e o jogo nunca divergem.
+// Cada prompt: [texto, intensidade] ou [texto, intensidade, { buddy?, duration? }].
+//   buddy    → dispara a escolha de um "buddy" (bebe junto).
+//   duration → regra que dura N jogadas (aviso persistente no ecrã).
+// No tipo `isto_ou_aquilo`, o texto traz as DUAS opções separadas por "||".
 
 export const GAME_TYPES = [
   {
@@ -83,6 +87,34 @@ export const GAME_TYPES = [
       ['Ordena as pessoas da mesa de quem confias mais para quem confias menos, em voz alta.', 'caos'],
       ['Diz a coisa que mudarias em cada pessoa à tua esquerda e à tua direita.', 'caos'],
       ['Revela um crush passado ou presente por alguém desta mesa — ou bebes 5.', 'caos'],
+      // Buddy (escolhes alguém que bebe contigo)
+      ['Escolhe um buddy: até à tua próxima vez, sempre que bebes, ele/ela bebe também.', 'leve', { buddy: true }],
+      ['Escolhe o teu buddy da desgraça — bebem sempre em dobro, juntos, nesta ronda.', 'picante', { buddy: true }],
+      // Regras com duração (aviso persistente no ecrã)
+      ['Até às próximas 2 jogadas, tens de rimar sempre que falas — senão bebes.', 'leve', { duration: 2 }],
+      ['Nas próximas 2 jogadas, só podes falar na terceira pessoa — senão bebes.', 'leve', { duration: 2 }],
+      ['Nas próximas 3 jogadas, acaba cada frase com "meu capitão" — senão bebes.', 'leve', { duration: 3 }],
+      ['Até às próximas 2 jogadas, não podes dizer "sim" nem "não" — senão bebes.', 'picante', { duration: 2 }],
+    ],
+  },
+  {
+    // Isto ou Aquilo — dilema com DUAS opções (texto = "A||B"); o da vez escolhe uma.
+    key: 'isto_ou_aquilo',
+    label: 'Isto ou Aquilo',
+    prompts: [
+      ['Fazer o pino durante 10s||Imitar um animal até alguém adivinhar', 'leve'],
+      ['Cantar o refrão da tua música favorita||Dançar 15s sem música', 'leve'],
+      ['Contar uma anedota; se ninguém rir, bebes 2||Beber 2 golos já', 'leve'],
+      ['Falar com sotaque até à tua próxima vez||Trocar de lugar com alguém', 'leve'],
+      ['Deixar o grupo escolher-te uma alcunha||Fazer 10 flexões', 'leve'],
+      ['Beber 3 golos||Mostrar a última foto da galeria (sem escolher)', 'picante'],
+      ['Mandar "estava a pensar em ti 😊" à 3.ª conversa||Beber 4 golos', 'picante'],
+      ['Deixar o grupo ler a tua última mensagem enviada||Beber 3 golos', 'picante'],
+      ['Beber 2 golos e fazer o pino||Mandar mensagem a alguém com quem já te relacionaste', 'hardcore'],
+      ['Revelar o teu crush do grupo||Beber 5 golos', 'hardcore'],
+      ['Ligar a um ex e falar 10s||Beber 5 golos', 'hardcore'],
+      ['Dizer o que achas mesmo de quem está à tua frente||Beber 5 golos', 'caos'],
+      ['Confessar a maior mentira que disseste a alguém da mesa||Beber 4 golos', 'caos'],
     ],
   },
   {

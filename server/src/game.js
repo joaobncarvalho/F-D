@@ -39,8 +39,26 @@ function nameOf(room, id) {
   return room.players.get(id)?.name;
 }
 
+// Regras com duração: cada avanço de vez é uma "jogada" → decrementa e limpa.
+function decrementRules(game) {
+  if (!game.activeRules?.length) return;
+  for (const rule of game.activeRules) rule.remaining -= 1;
+  game.activeRules = game.activeRules.filter((rule) => rule.remaining > 0);
+}
+
+function addRule(room, playerId, text, remaining) {
+  room.game.activeRules.push({
+    id: randomUUID(),
+    playerId,
+    playerName: nameOf(room, playerId),
+    text,
+    remaining,
+  });
+}
+
 function advanceTurn(room) {
   const g = room.game;
+  decrementRules(g); // uma jogada passou
   const order = connectedOrder(room);
   if (!order.length) {
     g.currentPlayerId = null;
@@ -370,6 +388,7 @@ export function initGame(room, { lives = DEFAULT_LIVES, intensity = 'leve' } = {
     roundCount: 0,
     currentPlayerId: null,
     stats: {},
+    activeRules: [], // regras com duração: { id, playerId, playerName, text, remaining }
     finalStats: null,
   };
   return room.game;
@@ -431,16 +450,31 @@ export async function spinWheel(room, playerId) {
     currentPlayerName: player.name,
     prompt: null,
     status: 'pending',
+    needsBuddy: false, // prompt de buddy → o jogador escolhe alguém que bebe junto
+    buddyId: null,
+    buddyName: null,
+    ruleDuration: null, // se aceitar um prompt com duração → cria regra ativa
   };
 
   if (gt.key === 'boca_calada') {
     const q = pickQuestion(g, playerId) || (await repo.getRandomPrompt('boca_calada', g.intensity));
     round.prompt = q ? { text: q.text } : null;
+    round.needsBuddy = !!q?.buddy;
+    round.ruleDuration = q?.duration || null;
     g.phase = 'prompt';
   } else if (gt.key === 'desafio') {
     const p = await repo.getRandomPrompt('desafio', g.intensity);
     round.prompt = p ? { text: p.text } : null;
+    round.needsBuddy = !!p?.buddy;
+    round.ruleDuration = p?.duration || null;
     g.phase = 'prompt';
+  } else if (gt.key === 'isto_ou_aquilo') {
+    const p = await repo.getRandomPrompt('isto_ou_aquilo', g.intensity);
+    const parts = String(p?.text || '||').split('||');
+    round.options = [(parts[0] || '—').trim(), (parts[1] || '—').trim()];
+    round.chosen = null;
+    round.needsBuddy = !!p?.buddy;
+    g.phase = 'choice';
   } else if (gt.key === 'intrigas') {
     const p = await repo.getRandomPrompt('intrigas', g.intensity);
     round.reason = p ? p.text : 'Quem é mais provável?'; // SERVER-SIDE (nunca no broadcast)
@@ -487,6 +521,7 @@ export function resolveAction(room, playerId, action) {
   const g = room.game;
   if (!g || g.phase !== 'prompt' || !g.round) throw new AppError('Não há ronda ativa.');
   if (g.round.currentPlayerId !== playerId) throw new AppError('Não é a tua vez.');
+  if (g.round.needsBuddy && !g.round.buddyId) throw new AppError('Escolhe primeiro o teu buddy 🤝.');
 
   const player = room.players.get(playerId);
   const st = statsFor(g, playerId);
@@ -508,9 +543,42 @@ export function resolveAction(room, playerId, action) {
     g.round.status = 'resolved';
   }
 
-  advanceTurn(room);
+  // Aceitar um desafio com duração → passa a regra ativa (N jogadas).
+  const dur = action !== 'refuse' ? g.round.ruleDuration : null;
+  const ruleText = g.round.prompt?.text;
+  advanceTurn(room); // decrementa regras existentes...
+  if (dur && ruleText) addRule(room, playerId, ruleText, dur); // ...e adiciona a nova com duração cheia
   g.phase = 'wheel';
   return { round: g.round, effect };
+}
+
+/** Buddy: quem tem o desafio escolhe outro jogador que "bebe junto". */
+export function chooseBuddy(room, playerId, buddyId) {
+  const g = room.game;
+  const r = g?.round;
+  if (!g || !r || !r.needsBuddy) throw new AppError('Não há buddy a escolher.');
+  if (r.currentPlayerId !== playerId) throw new AppError('Só quem tem o desafio escolhe o buddy.');
+  if (r.buddyId) throw new AppError('Já escolheste o buddy.');
+  const buddy = room.players.get(buddyId);
+  if (!buddy || !buddy.connected) throw new AppError('Escolhe um jogador válido.');
+  if (buddyId === playerId) throw new AppError('Escolhe outra pessoa.');
+  r.buddyId = buddyId;
+  r.buddyName = buddy.name;
+  return r;
+}
+
+/** Isto ou Aquilo: o jogador da vez escolhe a opção 0 ou 1. Mostra e espera "continuar". */
+export function chooseOption(room, playerId, index) {
+  const g = room.game;
+  const r = g?.round;
+  if (!g || g.phase !== 'choice' || !r) throw new AppError('Não há escolha ativa.');
+  if (r.currentPlayerId !== playerId) throw new AppError('Não é a tua vez.');
+  if (r.needsBuddy && !r.buddyId) throw new AppError('Escolhe primeiro o teu buddy 🤝.');
+  const i = Number(index);
+  if (i !== 0 && i !== 1) throw new AppError('Escolha inválida.');
+  r.chosen = i;
+  r.status = 'resolved';
+  return r;
 }
 
 /**
@@ -656,6 +724,15 @@ export function continueRound(room, playerId) {
   // Jogo do Vasco: fecha-se no resultado (prémio +1 vida já aplicado no reveal).
   if (g.phase === 'vasco') {
     if (g.round?.substate !== 'result') throw new AppError('O Jogo do Vasco ainda não terminou.');
+    advanceTurn(room);
+    g.round = null;
+    g.phase = 'wheel';
+    return { game: g, rewarded: [] };
+  }
+
+  // Isto ou Aquilo: avança depois de a escolha estar feita.
+  if (g.phase === 'choice') {
+    if (g.round?.status !== 'resolved') throw new AppError('Escolhe uma opção primeiro.');
     advanceTurn(room);
     g.round = null;
     g.phase = 'wheel';
@@ -869,7 +946,14 @@ function serializeRound(g) {
     currentPlayerName: r.currentPlayerName,
     prompt: r.prompt,
     status: r.status,
+    needsBuddy: !!r.needsBuddy,
+    buddyId: r.buddyId || null,
+    buddyName: r.buddyName || null,
   };
+  if (r.gameTypeKey === 'isto_ou_aquilo') {
+    base.options = r.options || [];
+    base.chosen = r.chosen ?? null;
+  }
   if (r.gameTypeKey === 'intrigas') {
     base.substate = r.substate; // 'choosing' | 'rps' | 'reveal'
     base.accusedId = r.accusedId || null;
@@ -935,6 +1019,13 @@ export function serializeGame(room) {
     roundCount: g.roundCount,
     currentPlayerId: g.currentPlayerId,
     finalStats: g.finalStats,
+    activeRules: (g.activeRules || []).map((r) => ({
+      id: r.id,
+      playerId: r.playerId,
+      playerName: r.playerName,
+      text: r.text,
+      remaining: r.remaining,
+    })),
     round: serializeRound(g),
     questionCount: g.questions.length,
     questionsByTarget: g.questions.reduce((m, q) => {
