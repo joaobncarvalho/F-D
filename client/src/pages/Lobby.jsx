@@ -166,6 +166,7 @@ export default function Lobby({ room, youId, messages, error, onSendMessage, onS
                   { key: 'leve', label: '🍃 Leve' },
                   { key: 'picante', label: '🌶️ Picante +18' },
                   { key: 'hardcore', label: '🔥 Hardcore' },
+                  { key: 'caos', label: '💥 Caos' },
                 ].map((it) => (
                   <button
                     key={it.key}
@@ -181,6 +182,9 @@ export default function Lobby({ room, youId, messages, error, onSendMessage, onS
               </div>
               {intensity === 'hardcore' && (
                 <p className="text-xs text-rose-300/80">🔥 Mesmo embaraçoso e sem filtros — só para grupos à vontade.</p>
+              )}
+              {intensity === 'caos' && (
+                <p className="text-xs text-fuchsia-300/80">💥 Modo expose: constrangimento e drama entre quem está à mesa. Preparados? 😈</p>
               )}
             </div>
           </div>

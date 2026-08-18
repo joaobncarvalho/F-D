@@ -45,7 +45,7 @@ export function createAdminRouter() {
     const clean = String(text || '').trim();
     if (!gameTypeKey) return res.status(400).json({ error: 'Escolhe o tipo de jogo.' });
     if (clean.length < 3) return res.status(400).json({ error: 'Texto demasiado curto.' });
-    if (!['leve', 'picante', 'hardcore'].includes(intensity))
+    if (!['leve', 'picante', 'hardcore', 'caos'].includes(intensity))
       return res.status(400).json({ error: 'Intensidade inválida.' });
     res.json(await repo.adminCreatePrompt({ gameTypeKey, text: clean.slice(0, 300), intensity }));
   }));
@@ -55,7 +55,7 @@ export function createAdminRouter() {
     const data = {};
     if (text !== undefined) data.text = String(text).trim().slice(0, 300);
     if (intensity !== undefined) {
-      if (!['leve', 'picante', 'hardcore'].includes(intensity))
+      if (!['leve', 'picante', 'hardcore', 'caos'].includes(intensity))
         return res.status(400).json({ error: 'Intensidade inválida.' });
       data.intensity = intensity;
     }

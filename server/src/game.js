@@ -18,8 +18,8 @@ import { AppError } from './errors.js';
 const DEFAULT_LIVES = 3;
 const MIN_LIVES = 1;
 const MAX_LIVES = 5;
-// Leve · Picante (+18/festa) · Hardcore (mesmo embaraçoso, pior que picante).
-const INTENSITIES = ['leve', 'picante', 'hardcore'];
+// Leve · Picante (+18/festa) · Hardcore (mesmo embaraçoso) · Caos (expose/drama).
+const INTENSITIES = ['leve', 'picante', 'hardcore', 'caos'];
 
 function connectedOrder(room) {
   return [...room.players.values()]
