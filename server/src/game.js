@@ -132,7 +132,7 @@ const PYRAMID_SIZE = PYRAMID_LEVELS.reduce((n, l) => n + l.count, 0); // 15
 // qual for o número deles. Afina-se só aqui.
 const PIRAMIDE_SHARE = 0.1; // ≈ 10% das voltas
 
-function pickWeightedType(types) {
+export function pickWeightedType(types) {
   const piramide = types.find((t) => t.key === 'piramide');
   const others = types.filter((t) => t.key !== 'piramide');
   if (!others.length) return piramide || types[0];
@@ -990,6 +990,7 @@ export function resetToLobby(room, playerId) {
   const host = room.players.get(playerId);
   if (!host || !host.isHost) throw new AppError('Só o host pode voltar ao lobby.');
   room.game = null;
+  room.board = null; // limpa o tabuleiro (mantém o modo escolhido)
   room.status = 'lobby';
   room.intensityVotes = {}; // nova votação de intensidade
   return room;

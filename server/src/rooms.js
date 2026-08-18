@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { AppError } from './errors.js';
 import { serializeGame } from './game.js';
+import { serializeBoard } from './board.js';
 
 export { AppError }; // re-exportado para compatibilidade (socket.js importa daqui)
 
@@ -57,6 +58,7 @@ export class RoomManager {
       createdAt: new Date().toISOString(),
       players: new Map(),
       intensityVotes: {}, // playerId -> intensidade (votação no lobby)
+      mode: 'wheel', // 'wheel' (roda) | 'board' (tabuleiro)
     };
 
     const player = this.#addPlayer(room, name, /* isHost */ true);
@@ -156,6 +158,17 @@ export class RoomManager {
     return room;
   }
 
+  /** Modo de jogo escolhido pelo host no lobby ('wheel' | 'board'). */
+  setMode(code, playerId, mode) {
+    const room = this.getRoom(code);
+    if (!room) throw new AppError('Sala não encontrada.');
+    const player = room.players.get(playerId);
+    if (!player || !player.isHost) throw new AppError('Só o host pode escolher o modo.');
+    if (room.status !== 'lobby') throw new AppError('O jogo já começou.');
+    room.mode = mode === 'board' ? 'board' : 'wheel';
+    return room;
+  }
+
   /** Voto de intensidade no lobby (qualquer jogador). */
   voteIntensity(code, playerId, intensity) {
     const room = this.getRoom(code);
@@ -214,8 +227,10 @@ export function serializeRoom(room) {
         eliminated: p.eliminated,
       })),
     intensityVotes: room.intensityVotes || {}, // votos no lobby (playerId -> intensidade)
-    // Estado de jogo (null enquanto no lobby). Serialização/anonimização em game.js.
+    mode: room.mode || 'wheel',
+    // Estado de jogo (null enquanto no lobby). Serialização/anonimização em game.js/board.js.
     game: serializeGame(room),
+    board: serializeBoard(room),
   };
 }
 

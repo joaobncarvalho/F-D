@@ -1,5 +1,6 @@
 import { RoomManager, serializeRoom, AppError } from './rooms.js';
 import * as game from './game.js';
+import * as board from './board.js';
 
 const rooms = new RoomManager();
 
@@ -90,15 +91,71 @@ export function registerSocketHandlers(io) {
       }
     });
 
-    socket.on('start_game', ({ lives } = {}, ack) => {
+    socket.on('set_mode', ({ mode } = {}, ack) => {
+      try {
+        const { code, playerId } = socket.data;
+        rooms.setMode(code, playerId, mode);
+        broadcastState(io, code);
+        if (typeof ack === 'function') ack({ ok: true });
+      } catch (err) {
+        handleError(socket, ack, err);
+      }
+    });
+
+    socket.on('start_game', async ({ lives } = {}, ack) => {
       try {
         const { code, playerId } = socket.data;
         const room = rooms.startGame(code, playerId);
         // Intensidade decidida pela VOTAÇÃO (maioria; empate → sorteio/randomizer).
         const intensityResult = game.tallyIntensity(room);
-        game.initGame(room, { lives, intensity: intensityResult.intensity });
-        io.to(code).emit('game_started', { intensityResult });
+        if (room.mode === 'board') {
+          await board.initBoard(room, { intensity: intensityResult.intensity }); // modo Tabuleiro
+        } else {
+          game.initGame(room, { lives, intensity: intensityResult.intensity }); // modo Roda
+        }
+        io.to(code).emit('game_started', { mode: room.mode, intensityResult });
         broadcastState(io, code);
+        if (typeof ack === 'function') ack({ ok: true });
+      } catch (err) {
+        handleError(socket, ack, err);
+      }
+    });
+
+    // ----- Modo Tabuleiro -----
+    const boardEvents = {
+      board_roll: (room, pid) => board.rollOrder(room, pid),
+    };
+    for (const [event, fn] of Object.entries(boardEvents)) {
+      socket.on(event, (_payload, ack) => {
+        try {
+          const room = requireRoom(socket);
+          fn(room, socket.data.playerId);
+          broadcastState(io, room.code);
+          if (typeof ack === 'function') ack({ ok: true });
+        } catch (err) {
+          handleError(socket, ack, err);
+        }
+      });
+    }
+
+    socket.on('board_pick_pawn', ({ pawn } = {}, ack) => {
+      try {
+        const room = requireRoom(socket);
+        board.pickPawn(room, socket.data.playerId, pawn);
+        broadcastState(io, room.code);
+        if (typeof ack === 'function') ack({ ok: true });
+      } catch (err) {
+        handleError(socket, ack, err);
+      }
+    });
+
+    socket.on('board_advance', ({ squares } = {}, ack) => {
+      try {
+        const room = requireRoom(socket);
+        board.advance(room, socket.data.playerId, squares);
+        // A vitória (board.phase='over' + winner) e a prisão (lastMove.toPrison)
+        // são lidas pelo cliente a partir do estado serializado.
+        broadcastState(io, room.code);
         if (typeof ack === 'function') ack({ ok: true });
       } catch (err) {
         handleError(socket, ack, err);

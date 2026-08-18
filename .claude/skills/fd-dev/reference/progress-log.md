@@ -5,6 +5,31 @@
 
 ---
 
+## 2026-08-19 — Modo Tabuleiro (Fase 1: motor + servidor)
+
+Novo modo à parte da roda (spec em `reference/board-mode.md`). Fundação:
+- **`server/src/board.js`:** tabuleiro de **45 casas** (1 Partida + 5 ?? + 3 Gamble
+  + 36 mini-jogo distribuídas pelo **peso da roda** `pickWeightedType`, agora
+  exportado). Estado por jogador (peão, pos, golos, slowStreak, skipTurns).
+  Fases `pawn → order → playing → over`. **Avançar 1/2/3 casas = 2/4/6 golos**
+  (sem vidas). **Vitória = dar a volta** (pos ≥ 45). **Prisão por abuso** (andar 1
+  casa 3× seguidas → perde a próxima vez). Funções: initBoard, pickPawn, rollOrder,
+  advance, serializeBoard.
+- **`rooms.js`:** `room.mode` ('wheel'|'board'), `setMode` (host), serializa
+  `mode` + `board`. **`game.js`:** `resetToLobby` limpa o board.
+- **`socket.js`:** `set_mode`, `board_pick_pawn`, `board_roll`, `board_advance`;
+  `start_game` ramifica por modo (board → `initBoard`; roda → `initGame`).
+  `game_started` leva `mode`.
+- **Verificação:** smoke do motor (45 casas + distribuição, peões únicos, ordem por
+  dado, prisão por abuso salta a vez, volta = vitória) ✓. Modo dormente (a roda não
+  muda) até haver UI.
+
+**A seguir (Fase 1 cliente):** seletor de modo no lobby + ecrã do tabuleiro (peões,
+dado da ordem, avançar, render do anel, vitória). Depois Fase 2 (mini-jogo/??/
+Gamble) e Fase 3 (cartas/traits).
+
+---
+
 ## 2026-08-18 — Eliminação: telemóvel partido + espectador + último de pé
 
 Pedido do João: quem fica sem vidas é **eliminado** (o jogo acaba para essa
