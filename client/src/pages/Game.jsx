@@ -16,6 +16,40 @@ const TYPES = [
 ];
 const SPIN_PHASES = ['prompt', 'intrigas', 'guessing', 'piramide', 'vasco', 'choice'];
 
+// Sugestões para os indecisos na preparação (banco curado — offline, sem custo).
+// Trocável por geração com a API da Anthropic quando houver ANTHROPIC_API_KEY.
+const QUESTION_SUGGESTIONS = [
+  'Qual foi a maior vergonha que passaste em público?',
+  'Quem desta mesa levarias para uma ilha deserta?',
+  'Qual foi a mentira mais parva que já contaste para te safares?',
+  'Qual é a coisa mais embaraçosa que tens no telemóvel?',
+  'Já ficaste com alguém e te arrependeste na hora? Conta.',
+  'Qual foi o pior encontro da tua vida?',
+  'Se pudesses apagar uma noite da tua vida, qual era?',
+  'Qual é o hábito mais nojento que tens quando estás sozinho/a?',
+  'Quem foi o teu pior beijo?',
+  'Qual é a app que mais escondes de toda a gente?',
+  'Já espiaste o telemóvel de alguém? De quem?',
+  'Qual é a tua maior obsessão parva?',
+  'Se tivesses de trocar de vida com alguém aqui, quem seria?',
+  'Qual foi a coisa mais atrevida que já fizeste?',
+];
+const SECRET_SUGGESTIONS = [
+  'Já fingi estar doente para faltar a um plano com este grupo.',
+  'Tenho um talento escondido que ninguém aqui conhece.',
+  'Uma vez chorei a ver um anúncio parvo na TV.',
+  'Já stalkei o ex de um/a amigo/a nas redes.',
+  'Guardo uma mentira que contei a alguém desta mesa.',
+  'Já finji que adorei uma prenda que odiei.',
+  'Tenho uma playlist secreta que morreria de vergonha se vissem.',
+  'Uma vez fugi de um encontro pela casa de banho.',
+  'Já mandei mensagem à pessoa errada sobre alguém.',
+  'Tenho um crush improvável por um/a famoso/a.',
+  'Já comi comida que caiu no chão e não disse a ninguém.',
+  'Tenho um medo irracional de uma coisa muito parva.',
+];
+const suggest = (arr) => arr[Math.floor(Math.random() * arr.length)];
+
 export default function Game(props) {
   const { room, youId, authorRoundId } = props;
   const g = room?.game;
@@ -358,9 +392,22 @@ function PrepPhase({ room, youId, onAddQuestion, onAddSecret, onBeginPlay, onLea
             rows={2}
             className="fd-input resize-none"
           />
-          <button type="submit" className="fd-btn fd-btn-ghost py-2 text-sm">
-            + Adicionar pergunta
-          </button>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                sfx.click();
+                setQText(suggest(QUESTION_SUGGESTIONS));
+              }}
+              className="fd-btn fd-btn-ghost py-2 text-sm flex-1"
+              title="Sugestão para indecisos"
+            >
+              💡 Sugerir
+            </button>
+            <button type="submit" className="fd-btn fd-btn-ghost py-2 text-sm flex-1">
+              + Adicionar
+            </button>
+          </div>
         </form>
       </section>
 
@@ -381,9 +428,22 @@ function PrepPhase({ room, youId, onAddQuestion, onAddSecret, onBeginPlay, onLea
             rows={2}
             className="fd-input resize-none"
           />
-          <button type="submit" className="fd-btn fd-btn-ghost py-2 text-sm">
-            + Adicionar segredo ({g.secretCount || 0})
-          </button>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                sfx.click();
+                setSText(suggest(SECRET_SUGGESTIONS));
+              }}
+              className="fd-btn fd-btn-ghost py-2 text-sm flex-1"
+              title="Sugestão para indecisos"
+            >
+              💡 Sugerir
+            </button>
+            <button type="submit" className="fd-btn fd-btn-ghost py-2 text-sm flex-1">
+              + Adicionar ({g.secretCount || 0})
+            </button>
+          </div>
         </form>
       </section>
 
