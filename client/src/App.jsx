@@ -186,6 +186,9 @@ export default function App() {
   const boardPickPawn = useCallback((pawn) => socket.emit('board_pick_pawn', { pawn }), []);
   const boardRoll = useCallback(() => socket.emit('board_roll'), []);
   const boardAdvance = useCallback((squares) => socket.emit('board_advance', { squares }), []);
+  const boardResolve = useCallback((payload) => socket.emit('board_resolve', payload || {}), []);
+  const boardGamble = useCallback((bet) => socket.emit('board_gamble', { bet }), []);
+  const boardPlayCard = useCallback((cardId, targetId) => socket.emit('board_play_card', { cardId, targetId }), []);
   const addQuestion = useCallback(
     (targetPlayerId, text) => socket.emit('add_question', { targetPlayerId, text }),
     []
@@ -282,6 +285,9 @@ export default function App() {
             onPickPawn={boardPickPawn}
             onRoll={boardRoll}
             onAdvance={boardAdvance}
+            onResolve={boardResolve}
+            onGamble={boardGamble}
+            onPlayCard={boardPlayCard}
             onReset={resetGame}
             onLeave={leaveRoom}
           />

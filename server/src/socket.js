@@ -149,12 +149,43 @@ export function registerSocketHandlers(io) {
       }
     });
 
-    socket.on('board_advance', ({ squares } = {}, ack) => {
+    socket.on('board_advance', async ({ squares } = {}, ack) => {
       try {
         const room = requireRoom(socket);
-        board.advance(room, socket.data.playerId, squares);
-        // A vitória (board.phase='over' + winner) e a prisão (lastMove.toPrison)
-        // são lidas pelo cliente a partir do estado serializado.
+        await board.advance(room, socket.data.playerId, squares); // async (conteúdo da casa)
+        broadcastState(io, room.code);
+        if (typeof ack === 'function') ack({ ok: true });
+      } catch (err) {
+        handleError(socket, ack, err);
+      }
+    });
+
+    socket.on('board_resolve', ({ action, choice } = {}, ack) => {
+      try {
+        const room = requireRoom(socket);
+        board.boardResolve(room, socket.data.playerId, { action, choice });
+        broadcastState(io, room.code);
+        if (typeof ack === 'function') ack({ ok: true });
+      } catch (err) {
+        handleError(socket, ack, err);
+      }
+    });
+
+    socket.on('board_gamble', ({ bet } = {}, ack) => {
+      try {
+        const room = requireRoom(socket);
+        board.boardGamble(room, socket.data.playerId, !!bet);
+        broadcastState(io, room.code);
+        if (typeof ack === 'function') ack({ ok: true });
+      } catch (err) {
+        handleError(socket, ack, err);
+      }
+    });
+
+    socket.on('board_play_card', ({ cardId, targetId } = {}, ack) => {
+      try {
+        const room = requireRoom(socket);
+        board.playCard(room, socket.data.playerId, cardId, targetId);
         broadcastState(io, room.code);
         if (typeof ack === 'function') ack({ ok: true });
       } catch (err) {

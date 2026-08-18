@@ -32,8 +32,31 @@ mais"). `App.jsx` liga o ecrã `board` e os emitters. **Tabuleiro jogável
 ponta-a-ponta.** Verificação: **e2e socket** (modo→peões→dado→corrida→vitória) ✓,
 client build ✓.
 
-**A seguir:** Fase 2 (resolver casas: mini-jogo reusa o motor / ?? / Gamble) e
-Fase 3 (cartas/traits + bancos na admin).
+## 2026-08-19 — Modo Tabuleiro Fases 2+3 (casas + cartas)
+
+- **Casas de mini-jogo:** ao cair, desafio **rápido single-player** — prompt de
+  Boca Calada/Desafio (fazer ou beber 3 golos) ou dilema Isto ou Aquilo (escolher).
+  Os jogos de GRUPO (Vasco/Intrigas/Segredos/Piramide) ficam na Roda (não cabem em
+  "1 pessoa cai e faz"). `board.pending` bloqueia o fim da vez até resolver.
+- **Casa ??:** efeito de sorte automático (avança/recua 2 · bebe 3 · ganha carta ·
+  prisão · todos os outros bebem 2).
+- **Casa Gamble:** aposta (50/50 avança 2 / recua 2) ou passa.
+- **Prisão:** consequência **aleatória** (perde 1-2 vezes · bebe 4 · recua 3 · perde
+  carta) além de perder a vez.
+- **Cartas/traits:** inventário por jogador (ganhas em ??), 7 cartas jogáveis contra
+  outros na tua vez (🔁⬅️⛓️⏭️🛡️🍺🎁); Escudo bloqueia a próxima carta. Públicas (MVP).
+- **Ficheiros:** `board.js` (openMini/boardResolve/boardGamble/applyEvento/applyPrison/
+  playCard/giveCard, serialização com pending/lastEvent/cards), `socket.js`
+  (board_resolve/gamble/play_card; advance async), `App.jsx` + `pages/Board.jsx`
+  (resolução das casas, feedback, inventário + jogar carta com alvo).
+- **Verificação:** smoke do motor (mini/gamble/??/prisão/cartas+escudo) + **e2e
+  socket** completo (corrida a resolver casas, jogar carta, até à vitória) ✓. Build ✓.
+
+**A seguir:** playtest no browser (roda + tabuleiro). Melhorias possíveis: cartas
+privadas, bancos de ??/prisão na admin, casas neutras, mais jogos rápidos.
+
+---
+
 
 ---
 

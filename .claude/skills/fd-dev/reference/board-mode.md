@@ -47,11 +47,15 @@
   - 🎁 Roubo — roubas uma carta a alguém
 
 ## Plano por fases (ordem de construção)
-- **Fase 1 — fundação:** modo no lobby, peões, ordem (dado), tabuleiro renderizado
-  (anel, mobile), avançar-por-golos (cap 3), dar a volta = vitória, prisão por abuso,
-  casas neutras. Jogável ponta-a-ponta.
-- **Fase 2 — casas especiais:** mini-jogo (reusa os 7 jogos) + ?? + Gamble.
-- **Fase 3 — cartas/traits:** inventário + jogar contra outros + bancos na admin.
+- **Fase 1 — fundação ✅:** modo no lobby, peões, ordem (dado), pista de 45 casas,
+  avançar-por-golos (cap 3), dar a volta = vitória, prisão por abuso.
+- **Fase 2 — casas especiais ✅:** mini-jogo (só os **rápidos single-player**:
+  Boca Calada/Desafio/Isto ou Aquilo — os de grupo ficam na Roda) · ?? (banco de
+  sorte auto) · Gamble (aposta 50/50). Prisão passou a ter **consequência aleatória**.
+- **Fase 3 — cartas/traits ✅:** inventário (ganhas em ??), joga na tua vez contra
+  outros: 🔁 Troca · ⬅️ Empurrão · ⛓️ Denúncia · ⏭️ Salta-vez · 🛡️ Escudo (bloqueia)
+  · 🍺 Ronda · 🎁 Roubo. Cartas **públicas** (MVP). Bancos (??/prisão/cartas) em
+  código — mover para a admin/BD é melhoria futura.
 
 ## Arquitetura (notas)
 - Estado do tabuleiro em memória (`room.board` / `game`), como os outros modos.

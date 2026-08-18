@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { sfx } from '../sfx.js';
 import { confetti, haptic } from '../confetti.js';
@@ -20,10 +20,11 @@ const ADVANCE = [
   { n: 3, golos: 6 },
 ];
 
-export default function Board({ room, youId, onPickPawn, onRoll, onAdvance, onReset, onLeave }) {
+export default function Board({ room, youId, onPickPawn, onRoll, onAdvance, onResolve, onGamble, onPlayCard, onReset, onLeave }) {
   const b = room.board;
   const you = room.players.find((p) => p.id === youId);
   const isHost = you?.isHost;
+  const [selCard, setSelCard] = useState(null); // carta selecionada p/ jogar (à espera de alvo)
 
   // Efeitos por evento (vitória / prisão / passo).
   const wonRef = useRef(false);
@@ -182,8 +183,16 @@ export default function Board({ room, youId, onPickPawn, onRoll, onAdvance, onRe
   }
 
   // ---------- A jogar ----------
-  const board = [...rows].sort((a, c) => c.pos - a.pos);
+  const leaderboard = [...rows].sort((a, c) => c.pos - a.pos);
   const lm = b.lastMove;
+  const ev = b.lastEvent;
+  const meta = b.cardMeta || {};
+  const myCards = b.players[youId]?.cards || [];
+  const pending = b.pending;
+  const targets = room.players.filter((p) => p.connected && p.id !== youId);
+  const selMeta = selCard ? meta[selCard.key] : null;
+  const needsTarget = selMeta && selCard.key !== 'shield';
+
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex-1 flex flex-col gap-3">
       <Header sub={`corrida até dar a volta (${b.size} casas)`}>
@@ -194,7 +203,7 @@ export default function Board({ room, youId, onPickPawn, onRoll, onAdvance, onRe
       <div className="flex gap-1 overflow-x-auto pb-2 -mx-1 px-1">
         {b.squares.map((sq) => {
           const here = rows.filter((r) => r.pos === sq.i && r.pawn);
-          const isCur = currentPlayer && b.players[b.currentPlayerId]?.pos === sq.i;
+          const isCur = b.players[b.currentPlayerId]?.pos === sq.i;
           return (
             <div
               key={sq.i}
@@ -210,42 +219,110 @@ export default function Board({ room, youId, onPickPawn, onRoll, onAdvance, onRe
         })}
       </div>
 
-      {/* Classificação compacta */}
+      {/* Classificação + cartas (públicas) */}
       <div className="fd-card p-2.5 flex flex-col gap-1">
-        {board.map((r) => (
+        {leaderboard.map((r) => (
           <div key={r.id} className={`flex items-center justify-between text-xs ${r.id === b.currentPlayerId ? 'text-pink-300 font-semibold' : ''}`}>
             <span>
               {r.pawn} {r.name}
-              {r.skipTurns > 0 && <span className="text-rose-300"> 🚔 preso</span>}
+              {r.shield && ' 🛡️'}
+              {r.skipTurns > 0 && <span className="text-rose-300"> 🚔</span>}
             </span>
             <span className="text-white/60">
-              {r.pos}/{b.size} · 🍺 {r.golos}
+              {(r.cards || []).map((c) => meta[c.key]?.emoji).join('')} {r.pos}/{b.size} · 🍺 {r.golos}
             </span>
           </div>
         ))}
       </div>
 
-      {lm && (
+      {ev ? (
+        <p className="text-center text-sm text-amber-200">{ev.text}</p>
+      ) : lm ? (
         <p className="text-center text-xs text-white/50">
-          {lm.pawn} {lm.name} andou {lm.squares} casa{lm.squares > 1 ? 's' : ''} (bebeu {lm.golos} golos)
-          {lm.toPrison && <span className="text-rose-300 font-semibold"> — e foi PRESO! 🚔</span>}
+          {lm.name} andou {lm.squares} casa{lm.squares > 1 ? 's' : ''} (🍺 {lm.golos})
         </p>
+      ) : null}
+
+      {/* Resolver a casa onde caiu */}
+      {pending && isMyTurn && (
+        <div className="fd-card p-4 flex flex-col gap-3 text-center" style={{ boxShadow: '0 10px 30px -12px #ffb02099' }}>
+          {pending.kind === 'mini' && pending.variant === 'dare' && (
+            <>
+              <p className="text-xs font-bold uppercase tracking-wide text-white/50">{pending.gameLabel}</p>
+              <p className="text-base">{pending.text}</p>
+              <div className="flex gap-2">
+                <button onClick={() => { sfx.click(); onResolve({ action: 'do' }); }} className="fd-btn fd-btn-success flex-1">✅ Faço!</button>
+                <button onClick={() => { sfx.click(); onResolve({ action: 'drink' }); }} className="fd-btn fd-btn-danger flex-1">🍺 Bebo 3</button>
+              </div>
+            </>
+          )}
+          {pending.kind === 'mini' && pending.variant === 'choice' && (
+            <>
+              <p className="text-xs font-bold uppercase tracking-wide text-white/50">⚖️ Isto ou Aquilo?</p>
+              {pending.options.map((o, i) => (
+                <button key={i} onClick={() => { sfx.click(); onResolve({ choice: i }); }} className="fd-btn fd-btn-ghost text-left py-3">
+                  {i === 0 ? '👈 ' : '👉 '}{o}
+                </button>
+              ))}
+            </>
+          )}
+          {pending.kind === 'gamble' && (
+            <>
+              <p className="text-lg font-bold text-amber-300">🎲 Gamble!</p>
+              <p className="text-sm text-white/60">Aposta 2 golos: 50/50 → avanças 2 ou recuas 2. Passar = ficas.</p>
+              <div className="flex gap-2">
+                <button onClick={() => { sfx.click(); onGamble(true); }} className="fd-btn fd-btn-amber flex-1">🎲 Apostar</button>
+                <button onClick={() => { sfx.click(); onGamble(false); }} className="fd-btn fd-btn-ghost flex-1">Passar</button>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+      {pending && !isMyTurn && (
+        <p className="text-center text-sm text-white/40">{currentPlayer?.name} está a resolver a casa…</p>
       )}
 
-      {/* Controlos */}
-      {isMyTurn ? (
+      {/* Cartas + avançar (só a vez, sem casa pendente) */}
+      {isMyTurn && !pending && (
         <div className="mt-auto flex flex-col gap-2">
+          {myCards.length > 0 && (
+            <div className="fd-card p-2.5 flex flex-col gap-2">
+              <p className="text-xs text-white/60">🎴 As tuas cartas — joga uma antes de andar:</p>
+              <div className="flex flex-wrap gap-2">
+                {myCards.map((c) => (
+                  <button
+                    key={c.id}
+                    onClick={() => { sfx.click(); setSelCard(selCard?.id === c.id ? null : c); }}
+                    className={`fd-chip ${selCard?.id === c.id ? 'fd-chip-on' : ''}`}
+                  >
+                    {meta[c.key]?.emoji} {meta[c.key]?.name}
+                  </button>
+                ))}
+              </div>
+              {selCard && (
+                <div className="flex flex-col gap-1">
+                  <p className="text-xs text-white/50">{selMeta?.desc}</p>
+                  {needsTarget ? (
+                    <div className="flex flex-wrap gap-2">
+                      {targets.map((p) => (
+                        <button key={p.id} onClick={() => { sfx.click(); onPlayCard(selCard.id, p.id); setSelCard(null); }} className="fd-chip">
+                          {b.players[p.id]?.pawn} {p.name}
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <button onClick={() => { sfx.click(); onPlayCard(selCard.id, null); setSelCard(null); }} className="fd-btn fd-btn-primary py-2 text-sm">
+                      Ativar {selMeta?.name}
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
           <p className="text-center text-sm text-white/60">Quanto queres andar? (bebes e avanças)</p>
           <div className="flex gap-2">
             {ADVANCE.map((a) => (
-              <button
-                key={a.n}
-                onClick={() => {
-                  sfx.click();
-                  onAdvance(a.n);
-                }}
-                className="fd-btn fd-btn-primary flex-1 flex flex-col py-3"
-              >
+              <button key={a.n} onClick={() => { sfx.click(); onAdvance(a.n); }} className="fd-btn fd-btn-primary flex-1 flex flex-col py-3">
                 <span className="text-lg font-extrabold">{a.n} casa{a.n > 1 ? 's' : ''}</span>
                 <span className="text-xs opacity-80">🍺 {a.golos} golos</span>
               </button>
@@ -253,10 +330,9 @@ export default function Board({ room, youId, onPickPawn, onRoll, onAdvance, onRe
           </div>
           <p className="text-center text-[11px] text-white/35">Andar só 1 casa 3× seguidas → prisão 🚔</p>
         </div>
-      ) : (
-        <p className="text-center text-white/40 py-3 mt-auto">
-          À espera de <b className="text-white">{currentPlayer?.name}</b>…
-        </p>
+      )}
+      {!isMyTurn && !pending && (
+        <p className="text-center text-white/40 py-3 mt-auto">À espera de <b className="text-white">{currentPlayer?.name}</b>…</p>
       )}
     </motion.div>
   );

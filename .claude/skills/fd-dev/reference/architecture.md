@@ -119,7 +119,10 @@ Objetivo: a app nunca fala Prisma diretamente nos handlers. Introduzir um
 | `set_mode` | `{ mode: 'wheel'\|'board' }` | Lobby, **só host**. Escolhe o modo (roda ou tabuleiro). Em `room.mode`. |
 | `board_pick_pawn` | `{ pawn }` | Tabuleiro (`pawn`). Escolhe o peão (único). Todos escolheram → `order`. |
 | `board_roll` | — | Tabuleiro (`order`). Lança o dado da ordem. Todos lançaram → `playing`. |
-| `board_advance` | `{ squares: 1\|2\|3 }` | Tabuleiro (`playing`). Só a vez. Bebe 2/4/6 golos e anda; volta = vitória; 3× andar 1 → prisão. |
+| `board_advance` | `{ squares: 1\|2\|3 }` | Tabuleiro (`playing`). Só a vez. Bebe 2/4/6 golos e anda; resolve a casa (mini/??/Gamble); volta = vitória; 3× andar 1 → prisão. |
+| `board_resolve` | `{ action:'do'\|'drink' }` ou `{ choice:0\|1 }` | Resolve a casa de **mini-jogo** (fazer o desafio/beber, ou escolher no Isto/Aquilo). |
+| `board_gamble` | `{ bet: bool }` | Casa **Gamble**: apostar (50/50 avança 2 / recua 2) ou passar (fica). |
+| `board_play_card` | `{ cardId, targetId }` | Joga uma **carta** na tua vez (antes de andar): Troca/Empurrão/Denúncia/Salta-vez/Escudo/Ronda/Roubo. Escudo bloqueia a próxima carta contra ti. |
 | `start_game` | `{ lives }` | Só host, ≥2 ligados. A **intensidade vem da votação** (`tallyIntensity`: maioria; empate → sorteio). `initGame` → fase `prep`, emite `game_started`. |
 | `add_question` | `{ targetPlayerId, text }` | Fase `prep`. Pergunta dirigida a outro (não a si) → Boca Calada. |
 | `add_secret` | `{ text }` | Fase `prep`. Segredo anónimo → Segredos. |
