@@ -4,183 +4,333 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>F&D — Admin de conteúdo</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;800&family=Fredoka:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
     <style>
-      :root { color-scheme: dark; }
+      :root {
+        color-scheme: dark;
+        --pink: #ff3d8b;
+        --purple: #9b5cff;
+        --amber: #ffb020;
+        --teal: #1fd3b6;
+        --red: #ff4d6d;
+        --bg: #0b0b12;
+        --card: rgba(255, 255, 255, 0.06);
+        --border: rgba(255, 255, 255, 0.1);
+      }
       * { box-sizing: border-box; }
-      body { margin: 0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; background: #0b0b12; color: #f5f5f7; }
-      .wrap { max-width: 820px; margin: 0 auto; padding: 20px 16px 60px; }
-      h1 { font-size: 1.4rem; margin: 8px 0 4px; }
-      .muted { color: rgba(255,255,255,.5); font-size: .85rem; }
-      .card { background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.1); border-radius: 14px; padding: 14px; margin: 12px 0; }
-      input, select, textarea, button { font: inherit; }
-      input, select, textarea { background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.14); border-radius: 10px; padding: 9px 11px; color: #fff; outline: none; width: 100%; }
-      textarea { resize: vertical; min-height: 42px; }
-      label { font-size: .8rem; color: rgba(255,255,255,.6); display: block; margin-bottom: 4px; }
-      button { cursor: pointer; border: none; border-radius: 10px; padding: 9px 14px; font-weight: 700; color: #fff; background: linear-gradient(135deg,#ff3d8b,#9b5cff); }
-      button.ghost { background: rgba(255,255,255,.1); }
-      button.danger { background: linear-gradient(135deg,#ff4d6d,#d61f5c); }
-      button.small { padding: 6px 10px; font-size: .8rem; }
-      button:disabled { opacity: .4; cursor: default; }
-      .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: end; }
-      .grow { flex: 1; min-width: 160px; }
-      .prompt { display: flex; gap: 8px; align-items: center; padding: 8px 0; border-top: 1px solid rgba(255,255,255,.08); }
-      .prompt textarea { min-height: 38px; }
-      .badge { font-size: .68rem; padding: 2px 8px; border-radius: 999px; white-space: nowrap; font-weight: 700; }
-      .leve { background: rgba(31,211,182,.2); color: #7ff0dd; }
-      .picante { background: rgba(255,176,32,.2); color: #ffd27f; }
-      .hardcore { background: rgba(255,77,109,.22); color: #ff9db0; }
+      html, body { height: 100%; }
+      body {
+        margin: 0;
+        font-family: "Fredoka", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+        background: var(--bg);
+        color: #f5f5f7;
+        -webkit-tap-highlight-color: transparent;
+        overflow-x: hidden;
+      }
+      /* Fundo de luzes de festa */
+      body::before, body::after {
+        content: ""; position: fixed; inset: -20% -20% auto -20%; height: 80vh;
+        z-index: -2; filter: blur(90px); opacity: 0.5; pointer-events: none;
+      }
+      body::before {
+        background: radial-gradient(40% 50% at 20% 20%, var(--pink) 0%, transparent 70%),
+          radial-gradient(45% 55% at 80% 10%, var(--purple) 0%, transparent 70%);
+      }
+      body::after {
+        top: auto; bottom: -20%;
+        background: radial-gradient(45% 55% at 75% 85%, var(--amber) 0%, transparent 70%),
+          radial-gradient(40% 50% at 15% 90%, var(--teal) 0%, transparent 70%);
+      }
+      .wrap { max-width: 860px; margin: 0 auto; padding: 26px 16px 80px; }
+      h1 {
+        font-family: "Baloo 2", sans-serif; font-weight: 800; font-size: 1.7rem;
+        margin: 4px 0 2px; letter-spacing: -0.01em;
+      }
+      .grad { background: linear-gradient(120deg, var(--pink), var(--purple), var(--amber)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+      .muted { color: rgba(255, 255, 255, 0.55); font-size: 0.9rem; margin: 0; }
+      .card {
+        background: var(--card); border: 1px solid var(--border); border-radius: 18px;
+        padding: 18px; margin: 16px 0; backdrop-filter: blur(12px);
+        box-shadow: 0 12px 34px -16px rgba(0, 0, 0, 0.7);
+      }
+      .card h2 { font-family: "Baloo 2", sans-serif; font-size: 1.05rem; margin: 0 0 12px; }
+      label { font-size: 0.78rem; color: rgba(255, 255, 255, 0.55); display: block; margin-bottom: 6px; font-weight: 500; }
+      input, textarea, select {
+        font: inherit; width: 100%; color: #fff; background: rgba(255, 255, 255, 0.07);
+        border: 1px solid var(--border); border-radius: 12px; padding: 11px 13px; outline: none;
+        transition: border-color 0.15s, box-shadow 0.15s;
+      }
+      input:focus, textarea:focus, select:focus { border-color: var(--pink); box-shadow: 0 0 0 3px rgba(255, 61, 139, 0.22); }
+      textarea { resize: vertical; min-height: 46px; line-height: 1.35; }
+      ::placeholder { color: rgba(255, 255, 255, 0.32); }
+      /* Select estilizado com seta própria */
+      select {
+        appearance: none; -webkit-appearance: none; padding-right: 38px; cursor: pointer;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23bbb' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+        background-repeat: no-repeat; background-position: right 12px center;
+      }
+      select option { background: #16161f; color: #fff; }
+      button {
+        font: inherit; cursor: pointer; border: none; border-radius: 12px; padding: 11px 16px;
+        font-weight: 600; color: #fff; transition: transform 0.1s, filter 0.15s;
+      }
+      button:active { transform: scale(0.96); }
+      button:disabled { opacity: 0.45; cursor: default; transform: none; }
+      .btn-primary { background: linear-gradient(135deg, var(--pink), var(--purple)); box-shadow: 0 8px 22px -10px rgba(255, 61, 139, 0.7); }
+      .btn-ghost { background: rgba(255, 255, 255, 0.09); border: 1px solid var(--border); }
+      .btn-danger { background: rgba(255, 77, 109, 0.16); border: 1px solid rgba(255, 77, 109, 0.4); color: #ff9db0; }
+      .small { padding: 8px 12px; font-size: 0.85rem; }
+      .row { display: flex; gap: 12px; flex-wrap: wrap; }
+      .grow { flex: 1 1 auto; min-width: 0; }
+      .spacer { flex: 1; }
+
+      /* Segmented control (intensidade) */
+      .seg { display: inline-flex; background: rgba(255, 255, 255, 0.06); border: 1px solid var(--border); border-radius: 12px; padding: 3px; gap: 3px; }
+      .seg button { background: transparent; color: rgba(255, 255, 255, 0.6); padding: 7px 12px; border-radius: 9px; font-size: 0.85rem; font-weight: 600; }
+      .seg button[data-on="leve"].active { background: rgba(31, 211, 182, 0.22); color: #8ff2e2; }
+      .seg button[data-on="picante"].active { background: rgba(255, 176, 32, 0.22); color: #ffd382; }
+      .seg button[data-on="hardcore"].active { background: rgba(255, 77, 109, 0.22); color: #ff9db0; }
+
+      .toolbar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin: 20px 2px 10px; }
+      .count { color: rgba(255, 255, 255, 0.5); font-size: 0.85rem; }
+
+      .prompt-card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 12px 13px; margin: 10px 0; transition: opacity 0.2s; }
+      .prompt-card.off { opacity: 0.5; }
+      .prompt-card textarea { background: rgba(0, 0, 0, 0.18); border-color: rgba(255, 255, 255, 0.08); }
+      .prompt-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 10px; }
+      .type-chip { font-size: 0.72rem; font-weight: 600; padding: 4px 10px; border-radius: 999px; background: rgba(155, 92, 255, 0.18); color: #cbb5ff; white-space: nowrap; }
+
+      .err { color: #ff9db0; font-size: 0.85rem; min-height: 1.1em; margin: 8px 0 0; }
+      .empty { text-align: center; color: rgba(255, 255, 255, 0.4); padding: 30px; }
       .hidden { display: none; }
-      .toolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin: 10px 0; }
-      .err { color: #ff9db0; font-size: .85rem; min-height: 1.1em; }
-      .off { opacity: .45; }
+
+      /* Login */
+      .login-wrap { min-height: 62vh; display: grid; place-items: center; }
+      .login-card { width: 100%; max-width: 380px; text-align: center; }
+      .login-card .emoji { font-size: 2.4rem; }
+
+      /* Toast */
+      .toast { position: fixed; bottom: 22px; left: 50%; transform: translate(-50%, 20px); opacity: 0; transition: 0.25s; z-index: 50; padding: 12px 18px; border-radius: 12px; font-weight: 600; box-shadow: 0 12px 30px -8px rgba(0, 0, 0, 0.6); }
+      .toast.show { transform: translate(-50%, 0); opacity: 1; }
+      .toast.ok { background: linear-gradient(135deg, #14b884, #0e9c8a); }
+      .toast.bad { background: linear-gradient(135deg, var(--red), #d61f5c); }
+
+      @media (max-width: 560px) {
+        .row.form-row > * { flex: 1 1 100%; }
+      }
     </style>
   </head>
   <body>
     <div class="wrap">
-      <h1>🍻 F&D — Admin de conteúdo</h1>
-      <p class="muted">Escreve desafios para <b>Boca Calada</b>, <b>Intrigas</b> e <b>Desafio</b> (e mais). Guardam na base de dados.</p>
-
       <!-- Login -->
-      <div id="login" class="card">
-        <label>Password de admin</label>
-        <div class="row">
-          <div class="grow"><input id="pass" type="password" placeholder="ADMIN_PASSWORD" /></div>
-          <button id="enter">Entrar</button>
+      <div id="login" class="login-wrap">
+        <div class="card login-card">
+          <div class="emoji">🍻</div>
+          <h1 class="grad">F&D · Admin</h1>
+          <p class="muted" style="margin-bottom: 16px">Entra para gerir os desafios</p>
+          <input id="pass" type="password" placeholder="Password de admin" autocomplete="current-password" />
+          <button id="enter" class="btn-primary" style="width: 100%; margin-top: 10px">Entrar</button>
+          <p id="loginErr" class="err"></p>
         </div>
-        <p id="loginErr" class="err"></p>
       </div>
 
       <!-- App -->
       <div id="app" class="hidden">
+        <header style="display: flex; align-items: center; justify-content: space-between; gap: 10px">
+          <div>
+            <h1 class="grad">F&D · Admin</h1>
+            <p class="muted">Desafios de Boca Calada, Intrigas e Desafio — guardados na base de dados.</p>
+          </div>
+          <button id="logout" class="btn-ghost small">Sair</button>
+        </header>
+
+        <!-- Novo -->
         <div class="card">
-          <b>Novo desafio</b>
-          <div class="row" style="margin-top:10px">
-            <div>
-              <label>Tipo</label>
+          <h2>➕ Novo desafio</h2>
+          <div class="row form-row">
+            <div style="flex: 0 0 200px">
+              <label>Tipo de jogo</label>
               <select id="newType"></select>
             </div>
-            <div>
-              <label>Intensidade</label>
-              <select id="newIntensity">
-                <option value="leve">🍃 Leve</option>
-                <option value="picante">🌶️ Picante +18</option>
-                <option value="hardcore">🔥 Hardcore</option>
-              </select>
-            </div>
             <div class="grow">
-              <label>Texto</label>
-              <textarea id="newText" maxlength="300" placeholder="Ex.: Faz a tua melhor imitação de outro jogador…"></textarea>
+              <label>Intensidade</label>
+              <div id="newIntensity"></div>
             </div>
-            <button id="add">+ Adicionar</button>
           </div>
-          <p id="addErr" class="err"></p>
+          <div style="margin-top: 12px">
+            <label>Texto do desafio</label>
+            <textarea id="newText" maxlength="300" placeholder="Ex.: Faz a tua melhor imitação de outro jogador; se ninguém adivinhar, bebes."></textarea>
+          </div>
+          <div class="row" style="margin-top: 12px; justify-content: flex-end; align-items: center">
+            <p id="addErr" class="err" style="flex: 1; margin: 0"></p>
+            <button id="add" class="btn-primary">Adicionar desafio</button>
+          </div>
         </div>
 
+        <!-- Lista -->
         <div class="toolbar">
-          <label style="margin:0">Filtrar:</label>
-          <select id="filterType" style="width:auto"><option value="">Todos</option></select>
-          <span id="count" class="muted"></span>
-          <button id="logout" class="ghost small" style="margin-left:auto">Sair</button>
+          <div style="flex: 0 0 190px">
+            <select id="filterType"></select>
+          </div>
+          <div id="filterIntensity"></div>
+          <span class="spacer"></span>
+          <span id="count" class="count"></span>
         </div>
-
         <div id="list"></div>
       </div>
     </div>
 
     <script>
-      const API = '/admin/api';
-      const HIDE_TYPES = ['piramide', 'vasco']; // mecânica, sem prompts
-      let pass = sessionStorage.getItem('fd_admin_pass') || '';
+      const API = "/admin/api";
+      const HIDE_TYPES = ["piramide", "vasco"]; // mecânica, sem prompts
+      const INTS = [
+        { key: "leve", label: "🍃 Leve" },
+        { key: "picante", label: "🌶️ Picante +18" },
+        { key: "hardcore", label: "🔥 Hardcore" },
+      ];
+      let pass = sessionStorage.getItem("fd_admin_pass") || "";
       let types = [];
+      let cache = []; // prompts do tipo filtrado (todas intensidades)
+      let intFilter = "all";
 
       const $ = (id) => document.getElementById(id);
       const el = (t, props = {}, kids = []) => {
         const n = Object.assign(document.createElement(t), props);
-        for (const k of [].concat(kids)) n.append(k);
+        for (const k of [].concat(kids)) if (k != null) n.append(k);
         return n;
       };
+
+      function toast(msg, ok = true) {
+        const t = el("div", { className: "toast " + (ok ? "ok" : "bad"), textContent: msg });
+        document.body.append(t);
+        requestAnimationFrame(() => t.classList.add("show"));
+        setTimeout(() => { t.classList.remove("show"); setTimeout(() => t.remove(), 300); }, 2200);
+      }
 
       async function api(path, opts = {}) {
         const res = await fetch(API + path, {
           ...opts,
-          headers: { 'Content-Type': 'application/json', 'x-admin-password': pass, ...(opts.headers || {}) },
+          headers: { "Content-Type": "application/json", "x-admin-password": pass, ...(opts.headers || {}) },
         });
         const data = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(data.error || ('Erro ' + res.status));
+        if (!res.ok) throw new Error(data.error || "Erro " + res.status);
         return data;
       }
 
-      const intOpt = (v) =>
-        `<option value="leve"${v==='leve'?' selected':''}>🍃 Leve</option>` +
-        `<option value="picante"${v==='picante'?' selected':''}>🌶️ Picante +18</option>` +
-        `<option value="hardcore"${v==='hardcore'?' selected':''}>🔥 Hardcore</option>`;
+      // Segmented control de intensidade. onChange(value). Devolve { node, get, set }.
+      function segmented(current, onChange, { withAll = false } = {}) {
+        const items = withAll ? [{ key: "all", label: "Todas" }, ...INTS] : INTS;
+        let value = current;
+        const node = el("div", { className: "seg" });
+        const btns = {};
+        for (const it of items) {
+          const b = el("button", { type: "button", textContent: it.label });
+          b.dataset.on = it.key;
+          if (it.key === value) b.classList.add("active");
+          b.onclick = () => {
+            value = it.key;
+            for (const k in btns) btns[k].classList.toggle("active", k === value);
+            onChange && onChange(value);
+          };
+          btns[it.key] = b;
+          node.append(b);
+        }
+        return { node, get: () => value, set: (v) => btns[v] && btns[v].click() };
+      }
+
+      let newInt;
 
       async function boot() {
-        try {
-          await api('/check');
-        } catch (e) {
-          $('login').classList.remove('hidden');
-          $('app').classList.add('hidden');
-          if (pass) $('loginErr').textContent = e.message;
+        try { await api("/check"); }
+        catch (e) {
+          $("login").classList.remove("hidden");
+          $("app").classList.add("hidden");
+          if (pass) $("loginErr").textContent = e.message;
           return;
         }
-        $('login').classList.add('hidden');
-        $('app').classList.remove('hidden');
-        types = (await api('/game-types')).filter((t) => !HIDE_TYPES.includes(t.key));
-        const opts = types.map((t) => `<option value="${t.key}">${t.label}</option>`).join('');
-        $('newType').innerHTML = opts;
-        $('filterType').innerHTML = '<option value="">Todos</option>' + opts;
+        $("login").classList.add("hidden");
+        $("app").classList.remove("hidden");
+
+        types = (await api("/game-types")).filter((t) => !HIDE_TYPES.includes(t.key));
+        $("newType").innerHTML = types.map((t) => `<option value="${t.key}">${t.label}</option>`).join("");
+        $("filterType").innerHTML =
+          '<option value="">Todos os tipos</option>' + types.map((t) => `<option value="${t.key}">${t.label}</option>`).join("");
+
+        newInt = segmented("leve", null);
+        $("newIntensity").replaceChildren(newInt.node);
+
+        const intF = segmented("all", (v) => { intFilter = v; render(); }, { withAll: true });
+        $("filterIntensity").replaceChildren(intF.node);
+
         await load();
       }
 
       async function load() {
-        const type = $('filterType').value;
-        const prompts = await api('/prompts' + (type ? '?type=' + encodeURIComponent(type) : ''));
-        $('count').textContent = prompts.length + ' desafios';
-        const list = $('list');
-        list.innerHTML = '';
-        for (const p of prompts) list.append(row(p));
+        const type = $("filterType").value;
+        cache = await api("/prompts" + (type ? "?type=" + encodeURIComponent(type) : ""));
+        render();
+      }
+
+      function render() {
+        const list = intFilter === "all" ? cache : cache.filter((p) => p.intensity === intFilter);
+        $("count").textContent = list.length + (list.length === 1 ? " desafio" : " desafios");
+        const box = $("list");
+        box.replaceChildren();
+        if (!list.length) { box.append(el("div", { className: "empty", textContent: "Sem desafios aqui ainda." })); return; }
+        for (const p of list) box.append(row(p));
       }
 
       function row(p) {
-        const ta = el('textarea', { value: p.text });
-        const sel = el('select'); sel.innerHTML = intOpt(p.intensity); sel.style.width = 'auto';
-        const badge = el('span', { className: 'badge ' + p.intensity, textContent: p.gameType.label });
-        const save = el('button', { className: 'small ghost', textContent: '💾' });
-        const del = el('button', { className: 'small danger', textContent: '🗑' });
-        const wrap = el('div', { className: 'prompt' + (p.active ? '' : ' off') });
+        const wrap = el("div", { className: "prompt-card" + (p.active ? "" : " off") });
+        const ta = el("textarea", { value: p.text });
+        const seg = segmented(p.intensity, null);
+        const chip = el("span", { className: "type-chip", textContent: p.gameType.label });
+        const save = el("button", { className: "btn-ghost small", textContent: "💾 Guardar" });
+        const del = el("button", { className: "btn-danger small", textContent: "🗑" });
 
         save.onclick = async () => {
           save.disabled = true;
-          try { await api('/prompts/' + p.id, { method: 'PATCH', body: JSON.stringify({ text: ta.value, intensity: sel.value }) }); save.textContent = '✓'; setTimeout(() => (save.textContent = '💾'), 900); }
-          catch (e) { alert(e.message); }
+          try {
+            await api("/prompts/" + p.id, { method: "PATCH", body: JSON.stringify({ text: ta.value, intensity: seg.get() }) });
+            p.intensity = seg.get();
+            toast("Guardado ✓");
+            if (intFilter !== "all" && seg.get() !== intFilter) render();
+          } catch (e) { toast(e.message, false); }
           save.disabled = false;
         };
         del.onclick = async () => {
-          if (!confirm('Apagar este desafio?')) return;
-          try { await api('/prompts/' + p.id, { method: 'DELETE' }); wrap.remove(); }
-          catch (e) { alert(e.message); }
+          if (!confirm("Apagar este desafio?")) return;
+          try { await api("/prompts/" + p.id, { method: "DELETE" }); cache = cache.filter((x) => x.id !== p.id); render(); toast("Apagado"); }
+          catch (e) { toast(e.message, false); }
         };
 
-        wrap.append(badge, ta, sel, save, del);
+        wrap.append(ta, el("div", { className: "prompt-actions" }, [chip, seg.node, el("span", { className: "spacer" }), save, del]));
         return wrap;
       }
 
       // Eventos
-      $('enter').onclick = () => { pass = $('pass').value.trim(); sessionStorage.setItem('fd_admin_pass', pass); boot(); };
-      $('pass').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('enter').click(); });
-      $('logout').onclick = () => { sessionStorage.removeItem('fd_admin_pass'); pass = ''; location.reload(); };
-      $('filterType').onchange = load;
-      $('add').onclick = async () => {
-        $('addErr').textContent = '';
+      $("enter").onclick = () => { pass = $("pass").value.trim(); sessionStorage.setItem("fd_admin_pass", pass); boot(); };
+      $("pass").addEventListener("keydown", (e) => { if (e.key === "Enter") $("enter").click(); });
+      $("logout").onclick = () => { sessionStorage.removeItem("fd_admin_pass"); pass = ""; location.reload(); };
+      $("filterType").onchange = load;
+      $("add").onclick = async () => {
+        $("addErr").textContent = "";
+        const text = $("newText").value.trim();
+        if (text.length < 3) { $("addErr").textContent = "Escreve o desafio."; return; }
         try {
-          await api('/prompts', { method: 'POST', body: JSON.stringify({ gameTypeKey: $('newType').value, intensity: $('newIntensity').value, text: $('newText').value }) });
-          $('newText').value = '';
+          await api("/prompts", { method: "POST", body: JSON.stringify({ gameTypeKey: $("newType").value, intensity: newInt.get(), text }) });
+          $("newText").value = "";
+          toast("Desafio adicionado ✓");
           await load();
-        } catch (e) { $('addErr').textContent = e.message; }
+        } catch (e) { $("addErr").textContent = e.message; }
       };
 
-      if (pass) boot(); else $('login').classList.remove('hidden');
+      if (pass) boot(); else $("login").classList.remove("hidden");
     </script>
   </body>
 </html>
