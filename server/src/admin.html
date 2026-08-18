@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="pt">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>F&D — Admin de conteúdo</title>
+    <style>
+      :root { color-scheme: dark; }
+      * { box-sizing: border-box; }
+      body { margin: 0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; background: #0b0b12; color: #f5f5f7; }
+      .wrap { max-width: 820px; margin: 0 auto; padding: 20px 16px 60px; }
+      h1 { font-size: 1.4rem; margin: 8px 0 4px; }
+      .muted { color: rgba(255,255,255,.5); font-size: .85rem; }
+      .card { background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.1); border-radius: 14px; padding: 14px; margin: 12px 0; }
+      input, select, textarea, button { font: inherit; }
+      input, select, textarea { background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.14); border-radius: 10px; padding: 9px 11px; color: #fff; outline: none; width: 100%; }
+      textarea { resize: vertical; min-height: 42px; }
+      label { font-size: .8rem; color: rgba(255,255,255,.6); display: block; margin-bottom: 4px; }
+      button { cursor: pointer; border: none; border-radius: 10px; padding: 9px 14px; font-weight: 700; color: #fff; background: linear-gradient(135deg,#ff3d8b,#9b5cff); }
+      button.ghost { background: rgba(255,255,255,.1); }
+      button.danger { background: linear-gradient(135deg,#ff4d6d,#d61f5c); }
+      button.small { padding: 6px 10px; font-size: .8rem; }
+      button:disabled { opacity: .4; cursor: default; }
+      .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: end; }
+      .grow { flex: 1; min-width: 160px; }
+      .prompt { display: flex; gap: 8px; align-items: center; padding: 8px 0; border-top: 1px solid rgba(255,255,255,.08); }
+      .prompt textarea { min-height: 38px; }
+      .badge { font-size: .68rem; padding: 2px 8px; border-radius: 999px; white-space: nowrap; font-weight: 700; }
+      .leve { background: rgba(31,211,182,.2); color: #7ff0dd; }
+      .picante { background: rgba(255,176,32,.2); color: #ffd27f; }
+      .hardcore { background: rgba(255,77,109,.22); color: #ff9db0; }
+      .hidden { display: none; }
+      .toolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin: 10px 0; }
+      .err { color: #ff9db0; font-size: .85rem; min-height: 1.1em; }
+      .off { opacity: .45; }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <h1>🍻 F&D — Admin de conteúdo</h1>
+      <p class="muted">Escreve desafios para <b>Boca Calada</b>, <b>Intrigas</b> e <b>Desafio</b> (e mais). Guardam na base de dados.</p>
+
+      <!-- Login -->
+      <div id="login" class="card">
+        <label>Password de admin</label>
+        <div class="row">
+          <div class="grow"><input id="pass" type="password" placeholder="ADMIN_PASSWORD" /></div>
+          <button id="enter">Entrar</button>
+        </div>
+        <p id="loginErr" class="err"></p>
+      </div>
+
+      <!-- App -->
+      <div id="app" class="hidden">
+        <div class="card">
+          <b>Novo desafio</b>
+          <div class="row" style="margin-top:10px">
+            <div>
+              <label>Tipo</label>
+              <select id="newType"></select>
+            </div>
+            <div>
+              <label>Intensidade</label>
+              <select id="newIntensity">
+                <option value="leve">🍃 Leve</option>
+                <option value="picante">🌶️ Picante +18</option>
+                <option value="hardcore">🔥 Hardcore</option>
+              </select>
+            </div>
+            <div class="grow">
+              <label>Texto</label>
+              <textarea id="newText" maxlength="300" placeholder="Ex.: Faz a tua melhor imitação de outro jogador…"></textarea>
+            </div>
+            <button id="add">+ Adicionar</button>
+          </div>
+          <p id="addErr" class="err"></p>
+        </div>
+
+        <div class="toolbar">
+          <label style="margin:0">Filtrar:</label>
+          <select id="filterType" style="width:auto"><option value="">Todos</option></select>
+          <span id="count" class="muted"></span>
+          <button id="logout" class="ghost small" style="margin-left:auto">Sair</button>
+        </div>
+
+        <div id="list"></div>
+      </div>
+    </div>
+
+    <script>
+      const API = '/admin/api';
+      const HIDE_TYPES = ['piramide', 'vasco']; // mecânica, sem prompts
+      let pass = sessionStorage.getItem('fd_admin_pass') || '';
+      let types = [];
+
+      const $ = (id) => document.getElementById(id);
+      const el = (t, props = {}, kids = []) => {
+        const n = Object.assign(document.createElement(t), props);
+        for (const k of [].concat(kids)) n.append(k);
+        return n;
+      };
+
+      async function api(path, opts = {}) {
+        const res = await fetch(API + path, {
+          ...opts,
+          headers: { 'Content-Type': 'application/json', 'x-admin-password': pass, ...(opts.headers || {}) },
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || ('Erro ' + res.status));
+        return data;
+      }
+
+      const intOpt = (v) =>
+        `<option value="leve"${v==='leve'?' selected':''}>🍃 Leve</option>` +
+        `<option value="picante"${v==='picante'?' selected':''}>🌶️ Picante +18</option>` +
+        `<option value="hardcore"${v==='hardcore'?' selected':''}>🔥 Hardcore</option>`;
+
+      async function boot() {
+        try {
+          await api('/check');
+        } catch (e) {
+          $('login').classList.remove('hidden');
+          $('app').classList.add('hidden');
+          if (pass) $('loginErr').textContent = e.message;
+          return;
+        }
+        $('login').classList.add('hidden');
+        $('app').classList.remove('hidden');
+        types = (await api('/game-types')).filter((t) => !HIDE_TYPES.includes(t.key));
+        const opts = types.map((t) => `<option value="${t.key}">${t.label}</option>`).join('');
+        $('newType').innerHTML = opts;
+        $('filterType').innerHTML = '<option value="">Todos</option>' + opts;
+        await load();
+      }
+
+      async function load() {
+        const type = $('filterType').value;
+        const prompts = await api('/prompts' + (type ? '?type=' + encodeURIComponent(type) : ''));
+        $('count').textContent = prompts.length + ' desafios';
+        const list = $('list');
+        list.innerHTML = '';
+        for (const p of prompts) list.append(row(p));
+      }
+
+      function row(p) {
+        const ta = el('textarea', { value: p.text });
+        const sel = el('select'); sel.innerHTML = intOpt(p.intensity); sel.style.width = 'auto';
+        const badge = el('span', { className: 'badge ' + p.intensity, textContent: p.gameType.label });
+        const save = el('button', { className: 'small ghost', textContent: '💾' });
+        const del = el('button', { className: 'small danger', textContent: '🗑' });
+        const wrap = el('div', { className: 'prompt' + (p.active ? '' : ' off') });
+
+        save.onclick = async () => {
+          save.disabled = true;
+          try { await api('/prompts/' + p.id, { method: 'PATCH', body: JSON.stringify({ text: ta.value, intensity: sel.value }) }); save.textContent = '✓'; setTimeout(() => (save.textContent = '💾'), 900); }
+          catch (e) { alert(e.message); }
+          save.disabled = false;
+        };
+        del.onclick = async () => {
+          if (!confirm('Apagar este desafio?')) return;
+          try { await api('/prompts/' + p.id, { method: 'DELETE' }); wrap.remove(); }
+          catch (e) { alert(e.message); }
+        };
+
+        wrap.append(badge, ta, sel, save, del);
+        return wrap;
+      }
+
+      // Eventos
+      $('enter').onclick = () => { pass = $('pass').value.trim(); sessionStorage.setItem('fd_admin_pass', pass); boot(); };
+      $('pass').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('enter').click(); });
+      $('logout').onclick = () => { sessionStorage.removeItem('fd_admin_pass'); pass = ''; location.reload(); };
+      $('filterType').onchange = load;
+      $('add').onclick = async () => {
+        $('addErr').textContent = '';
+        try {
+          await api('/prompts', { method: 'POST', body: JSON.stringify({ gameTypeKey: $('newType').value, intensity: $('newIntensity').value, text: $('newText').value }) });
+          $('newText').value = '';
+          await load();
+        } catch (e) { $('addErr').textContent = e.message; }
+      };
+
+      if (pass) boot(); else $('login').classList.remove('hidden');
+    </script>
+  </body>
+</html>

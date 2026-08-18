@@ -1,3 +1,4 @@
+import 'dotenv/config'; // carrega server/.env em dev; em produção (Railway) não faz nada
 import { createServer } from 'node:http';
 import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -6,6 +7,7 @@ import express from 'express';
 import cors from 'cors';
 import { Server } from 'socket.io';
 import { registerSocketHandlers } from './socket.js';
+import { createAdminRouter } from './admin.js';
 
 const PORT = process.env.PORT || 3001;
 
@@ -19,6 +21,9 @@ const app = express();
 app.use(cors({ origin: corsOrigin }));
 
 app.get('/health', (_req, res) => res.json({ ok: true, service: 'fd-server' }));
+
+// Página de admin (dev/conteúdo) — protegida por ADMIN_PASSWORD. Antes do catch-all da SPA.
+app.use('/admin', createAdminRouter());
 
 const httpServer = createServer(app);
 const io = new Server(httpServer, {

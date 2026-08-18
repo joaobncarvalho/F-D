@@ -81,7 +81,10 @@ Legenda: ✅ feito · 🚧 em curso · ⬜ por fazer · 🔗 ponto de integraç�
 - [x] **Redesign completo** (tema de festa): fundo animado, cartas glass, botões
       gradiente, fonte display, roda com halo
 - [x] **Som** (Web Audio sintetizado + mute), **confetti** (canvas) e **vibração**
-- [ ] 🔗 Troca final mock→Prisma (só quando a BD tiver strings; muda só `repo.js`)
+- [x] 🔗 **Troca final mock→Prisma** feita: `repo.js` lê da Supabase (pooler IPv4)
+      com fallback para memória. DB push + seed (112 prompts). `dotenv` + `.env`.
+- [x] **Página de admin** (`/admin`, `ADMIN_PASSWORD`): CRUD de desafios por tipo +
+      intensidade (leve/picante/hardcore). `server/src/admin.{html,js}` + repo CRUD.
 
 **Colega (BD)**
 - [ ] Finalizar schema definitivo, disponibilizar Prisma client estável

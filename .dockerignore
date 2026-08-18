@@ -8,5 +8,5 @@
 .git
 .claude
 *.md
-server/prisma
 server/db
+# server/prisma é NECESSÁRIO na imagem (schema.prisma → prisma generate no build).

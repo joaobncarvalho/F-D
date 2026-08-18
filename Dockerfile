@@ -16,15 +16,18 @@ RUN npm run build
 
 # ---- 2) Runtime do backend (serve API + frontend) ----
 FROM node:20-alpine AS runtime
-ENV NODE_ENV=production
 WORKDIR /app/server
 COPY server/package.json server/package-lock.json ./
-# --ignore-scripts evita o postinstall do Prisma (não é usado em runtime).
-RUN npm ci --omit=dev --ignore-scripts
+# Inclui devDeps (prisma CLI) para gerar o client; --ignore-scripts para controlar
+# o generate explicitamente a seguir (o postinstall do prisma não tem o schema ainda).
+RUN npm ci --include=dev --ignore-scripts
 COPY server/ ./
+# @prisma/client é usado em runtime (repo.js) → tem de ser gerado no build.
+RUN npx prisma generate
 # Frontend compilado onde o server o procura por defeito (../../client/dist).
 COPY --from=client /app/client/dist /app/client/dist
 
+ENV NODE_ENV=production
 # O Railway injeta PORT; o server já o lê (fallback 3001).
 EXPOSE 3001
 CMD ["npm", "start"]

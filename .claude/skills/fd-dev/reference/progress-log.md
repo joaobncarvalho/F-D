@@ -5,6 +5,39 @@
 
 ---
 
+## 2026-08-18 — BD ligada (Supabase/Prisma) + página de admin de conteúdo
+
+**Integração da BD (o seam da Semana 3 concretizado):** o `repo.js` passa a ler de
+Prisma/Supabase quando `DATABASE_URL` existe, com **fallback** para o conteúdo em
+código se não houver BD ou se ela falhar (dev sem `.env` corre na mesma; falha de
+BD não deita o jogo abaixo). `game.js`/handlers **não mudaram**.
+- Ligação: pooler IPv4 da Supabase (a ligação direta `db.<ref>` é IPv6-only e não
+  era alcançável). `DATABASE_URL` = transaction pooler (6543, `pgbouncer=true`);
+  `DIRECT_URL` = session pooler (5432). Password com `&` → `%26`.
+- `prisma db push` criou as tabelas; `prisma db seed` semeou **112 prompts** (28×4
+  tipos, incl. hardcore). `dotenv` adicionado (o app carrega `server/.env`; em
+  produção não faz nada e usa as env vars do Railway). `.env` é gitignored.
+
+**Página de admin** (`/admin`, protegida por `ADMIN_PASSWORD`): CRUD de desafios
+para Boca Calada / Intrigas / Desafio (e restantes tipos com prompts), com escolha
+de intensidade (leve/picante/hardcore). Página estática auto-contida
+(`server/src/admin.html`) + API (`server/src/admin.js`) montada antes do catch-all
+da SPA. Funções CRUD em `repo.js` (adminListPrompts/Create/Update/Delete).
+
+**Deploy (Docker):** como o `@prisma/client` passou a ser usado em runtime, a
+imagem corre `prisma generate` (antes saltava). `.dockerignore` deixa de excluir
+`server/prisma` (o schema é preciso no build). Falta: pôr `DATABASE_URL`,
+`DIRECT_URL` e `ADMIN_PASSWORD` nas *variables* do Railway.
+
+**Verificação:** `db push` + seed OK (112 prompts); admin API — 401 sem password,
+ok com; game-types e prompts vêm da BD; **create+delete gravam na Supabase** ✓.
+Servidor local liga à BD (log limpo, a servir frontend + /admin).
+
+**Segurança:** password da BD passou pelo chat → **rodar** em Settings → Database
+(e atualizar `.env` + Railway). `ADMIN_PASSWORD` local está "muda-me".
+
+---
+
 ## 2026-08-17 — Vasco v2 (só o tema, host marca) + fixes de animação/mobile
 
 **Fix animação (reportado):** o efeito de reveal (confetti+som) disparava para
