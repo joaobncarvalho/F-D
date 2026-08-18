@@ -56,6 +56,7 @@ export class RoomManager {
       status: 'lobby',
       createdAt: new Date().toISOString(),
       players: new Map(),
+      intensityVotes: {}, // playerId -> intensidade (votação no lobby)
     };
 
     const player = this.#addPlayer(room, name, /* isHost */ true);
@@ -155,6 +156,18 @@ export class RoomManager {
     return room;
   }
 
+  /** Voto de intensidade no lobby (qualquer jogador). */
+  voteIntensity(code, playerId, intensity) {
+    const room = this.getRoom(code);
+    if (!room) throw new AppError('Sala não encontrada.');
+    if (room.status !== 'lobby') throw new AppError('O jogo já começou.');
+    if (!room.players.get(playerId)) throw new AppError('Jogador inválido.');
+    if (!['leve', 'picante', 'hardcore', 'caos'].includes(intensity))
+      throw new AppError('Intensidade inválida.');
+    room.intensityVotes[playerId] = intensity;
+    return room;
+  }
+
   /** Religa um jogador existente após queda de ligação. */
   reconnect(code, playerId) {
     const room = this.getRoom(code);
@@ -198,6 +211,7 @@ export function serializeRoom(room) {
         isHost: p.isHost,
         connected: p.connected,
       })),
+    intensityVotes: room.intensityVotes || {}, // votos no lobby (playerId -> intensidade)
     // Estado de jogo (null enquanto no lobby). Serialização/anonimização em game.js.
     game: serializeGame(room),
   };

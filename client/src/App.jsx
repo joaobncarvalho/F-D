@@ -6,6 +6,7 @@ import Home from './pages/Home.jsx';
 import Lobby from './pages/Lobby.jsx';
 import Game from './pages/Game.jsx';
 import Countdown from './components/Countdown.jsx';
+import IntensityReveal from './components/IntensityReveal.jsx';
 import ErrorBoundary from './components/ErrorBoundary.jsx';
 
 const SESSION_KEY = 'fd_session';
@@ -29,6 +30,7 @@ export default function App() {
   const [intrigasReason, setIntrigasReason] = useState(null); // { roundId, reason }
   const [piramideHand, setPiramideHand] = useState(null); // { roundId, cards } — PRIVADO
   const [vascoRole, setVascoRole] = useState(null); // { roundId, isImpostor, word } — PRIVADO
+  const [intensityResult, setIntensityResult] = useState(null); // { intensity, randomized, candidates, counts }
   const [muted, setMuted] = useState(sfx.isMuted());
 
   const sessionRef = useRef(loadSession());
@@ -61,12 +63,13 @@ export default function App() {
     function onChatMessage(msg) {
       setMessages((prev) => [...prev, msg]);
     }
-    function onGameStarted() {
+    function onGameStarted({ intensityResult } = {}) {
       setAuthorRoundId(null);
       setIntrigasReason(null);
       setPiramideHand(null);
       setVascoRole(null);
-      setScreen('countdown');
+      setIntensityResult(intensityResult || null);
+      setScreen('intensity_reveal');
     }
     function onBackToLobby() {
       setAuthorRoundId(null);
@@ -176,6 +179,7 @@ export default function App() {
 
   const sendMessage = useCallback((text) => socket.emit('send_message', { text }), []);
   const startGame = useCallback((config) => socket.emit('start_game', config), []);
+  const voteIntensity = useCallback((intensity) => socket.emit('vote_intensity', { intensity }), []);
   const addQuestion = useCallback(
     (targetPlayerId, text) => socket.emit('add_question', { targetPlayerId, text }),
     []
@@ -259,7 +263,15 @@ export default function App() {
             error={error}
             onSendMessage={sendMessage}
             onStart={startGame}
+            onVoteIntensity={voteIntensity}
             onLeave={leaveRoom}
+          />
+        )}
+        {screen === 'intensity_reveal' && (
+          <IntensityReveal
+            key="intensity"
+            result={intensityResult}
+            onDone={() => setScreen('countdown')}
           />
         )}
         {screen === 'countdown' && <Countdown key="countdown" onDone={() => setScreen('game')} />}

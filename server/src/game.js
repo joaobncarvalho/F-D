@@ -412,6 +412,23 @@ function buildVascoResult(room) {
 
 // ---------------------------------------------------------------------------
 
+/**
+ * Apura a votação de intensidade do lobby. Maioria simples ganha; empate (ou
+ * sem votos) → sorteia entre as empatadas (o "randomizer" que o cliente anima).
+ */
+export function tallyIntensity(room) {
+  const counts = { leve: 0, picante: 0, hardcore: 0, caos: 0 };
+  for (const v of Object.values(room.intensityVotes || {})) {
+    if (counts[v] !== undefined) counts[v] += 1;
+  }
+  const max = Math.max(...Object.values(counts));
+  let candidates = INTENSITIES.filter((k) => counts[k] === max && max > 0);
+  if (!candidates.length) candidates = [...INTENSITIES]; // ninguém votou → sorteia entre todas
+  const randomized = candidates.length > 1;
+  const intensity = candidates[Math.floor(Math.random() * candidates.length)];
+  return { intensity, randomized, candidates, counts };
+}
+
 export function initGame(room, { lives = DEFAULT_LIVES, intensity = 'leve' } = {}) {
   const n = Math.max(MIN_LIVES, Math.min(MAX_LIVES, Number(lives) || DEFAULT_LIVES));
   for (const p of room.players.values()) p.lives = n;
@@ -957,6 +974,7 @@ export function resetToLobby(room, playerId) {
   if (!host || !host.isHost) throw new AppError('Só o host pode voltar ao lobby.');
   room.game = null;
   room.status = 'lobby';
+  room.intensityVotes = {}; // nova votação de intensidade
   return room;
 }
 

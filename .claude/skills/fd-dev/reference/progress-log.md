@@ -28,8 +28,12 @@ a mostrar **só o ícone** (maior, centrado); o nome aparece no cartão quando p
 (offline, sem chave) que preenche o campo — para os indecisos. Trocável por
 geração com a API da Anthropic quando houver `ANTHROPIC_API_KEY`.
 
-**Decidido, por fazer:** votação de **intensidade** no início (maioria; empate →
-randomizer interativo) — próximo passo.
+**Votação de intensidade (feito a seguir):** no lobby, **todos votam** a
+intensidade (`vote_intensity`); no `start_game` o servidor apura (`tallyIntensity`:
+maioria; empate ou sem votos → **sorteio**). `game_started` leva `intensityResult`
+e o cliente mostra uma **roleta** (`IntensityReveal`, reusa a `Wheel`) que gira até
+à intensidade decidida, antes do countdown. Vidas continuam config do host. Votos
+limpos no `reset_game`. Smoke + **e2e socket** (maioria + empate) ✓.
 
 ---
 

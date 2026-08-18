@@ -115,7 +115,8 @@ Objetivo: a app nunca fala Prisma diretamente nos handlers. Introduzir um
 | `create_room` | `{ name }` | Cria sala, criador vira host. Ack `{ok, room, you}` + emite `room_joined`. |
 | `join_room` | `{ code, name }` | Valida nome único na sala; junta. Ack + `room_joined`. |
 | `rejoin_room` | `{ code, playerId }` | Reconexão após queda; marca `connected=true`. Ack + `room_joined`, ou `session_invalid` se a sala/jogador já não existe. |
-| `start_game` | `{ lives, intensity }` | Só host, ≥2 ligados. Aplica config, `initGame` → fase `questions`, emite `game_started`. |
+| `vote_intensity` | `{ intensity }` | Lobby, **qualquer jogador**. Vota a intensidade (leve/picante/hardcore/caos). Contagens em `room.intensityVotes`. |
+| `start_game` | `{ lives }` | Só host, ≥2 ligados. A **intensidade vem da votação** (`tallyIntensity`: maioria; empate → sorteio). `initGame` → fase `prep`, emite `game_started`. |
 | `add_question` | `{ targetPlayerId, text }` | Fase `prep`. Pergunta dirigida a outro (não a si) → Boca Calada. |
 | `add_secret` | `{ text }` | Fase `prep`. Segredo anónimo → Segredos. |
 | `begin_play` | — | Só host. Fase `prep` → `wheel`; define o 1.º jogador da vez. |
@@ -151,7 +152,7 @@ Objetivo: a app nunca fala Prisma diretamente nos handlers. Introduzir um
 | `room_joined` | `{ room, you }` | Após criar OU juntar (confirmação individual). |
 | `room_state` | `{ room }` | Broadcast a toda a sala em qualquer mudança de estado. |
 | `chat_message` | `{ playerId, name, text, at }` | Nova mensagem. |
-| `game_started` | `{}` | Dispara a transição de countdown no cliente. |
+| `game_started` | `{ intensityResult }` | `intensityResult = { intensity, randomized, candidates, counts }`. Cliente mostra a roleta da intensidade (`IntensityReveal`) → countdown. |
 | `you_are_author` | `{ roundId }` | **PRIVADO** (só ao autor do segredo, via sala por playerId). |
 | `piramide_hand` | `{ roundId, cards: [{rank,suit}×3] }` | **PRIVADO** (Piramide). A mão de cada jogador, só a ele. **Nunca** em broadcast; reenviada no `rejoin_room`. |
 | `vasco_role` | `{ roundId, isImpostor, word }` | **PRIVADO** (Vasco). Papel de cada jogador: grupo recebe a `word`; o Vasco recebe `word:null`. **Nunca** em broadcast; reenviado no `rejoin_room`. |

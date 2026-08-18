@@ -3,12 +3,18 @@ import { motion, AnimatePresence } from 'framer-motion';
 import QRCode from '../components/QRCode.jsx';
 import { sfx } from '../sfx.js';
 
-export default function Lobby({ room, youId, messages, error, onSendMessage, onStart, onLeave }) {
+const INTENSITY_OPTS = [
+  { key: 'leve', label: '🍃 Leve' },
+  { key: 'picante', label: '🌶️ Picante +18' },
+  { key: 'hardcore', label: '🔥 Hardcore' },
+  { key: 'caos', label: '💥 Caos' },
+];
+
+export default function Lobby({ room, youId, messages, error, onSendMessage, onStart, onVoteIntensity, onLeave }) {
   const [draft, setDraft] = useState('');
   const [showQR, setShowQR] = useState(false);
   const [copied, setCopied] = useState(false);
   const [lives, setLives] = useState(3);
-  const [intensity, setIntensity] = useState('leve');
   const chatEndRef = useRef(null);
 
   useEffect(() => {
@@ -139,6 +145,40 @@ export default function Lobby({ room, youId, messages, error, onSendMessage, onS
         </form>
       </section>
 
+      {/* Votação da intensidade — TODOS votam (maioria; empate → randomizer). */}
+      {(() => {
+        const votes = room.intensityVotes || {};
+        const myVote = votes[youId];
+        const counts = { leve: 0, picante: 0, hardcore: 0, caos: 0 };
+        for (const v of Object.values(votes)) if (counts[v] !== undefined) counts[v] += 1;
+        return (
+          <div className="fd-card p-3 flex flex-col gap-2">
+            <span className="text-sm text-white/60">
+              🗳️ Votem a intensidade{' '}
+              <span className="text-white/40">— maioria ganha; empate → à sorte</span>
+            </span>
+            <div className="grid grid-cols-2 gap-2">
+              {INTENSITY_OPTS.map((it) => (
+                <button
+                  key={it.key}
+                  onClick={() => {
+                    sfx.click();
+                    onVoteIntensity(it.key);
+                  }}
+                  className={`fd-chip flex items-center justify-between ${myVote === it.key ? 'fd-chip-on' : ''}`}
+                >
+                  <span>{it.label}</span>
+                  {counts[it.key] > 0 && <span className="text-xs opacity-70 ml-1">{counts[it.key]}</span>}
+                </button>
+              ))}
+            </div>
+            {myVote === 'caos' && (
+              <p className="text-xs text-fuchsia-300/80">💥 Modo expose: constrangimento e drama à mesa. 😈</p>
+            )}
+          </div>
+        );
+      })()}
+
       {isHost ? (
         <div className="flex flex-col gap-3">
           <div className="fd-card p-3 flex flex-col gap-3">
@@ -159,39 +199,11 @@ export default function Lobby({ room, youId, messages, error, onSendMessage, onS
                 ))}
               </div>
             </div>
-            <div className="flex flex-col gap-2">
-              <span className="text-sm text-white/60">Intensidade</span>
-              <div className="flex gap-1 flex-wrap">
-                {[
-                  { key: 'leve', label: '🍃 Leve' },
-                  { key: 'picante', label: '🌶️ Picante +18' },
-                  { key: 'hardcore', label: '🔥 Hardcore' },
-                  { key: 'caos', label: '💥 Caos' },
-                ].map((it) => (
-                  <button
-                    key={it.key}
-                    onClick={() => {
-                      sfx.click();
-                      setIntensity(it.key);
-                    }}
-                    className={`fd-chip ${intensity === it.key ? 'fd-chip-on' : ''}`}
-                  >
-                    {it.label}
-                  </button>
-                ))}
-              </div>
-              {intensity === 'hardcore' && (
-                <p className="text-xs text-rose-300/80">🔥 Mesmo embaraçoso e sem filtros — só para grupos à vontade.</p>
-              )}
-              {intensity === 'caos' && (
-                <p className="text-xs text-fuchsia-300/80">💥 Modo expose: constrangimento e drama entre quem está à mesa. Preparados? 😈</p>
-              )}
-            </div>
           </div>
           <button
             onClick={() => {
               sfx.click();
-              onStart({ lives, intensity });
+              onStart({ lives });
             }}
             disabled={!canStart}
             className="fd-btn fd-btn-primary text-lg"

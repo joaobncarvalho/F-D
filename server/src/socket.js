@@ -79,12 +79,25 @@ export function registerSocketHandlers(io) {
       }
     });
 
-    socket.on('start_game', ({ lives, intensity } = {}, ack) => {
+    socket.on('vote_intensity', ({ intensity } = {}, ack) => {
+      try {
+        const { code, playerId } = socket.data;
+        rooms.voteIntensity(code, playerId, intensity);
+        broadcastState(io, code);
+        if (typeof ack === 'function') ack({ ok: true });
+      } catch (err) {
+        handleError(socket, ack, err);
+      }
+    });
+
+    socket.on('start_game', ({ lives } = {}, ack) => {
       try {
         const { code, playerId } = socket.data;
         const room = rooms.startGame(code, playerId);
-        game.initGame(room, { lives, intensity });
-        io.to(code).emit('game_started', {});
+        // Intensidade decidida pela VOTAÇÃO (maioria; empate → sorteio/randomizer).
+        const intensityResult = game.tallyIntensity(room);
+        game.initGame(room, { lives, intensity: intensityResult.intensity });
+        io.to(code).emit('game_started', { intensityResult });
         broadcastState(io, code);
         if (typeof ack === 'function') ack({ ok: true });
       } catch (err) {
