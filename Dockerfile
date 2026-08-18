@@ -15,14 +15,17 @@ ENV VITE_SERVER_URL=$VITE_SERVER_URL
 RUN npm run build
 
 # ---- 2) Runtime do backend (serve API + frontend) ----
-FROM node:20-alpine AS runtime
+# Debian slim (não Alpine): o Prisma funciona sem os problemas de musl/OpenSSL
+# (libssl.so.1.1) que dão "engines not compatible" no Alpine.
+FROM node:20-slim AS runtime
 WORKDIR /app/server
+RUN apt-get update && apt-get install -y --no-install-recommends openssl && rm -rf /var/lib/apt/lists/*
 COPY server/package.json server/package-lock.json ./
 # Inclui devDeps (prisma CLI) para gerar o client; --ignore-scripts para controlar
 # o generate explicitamente a seguir (o postinstall do prisma não tem o schema ainda).
 RUN npm ci --include=dev --ignore-scripts
 COPY server/ ./
-# @prisma/client é usado em runtime (repo.js) → tem de ser gerado no build.
+# @prisma/client é usado em runtime (repo.js) → tem de ser gerado no build (target Debian).
 RUN npx prisma generate
 # Frontend compilado onde o server o procura por defeito (../../client/dist).
 COPY --from=client /app/client/dist /app/client/dist
