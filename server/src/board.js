@@ -2,18 +2,22 @@
 //
 // Fluxo: escolher peão → lançar dado (ordem) → jogar. Na tua vez podes jogar
 // CARTAS contra outros e depois AVANÇAR 1/2/3 casas (2/4/6 golos, máx 3). A casa
-// onde cais resolve-se: mini-jogo (desafio rápido) · ?? (sorte) · Gamble (aposta).
-// Prisão (perde vez + consequência aleatória) por ABUSO (andar 1 casa 3× seguidas),
-// por ?? ou por carta "Denúncia". Vitória: dar a volta (pos ≥ 45).
+// onde cais resolve-se: mini-jogo (desafio rápido) · ?? (sorte) · Gamble (aposta) ·
+// Blackjack (bate a "casa" → recompensa positiva). Prisão (perde vez + consequência
+// aleatória) por ABUSO (andar 1 casa 3× seguidas), por ?? ou por carta "Denúncia".
+// GANÂNCIA: andar 3 casas 2× seguidas → evento de azar quase garantido.
+// Vitória: dar a volta (pos ≥ 60).
 import { randomUUID } from 'node:crypto';
 import * as repo from './repo.js';
 import { AppError } from './errors.js';
 
-const BOARD_SIZE = 45;
+const BOARD_SIZE = 60;
 const GOLOS_PER_SQUARE = 2;
-const SLOW_LIMIT = 3;
-const N_EVENTO = 5;
-const N_GAMBLE = 3;
+const SLOW_LIMIT = 3; // andar 1 casa Nx seguidas → prisão (abuso de bebida)
+const FAST_LIMIT = 2; // andar 3 casas Nx seguidas → azar da ganância
+const N_EVENTO = 6;
+const N_GAMBLE = 4;
+const N_BLACKJACK = 3;
 const MINI_DRINK = 3; // golos se "beber" em vez de fazer o desafio
 const PAWNS = ['🦊', '🐸', '🐵', '🦄', '🐙', '🐝', '🦁', '🐨', '🐼', '🐷', '🐧', '🐢', '🐔', '🦖'];
 // Casas de mini-jogo: só os jogos RÁPIDOS single-player (os de grupo ficam na Roda).
@@ -50,6 +54,7 @@ async function generateSquares() {
   const bag = [];
   for (let i = 0; i < N_EVENTO; i++) bag.push({ kind: 'evento' });
   for (let i = 0; i < N_GAMBLE; i++) bag.push({ kind: 'gamble' });
+  for (let i = 0; i < N_BLACKJACK; i++) bag.push({ kind: 'blackjack' });
   const miniCount = BOARD_SIZE - 1 - bag.length;
   for (let i = 0; i < miniCount; i++) {
     const gt = miniPool[Math.floor(Math.random() * miniPool.length)];
@@ -63,7 +68,7 @@ export async function initBoard(room, { intensity = 'leve' } = {}) {
   const squares = await generateSquares();
   const players = {};
   for (const p of room.players.values()) {
-    players[p.id] = { pawn: null, pos: 0, golos: 0, slowStreak: 0, skipTurns: 0, finished: false, cards: [], shield: false };
+    players[p.id] = { pawn: null, pos: 0, golos: 0, slowStreak: 0, fastStreak: 0, skipTurns: 0, finished: false, cards: [], shield: false };
   }
   room.mode = 'board';
   room.board = {
@@ -142,13 +147,23 @@ export async function advance(room, playerId, squares) {
 
   me.golos += n * GOLOS_PER_SQUARE;
   me.pos += n;
+  // Sequências: andar sempre 1 (abuso) → prisão; andar sempre 3 (ganância) → azar.
   let toPrison = false;
+  let greedy = false;
   if (n === 1) {
     me.slowStreak += 1;
+    me.fastStreak = 0;
     if (me.slowStreak >= SLOW_LIMIT) toPrison = true;
-  } else me.slowStreak = 0;
+  } else if (n === 3) {
+    me.fastStreak += 1;
+    me.slowStreak = 0;
+    if (me.fastStreak >= FAST_LIMIT) greedy = true;
+  } else {
+    me.slowStreak = 0;
+    me.fastStreak = 0;
+  }
 
-  b.lastMove = { playerId, name: nameOf(room, playerId), squares: n, golos: n * GOLOS_PER_SQUARE, toPrison, landedKind: null };
+  b.lastMove = { playerId, name: nameOf(room, playerId), squares: n, golos: n * GOLOS_PER_SQUARE, toPrison, greedy, landedKind: null };
   b.lastEvent = null;
 
   if (checkWin(room, playerId)) return { board: b, over: true };
@@ -157,6 +172,14 @@ export async function advance(room, playerId, squares) {
     applyPrison(room, playerId, 'abuso de bebida');
     advanceBoardTurn(room);
     return { board: b, over: false };
+  }
+
+  // Ganância: 3 casas 2× seguidas → evento de azar (99% mau, 1% escapa). Ignora a casa onde caiu.
+  if (greedy) {
+    me.fastStreak = 0;
+    applyGreed(room, playerId);
+    if (b.phase !== 'over') advanceBoardTurn(room);
+    return { board: b, over: b.phase === 'over' };
   }
 
   const sq = b.squares[me.pos];
@@ -169,12 +192,45 @@ export async function advance(room, playerId, squares) {
     b.pending = { kind: 'gamble', playerId };
     return { board: b, over: false };
   }
+  if (sq.kind === 'blackjack') {
+    openBlackjack(room, playerId); // define b.pending; resolve-se com hit/stand
+    return { board: b, over: false };
+  }
   if (sq.kind === 'evento') {
     openEvento(room, playerId); // 3 cartas viradas ao contrário; a vez só passa ao escolher (board_evento_pick)
     return { board: b, over: false };
   }
   advanceBoardTurn(room); // partida
   return { board: b, over: false };
+}
+
+// Azar da ganância: 99% algo mau, 1% escapa. Punição direta (não é escolha).
+function applyGreed(room, playerId) {
+  const b = room.board;
+  const me = b.players[playerId];
+  const nm = nameOf(room, playerId);
+  if (Math.random() < 0.01) {
+    b.lastEvent = { text: `😅 ${nm} abusou da ganância… mas escapou por um triz! Fica na mesma.`, greed: true };
+    return;
+  }
+  switch (Math.floor(Math.random() * 4)) {
+    case 0:
+      me.pos = Math.max(0, me.pos - 3);
+      b.lastEvent = { text: `🐍 Ganância castigada — ${nm} recua 3 casas!`, greed: true };
+      break;
+    case 1:
+      me.golos += 4;
+      b.lastEvent = { text: `🐍 Ganância castigada — ${nm} bebe 4 golos!`, greed: true };
+      break;
+    case 2:
+      me.golos += 6;
+      b.lastEvent = { text: `🐍 Ganância castigada — ${nm} vira 6 golos de uma vez! 🥴`, greed: true };
+      break;
+    case 3:
+      applyPrison(room, playerId, 'ganância');
+      if (b.lastEvent) b.lastEvent.greed = true;
+      break;
+  }
 }
 
 async function openMini(room, sq) {
@@ -235,6 +291,110 @@ export function boardGamble(room, playerId, bet) {
   b.pending = null;
   if (!checkWin(room, playerId)) advanceBoardTurn(room);
   return b;
+}
+
+// ---------- Casa Blackjack: bate a "casa" (dealer) → recompensa positiva ----------
+const BJ_RANKS = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
+const BJ_SUITS = ['♠', '♥', '♦', '♣'];
+function drawCard() {
+  return { rank: BJ_RANKS[Math.floor(Math.random() * BJ_RANKS.length)], suit: BJ_SUITS[Math.floor(Math.random() * BJ_SUITS.length)] };
+}
+function handValue(cards) {
+  let total = 0;
+  let aces = 0;
+  for (const c of cards) {
+    if (c.rank === 'A') { total += 11; aces += 1; }
+    else if (c.rank === 'K' || c.rank === 'Q' || c.rank === 'J' || c.rank === '10') total += 10;
+    else total += Number(c.rank);
+  }
+  while (total > 21 && aces > 0) { total -= 10; aces -= 1; }
+  return total;
+}
+
+function openBlackjack(room, playerId) {
+  room.board.pending = {
+    kind: 'blackjack',
+    playerId,
+    stage: 'player', // player (a decidir hit/stand) | done
+    player: [drawCard(), drawCard()],
+    dealer: [drawCard(), drawCard()], // dealer[0] fica escondido até "stand"
+  };
+}
+
+/** Recompensa POSITIVA por vencer a casa (equivalente ao ?? mas só coisas boas). */
+function positiveReward(room, playerId) {
+  const b = room.board;
+  const me = b.players[playerId];
+  switch (Math.floor(Math.random() * 3)) {
+    case 0: {
+      const key = CARD_KEYS[Math.floor(Math.random() * CARD_KEYS.length)];
+      me.cards.push({ id: randomUUID(), key });
+      return `ganha a carta ${CARD_META[key].name} ${CARD_META[key].emoji}`;
+    }
+    case 1:
+      for (const oid of Object.keys(b.players)) if (oid !== playerId) b.players[oid].golos += 2;
+      return 'todos os outros bebem 2 🍻';
+    default:
+      me.pos = Math.min(b.size, me.pos + 1);
+      return 'avança +1 casa extra 🚀';
+  }
+}
+
+function resolveBlackjack(room, result) {
+  const b = room.board;
+  const p = b.pending;
+  const id = p.playerId;
+  const me = b.players[id];
+  const nm = nameOf(room, id);
+  let text;
+  if (result === 'win') {
+    me.pos = Math.min(b.size, me.pos + 2);
+    const reward = positiveReward(room, id);
+    text = `🃏 ${nm} venceu a casa no Blackjack — avança 2 e ${reward}!`;
+    checkWin(room, id);
+  } else if (result === 'push') {
+    text = `🃏 ${nm} empatou com a casa — fica na mesma.`;
+  } else if (result === 'bust') {
+    me.golos += MINI_DRINK;
+    text = `🃏 ${nm} rebentou (+21) — bebe ${MINI_DRINK} golos!`;
+  } else {
+    me.golos += MINI_DRINK;
+    text = `🃏 ${nm} perdeu para a casa — bebe ${MINI_DRINK} golos!`;
+  }
+  b.lastEvent = {
+    text,
+    blackjack: { result, player: p.player, dealer: p.dealer, pv: handValue(p.player), dv: handValue(p.dealer) },
+  };
+  b.pending = null;
+  if (b.phase !== 'over') advanceBoardTurn(room);
+  return b;
+}
+
+/** Casa Blackjack: pedir carta (hit) ou plantar (stand). A casa saca até 17. */
+export function boardBlackjack(room, playerId, action) {
+  const b = requireBoard(room, ['playing']);
+  if (!b.pending || b.pending.kind !== 'blackjack') throw new AppError('Nada de Blackjack.');
+  if (b.currentPlayerId !== playerId) throw new AppError('Não é a tua vez.');
+  const p = b.pending;
+  if (p.stage !== 'player') throw new AppError('A mão já terminou.');
+  if (action === 'hit') {
+    p.player.push(drawCard());
+    if (handValue(p.player) > 21) return resolveBlackjack(room, 'bust');
+    if (handValue(p.player) === 21) return resolveBlackjack(room, standResult(p)); // 21 → planta sozinho
+    return b;
+  }
+  if (action === 'stand') return resolveBlackjack(room, standResult(p));
+  throw new AppError('Ação inválida.');
+}
+
+// A casa saca até 17 e compara. (Muta p.dealer para revelar a mão final.)
+function standResult(p) {
+  while (handValue(p.dealer) < 17) p.dealer.push(drawCard());
+  const pv = handValue(p.player);
+  const dv = handValue(p.dealer);
+  if (dv > 21 || pv > dv) return 'win';
+  if (pv < dv) return 'lose';
+  return 'push';
 }
 
 // Casa ?? ("mistério"): 3 cartas viradas ao contrário. Cada uma esconde uma
@@ -453,6 +613,30 @@ function advanceBoardTurn(room) {
   b.currentPlayerId = order[(order.indexOf(b.currentPlayerId) + 1) % order.length];
 }
 
+// Serializa o pending escondendo o que não pode vazar:
+//  - ?? : só o número de cartas (o conteúdo é surpresa até escolher).
+//  - blackjack: a carta tapada do dealer fica escondida enquanto o jogador decide.
+function serializePending(pending) {
+  if (!pending) return null;
+  if (pending.kind === 'evento') {
+    return { kind: 'evento', playerId: pending.playerId, count: pending.cards.length };
+  }
+  if (pending.kind === 'blackjack') {
+    const revealDealer = pending.stage !== 'player';
+    return {
+      kind: 'blackjack',
+      playerId: pending.playerId,
+      stage: pending.stage,
+      player: pending.player,
+      pv: handValue(pending.player),
+      dealer: revealDealer ? pending.dealer : [pending.dealer[0]],
+      dv: revealDealer ? handValue(pending.dealer) : handValue([pending.dealer[0]]),
+      dealerHidden: !revealDealer,
+    };
+  }
+  return pending;
+}
+
 export function serializeBoard(room) {
   const b = room.board;
   if (!b) return null;
@@ -471,6 +655,7 @@ export function serializeBoard(room) {
           pos: p.pos,
           golos: p.golos,
           slowStreak: p.slowStreak,
+          fastStreak: p.fastStreak,
           skipTurns: p.skipTurns,
           finished: p.finished,
           shield: p.shield,
@@ -481,11 +666,7 @@ export function serializeBoard(room) {
     dice: b.dice,
     order: b.order,
     currentPlayerId: b.currentPlayerId,
-    // Casa ??: só enviamos QUANTAS cartas há — o conteúdo fica escondido até escolher.
-    pending:
-      b.pending && b.pending.kind === 'evento'
-        ? { kind: 'evento', playerId: b.pending.playerId, count: b.pending.cards.length }
-        : b.pending,
+    pending: serializePending(b.pending),
     lastMove: b.lastMove,
     lastEvent: b.lastEvent,
     winner: b.winnerId ? { id: b.winnerId, name: nameOf(room, b.winnerId) } : null,

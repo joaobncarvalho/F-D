@@ -171,6 +171,17 @@ export function registerSocketHandlers(io) {
       }
     });
 
+    socket.on('board_blackjack', ({ action } = {}, ack) => {
+      try {
+        const room = requireRoom(socket);
+        board.boardBlackjack(room, socket.data.playerId, action);
+        broadcastState(io, room.code);
+        if (typeof ack === 'function') ack({ ok: true });
+      } catch (err) {
+        handleError(socket, ack, err);
+      }
+    });
+
     socket.on('board_evento_pick', ({ index } = {}, ack) => {
       try {
         const room = requireRoom(socket);

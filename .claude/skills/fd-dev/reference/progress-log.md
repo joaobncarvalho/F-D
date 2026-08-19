@@ -5,6 +5,41 @@
 
 ---
 
+## 2026-08-19 — Tabuleiro: fix jogada final + Blackjack + 60 casas + ganância
+
+Pedidos do João (troubleshooting + updates).
+
+- **BUG jogada final (corrigido):** o `EventoOverlay` prendia-se a cobrir o ecrã
+  (`fixed inset-0 z-50`) e os botões deixavam de responder. Causa: o `useEffect` da
+  revelação dependia do objeto `reveal` (recriado a cada `room_state`), por isso cada
+  broadcast limpava o `setTimeout` **sem o rearmar** → nunca escondia. Fix: efeito
+  depende só de `revealKey` (string estável) + **tap para fechar** + `AnimatePresence`
+  interno (deixou de ficar montado por fora). `client/src/pages/Board.jsx`.
+- **Ver o tabuleiro inteiro + seguir o ritmo:** a pista horizontal deu lugar a uma
+  **grelha responsiva** (`repeat(auto-fill, minmax(2.5rem,1fr))`) dentro de um cartão
+  scrollável (`max-h-34vh`) que faz **auto-scroll à casa do jogador da vez**
+  (`scrollIntoView`). Peões continuam a deslizar (`layoutId`) e a casa atual pulsa.
+- **Casa Blackjack (nova):** `kind:'blackjack'` (3 casas). Bate a "casa" (dealer saca
+  até 17): `openBlackjack` → `pending`, `boardBlackjack(action: hit|stand)`,
+  `resolveBlackjack`. **Vitória = avança 2 + recompensa POSITIVA** (`positiveReward`:
+  carta / todos bebem 2 / +1 casa) — equivalente ao ?? mas só coisas boas. Derrota/bust
+  = bebe 3; empate = fica. `serializePending` **esconde a carta tapada do dealer** até
+  ao stand. UI de mesa inline (nunca bloqueia o ecrã) + revelação das mãos finais.
+  Evento `board_blackjack`, emitter `onBlackjack`.
+- **Tabuleiro 60 casas** (era 45); +? e +gamble (6 ?? · 4 gamble · 3 blackjack · 46 mini).
+- **Taxa de ganância:** andar **3 casas 2× seguidas** → `applyGreed` (evento de azar
+  **99% mau** / 1% escapa: recua 3 · bebe 4 · bebe 6 · prisão), ignora a casa onde caiu.
+  `fastStreak` por jogador + aviso no cliente ao 1º passo de 3. (A prisão por abuso —
+  1 casa 3× — mantém-se.)
+- **Ficheiros:** `server/src/board.js` (blackjack, ganância, 60, serializePending),
+  `server/src/socket.js` (`board_blackjack`), `client/src/App.jsx` (emitter),
+  `client/src/pages/Board.jsx` (grelha + auto-scroll, mesa de blackjack, fix overlay,
+  aviso de ganância).
+- **Verificação:** smoke do motor (60 casas + distribuição · blackjack hit/stand/bust ·
+  serialização esconde dealer · ganância dispara e castiga · ?? regressão) ✓ · **e2e
+  socket** (2 clientes: board → peões → dado → avanço → wiring do `board_blackjack`) ✓ ·
+  client build ✓ · server `/health` ✓.
+
 ## 2026-08-19 — Tabuleiro: casa ?? interativa + animações
 
 Pedido do João: pista deixa de estar colada ao topo, mais animações no tabuleiro,

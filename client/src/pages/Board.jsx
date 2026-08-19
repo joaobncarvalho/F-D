@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { sfx } from '../sfx.js';
 import { confetti, haptic } from '../confetti.js';
 
-const KIND_ICON = { partida: '🏁', evento: '❓', gamble: '🎲' };
+const KIND_ICON = { partida: '🏁', evento: '❓', gamble: '🎲', blackjack: '🃏' };
 const GAME_EMOJI = {
   boca_calada: '🤐',
   desafio: '🔥',
@@ -20,18 +20,45 @@ const ADVANCE = [
   { n: 3, golos: 6 },
 ];
 
+// ---------- Carta de baralho (Blackjack) ----------
+function PlayingCard({ card, hidden, small }) {
+  const size = small ? 'w-7 h-10 text-[11px]' : 'w-9 h-12 text-sm';
+  if (hidden || !card) {
+    return (
+      <div
+        className={`${size} rounded-md grid place-items-center font-black text-white`}
+        style={{ background: 'linear-gradient(150deg,#9b5cff,#ff3d8b)', border: '1.5px solid rgba(255,255,255,0.3)' }}
+      >
+        ?
+      </div>
+    );
+  }
+  const red = card.suit === '♥' || card.suit === '♦';
+  return (
+    <div
+      className={`${size} rounded-md flex flex-col items-center justify-center font-extrabold bg-white leading-none`}
+      style={{ color: red ? '#d61f5c' : '#1a1a22', border: '1.5px solid rgba(0,0,0,0.15)' }}
+    >
+      <span>{card.rank}</span>
+      <span>{card.suit}</span>
+    </div>
+  );
+}
+
 // ---------- Casa ?? : 3 cartas viradas ao contrário + flip da escolhida ----------
 function EventoOverlay({ pending, reveal, isMyTurn, currentName, onPick }) {
   const [picked, setPicked] = useState(null); // índice escolhido (otimista, à espera do servidor)
   const [visibleReveal, setVisibleReveal] = useState(null);
-  const lastKey = useRef(null);
+  const shownKey = useRef(null);
+  const wasPending = useRef(false);
 
   const revealKey = reveal ? `${reveal.pickedIndex}|${reveal.title}|${reveal.desc}` : null;
 
-  // Nova revelação chegou: mostra o flip, som/confetti, e auto-esconde.
+  // Nova revelação: mostra flip, som/confetti e auto-esconde. Depende SÓ de revealKey
+  // (string estável) — assim os broadcasts do room_state não re-armam/limpam o timer.
   useEffect(() => {
-    if (!revealKey || revealKey === lastKey.current) return;
-    lastKey.current = revealKey;
+    if (!revealKey || shownKey.current === revealKey) return;
+    shownKey.current = revealKey;
     setVisibleReveal(reveal);
     setPicked(reveal.pickedIndex);
     sfx.reveal();
@@ -39,15 +66,17 @@ function EventoOverlay({ pending, reveal, isMyTurn, currentName, onPick }) {
     if (reveal.emoji === '🚀' || reveal.card) confetti({ count: 90, power: 13 });
     const t = setTimeout(() => setVisibleReveal(null), 3600);
     return () => clearTimeout(t);
-  }, [revealKey, reveal]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [revealKey]);
 
-  // Novo mistério a começar: limpa a escolha otimista.
+  // Novo mistério a começar (transição de sem-pending → pending): limpa a escolha otimista.
   useEffect(() => {
-    if (pending) setPicked(null);
+    const active = !!pending;
+    if (active && !wasPending.current) setPicked(null);
+    wasPending.current = active;
   }, [pending]);
 
   const mode = pending ? 'pick' : visibleReveal ? 'reveal' : null;
-  if (!mode) return null;
 
   const handleTap = (i) => {
     if (mode !== 'pick' || !isMyTurn || picked !== null) return;
@@ -58,131 +87,135 @@ function EventoOverlay({ pending, reveal, isMyTurn, currentName, onPick }) {
   };
 
   return (
-    <motion.div
-      key="evento-overlay"
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      className="fixed inset-0 z-50 grid place-items-center px-6"
-      style={{ background: 'rgba(6,6,12,0.72)', backdropFilter: 'blur(6px)' }}
-    >
-      <div className="w-full max-w-sm flex flex-col items-center gap-5">
+    <AnimatePresence>
+      {mode && (
         <motion.div
-          initial={{ scale: 0.6, opacity: 0, y: -14 }}
-          animate={{ scale: 1, opacity: 1, y: 0 }}
-          transition={{ type: 'spring', stiffness: 300, damping: 16 }}
-          className="text-center"
+          key="evento-overlay"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          onClick={() => mode === 'reveal' && setVisibleReveal(null)}
+          className="fixed inset-0 z-50 grid place-items-center px-6"
+          style={{ background: 'rgba(6,6,12,0.72)', backdropFilter: 'blur(6px)' }}
         >
-          <p className="text-4xl font-extrabold fd-neon">❓ Casa Mistério</p>
-          <p className="text-sm text-white/60 mt-1">
-            {mode === 'reveal'
-              ? 'A carta virou-se…'
-              : isMyTurn
-                ? 'Escolhe UMA das 3 cartas'
-                : `${currentName || 'O jogador'} está a escolher…`}
-          </p>
-        </motion.div>
-
-        <div className="flex gap-3 justify-center">
-          {[0, 1, 2].map((i) => {
-            const isRevealed = mode === 'reveal' && i === visibleReveal.pickedIndex;
-            const dimmed = mode === 'reveal' && i !== visibleReveal.pickedIndex;
-            const optimistic = mode === 'pick' && picked === i;
-            const tappable = mode === 'pick' && isMyTurn && picked === null;
-            const front = isRevealed ? visibleReveal : null;
-            return (
-              <motion.button
-                key={i}
-                disabled={!tappable}
-                onClick={() => handleTap(i)}
-                className="relative"
-                style={{ width: 92, height: 130, perspective: 800 }}
-                initial={{ opacity: 0, y: 30, rotate: -8 + i * 8 }}
-                animate={
-                  mode === 'pick' && !optimistic
-                    ? { opacity: 1, y: [0, -6, 0], rotate: 0, scale: 1 }
-                    : { opacity: dimmed ? 0.3 : 1, y: 0, rotate: 0, scale: optimistic || isRevealed ? 1.08 : 1 }
-                }
-                transition={
-                  mode === 'pick' && !optimistic
-                    ? { y: { duration: 2.2, repeat: Infinity, ease: 'easeInOut', delay: i * 0.18 }, opacity: { duration: 0.3 }, default: { duration: 0.35 } }
-                    : { type: 'spring', stiffness: 240, damping: 18 }
-                }
-                whileTap={tappable ? { scale: 0.93 } : undefined}
-              >
-                <motion.div
-                  className="absolute inset-0"
-                  style={{ transformStyle: 'preserve-3d' }}
-                  animate={{ rotateY: isRevealed ? 180 : 0 }}
-                  transition={{ duration: 0.65, ease: 'easeInOut' }}
-                >
-                  {/* Verso (?) */}
-                  <div
-                    className="absolute inset-0 rounded-2xl grid place-items-center text-4xl font-black"
-                    style={{
-                      backfaceVisibility: 'hidden',
-                      WebkitBackfaceVisibility: 'hidden',
-                      background: 'linear-gradient(150deg, #9b5cff, #ff3d8b)',
-                      border: '2px solid rgba(255,255,255,0.25)',
-                      boxShadow: optimistic ? '0 0 26px 2px rgba(255,61,139,0.8)' : '0 12px 26px -10px rgba(0,0,0,0.7)',
-                    }}
-                  >
-                    ?
-                  </div>
-                  {/* Frente (revelação) */}
-                  <div
-                    className="absolute inset-0 rounded-2xl flex flex-col items-center justify-center gap-1 px-2 text-center"
-                    style={{
-                      backfaceVisibility: 'hidden',
-                      WebkitBackfaceVisibility: 'hidden',
-                      transform: 'rotateY(180deg)',
-                      background: 'linear-gradient(160deg, rgba(255,255,255,0.16), rgba(255,255,255,0.06))',
-                      border: '2px solid rgba(255,255,255,0.35)',
-                      boxShadow: '0 12px 30px -8px rgba(0,0,0,0.7)',
-                    }}
-                  >
-                    {front && (
-                      <>
-                        <span className="text-4xl leading-none">{front.emoji}</span>
-                        <span className="text-sm font-extrabold leading-tight">{front.title}</span>
-                        <span className="text-[10px] text-white/70 leading-tight">{front.desc}</span>
-                      </>
-                    )}
-                  </div>
-                </motion.div>
-              </motion.button>
-            );
-          })}
-        </div>
-
-        <AnimatePresence mode="wait">
-          {mode === 'reveal' && (
-            <motion.p
-              key="reveal-text"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0 }}
-              transition={{ delay: 0.5 }}
-              className="text-center text-base font-semibold text-amber-200"
+          <div className="w-full max-w-sm flex flex-col items-center gap-5">
+            <motion.div
+              initial={{ scale: 0.6, opacity: 0, y: -14 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              transition={{ type: 'spring', stiffness: 300, damping: 16 }}
+              className="text-center"
             >
-              {reveal?.card ? '🎴 Carta nova!' : visibleReveal?.title}
-            </motion.p>
-          )}
-        </AnimatePresence>
-      </div>
-    </motion.div>
+              <p className="text-4xl font-extrabold fd-neon">❓ Casa Mistério</p>
+              <p className="text-sm text-white/60 mt-1">
+                {mode === 'reveal'
+                  ? 'A carta virou-se…'
+                  : isMyTurn
+                    ? 'Escolhe UMA das 3 cartas'
+                    : `${currentName || 'O jogador'} está a escolher…`}
+              </p>
+            </motion.div>
+
+            <div className="flex gap-3 justify-center">
+              {[0, 1, 2].map((i) => {
+                const isRevealed = mode === 'reveal' && i === visibleReveal.pickedIndex;
+                const dimmed = mode === 'reveal' && i !== visibleReveal.pickedIndex;
+                const optimistic = mode === 'pick' && picked === i;
+                const tappable = mode === 'pick' && isMyTurn && picked === null;
+                const front = isRevealed ? visibleReveal : null;
+                return (
+                  <motion.button
+                    key={i}
+                    disabled={!tappable}
+                    onClick={(e) => { e.stopPropagation(); handleTap(i); }}
+                    className="relative"
+                    style={{ width: 92, height: 130, perspective: 800 }}
+                    initial={{ opacity: 0, y: 30, rotate: -8 + i * 8 }}
+                    animate={
+                      mode === 'pick' && !optimistic
+                        ? { opacity: 1, y: [0, -6, 0], rotate: 0, scale: 1 }
+                        : { opacity: dimmed ? 0.3 : 1, y: 0, rotate: 0, scale: optimistic || isRevealed ? 1.08 : 1 }
+                    }
+                    transition={
+                      mode === 'pick' && !optimistic
+                        ? { y: { duration: 2.2, repeat: Infinity, ease: 'easeInOut', delay: i * 0.18 }, opacity: { duration: 0.3 }, default: { duration: 0.35 } }
+                        : { type: 'spring', stiffness: 240, damping: 18 }
+                    }
+                    whileTap={tappable ? { scale: 0.93 } : undefined}
+                  >
+                    <motion.div
+                      className="absolute inset-0"
+                      style={{ transformStyle: 'preserve-3d' }}
+                      animate={{ rotateY: isRevealed ? 180 : 0 }}
+                      transition={{ duration: 0.65, ease: 'easeInOut' }}
+                    >
+                      {/* Verso (?) */}
+                      <div
+                        className="absolute inset-0 rounded-2xl grid place-items-center text-4xl font-black"
+                        style={{
+                          backfaceVisibility: 'hidden',
+                          WebkitBackfaceVisibility: 'hidden',
+                          background: 'linear-gradient(150deg, #9b5cff, #ff3d8b)',
+                          border: '2px solid rgba(255,255,255,0.25)',
+                          boxShadow: optimistic ? '0 0 26px 2px rgba(255,61,139,0.8)' : '0 12px 26px -10px rgba(0,0,0,0.7)',
+                        }}
+                      >
+                        ?
+                      </div>
+                      {/* Frente (revelação) */}
+                      <div
+                        className="absolute inset-0 rounded-2xl flex flex-col items-center justify-center gap-1 px-2 text-center"
+                        style={{
+                          backfaceVisibility: 'hidden',
+                          WebkitBackfaceVisibility: 'hidden',
+                          transform: 'rotateY(180deg)',
+                          background: 'linear-gradient(160deg, rgba(255,255,255,0.16), rgba(255,255,255,0.06))',
+                          border: '2px solid rgba(255,255,255,0.35)',
+                          boxShadow: '0 12px 30px -8px rgba(0,0,0,0.7)',
+                        }}
+                      >
+                        {front && (
+                          <>
+                            <span className="text-4xl leading-none">{front.emoji}</span>
+                            <span className="text-sm font-extrabold leading-tight">{front.title}</span>
+                            <span className="text-[10px] text-white/70 leading-tight">{front.desc}</span>
+                          </>
+                        )}
+                      </div>
+                    </motion.div>
+                  </motion.button>
+                );
+              })}
+            </div>
+
+            {mode === 'reveal' && (
+              <motion.p
+                key="reveal-text"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.5 }}
+                className="text-center text-base font-semibold text-amber-200"
+              >
+                {visibleReveal?.card ? '🎴 Carta nova!' : visibleReveal?.title} <span className="block text-xs text-white/40 mt-1">(toca para continuar)</span>
+              </motion.p>
+            )}
+          </div>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 }
 
-export default function Board({ room, youId, onPickPawn, onRoll, onAdvance, onResolve, onGamble, onEventoPick, onPlayCard, onReset, onLeave }) {
+export default function Board({ room, youId, onPickPawn, onRoll, onAdvance, onResolve, onGamble, onEventoPick, onBlackjack, onPlayCard, onReset, onLeave }) {
   const b = room.board;
   const you = room.players.find((p) => p.id === youId);
   const isHost = you?.isHost;
   const [selCard, setSelCard] = useState(null); // carta selecionada p/ jogar (à espera de alvo)
 
-  // Efeitos por evento (vitória / prisão / passo).
+  // Efeitos por evento (vitória / prisão / passo / blackjack).
   const wonRef = useRef(false);
   const moveRef = useRef(null);
+  const bjRef = useRef(null);
+  const curCellRef = useRef(null);
   useEffect(() => {
     if (b?.phase === 'over' && !wonRef.current) {
       wonRef.current = true;
@@ -193,10 +226,10 @@ export default function Board({ room, youId, onPickPawn, onRoll, onAdvance, onRe
   useEffect(() => {
     const lm = b?.lastMove;
     if (!lm) return;
-    const key = lm.playerId + ':' + lm.squares + ':' + lm.golos + ':' + lm.toPrison;
+    const key = lm.playerId + ':' + lm.squares + ':' + lm.golos + ':' + lm.toPrison + ':' + lm.greedy;
     if (moveRef.current === key) return;
     moveRef.current = key;
-    if (lm.toPrison) {
+    if (lm.toPrison || lm.greedy) {
       sfx.shot();
       haptic([80, 50, 120]);
     } else {
@@ -204,6 +237,21 @@ export default function Board({ room, youId, onPickPawn, onRoll, onAdvance, onRe
       haptic(20);
     }
   }, [b?.lastMove]);
+  useEffect(() => {
+    const bj = b?.lastEvent?.blackjack;
+    if (!bj) return;
+    const key = b.lastEvent.text;
+    if (bjRef.current === key) return;
+    bjRef.current = key;
+    if (bj.result === 'win') { sfx.win(); confetti({ count: 90, power: 13 }); haptic([20, 40, 80]); }
+    else if (bj.result === 'push') sfx.click();
+    else { sfx.shot(); haptic([80, 50, 120]); }
+  }, [b?.lastEvent]);
+  // Segue o ritmo: mantém a casa do jogador da vez à vista.
+  const curPos = b?.players?.[b?.currentPlayerId]?.pos;
+  useEffect(() => {
+    curCellRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }, [curPos, b?.currentPlayerId]);
 
   if (!b) return null;
   const rows = room.players.map((p) => ({ ...p, ...(b.players[p.id] || {}) }));
@@ -366,8 +414,11 @@ export default function Board({ room, youId, onPickPawn, onRoll, onAdvance, onRe
   const ev = b.lastEvent;
   const meta = b.cardMeta || {};
   const myCards = b.players[youId]?.cards || [];
+  const myFastStreak = b.players[youId]?.fastStreak || 0;
   const pending = b.pending;
   const eventoPending = pending?.kind === 'evento' ? pending : null;
+  const bjPending = pending?.kind === 'blackjack' ? pending : null;
+  const miniGamblePending = pending && pending.kind !== 'evento' && pending.kind !== 'blackjack' ? pending : null;
   const targets = room.players.filter((p) => p.connected && p.id !== youId);
   const selMeta = selCard ? meta[selCard.key] : null;
   const needsTarget = selMeta && selCard.key !== 'shield';
@@ -379,34 +430,38 @@ export default function Board({ room, youId, onPickPawn, onRoll, onAdvance, onRe
       </Header>
 
       {/* Casa ?? — overlay de 3 cartas viradas + flip */}
-      <AnimatePresence>
-        {(eventoPending || ev?.evento) && (
-          <EventoOverlay
-            pending={eventoPending}
-            reveal={ev?.evento || null}
-            isMyTurn={isMyTurn}
-            currentName={currentPlayer?.name}
-            onPick={onEventoPick}
-          />
-        )}
-      </AnimatePresence>
+      <EventoOverlay
+        pending={eventoPending}
+        reveal={ev?.evento || null}
+        isMyTurn={isMyTurn}
+        currentName={currentPlayer?.name}
+        onPick={onEventoPick}
+      />
 
-      {/* Pista (com respiro no topo, não colada à margem) */}
-      <motion.div
-        initial={{ opacity: 0, y: -8 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="fd-card p-2.5 mt-1"
-      >
-        <p className="text-[10px] uppercase tracking-widest text-white/35 mb-1.5 px-1">Pista</p>
-        <div className="flex gap-1 overflow-x-auto pb-1.5 px-0.5">
+      {/* Tabuleiro inteiro (grelha) — com respiro no topo e auto-scroll à casa da vez */}
+      <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} className="fd-card p-2.5 mt-1">
+        <p className="text-[10px] uppercase tracking-widest text-white/35 mb-1.5 px-1">Tabuleiro</p>
+        <div
+          className="overflow-y-auto pr-0.5"
+          style={{ maxHeight: '34vh', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(2.5rem, 1fr))', gap: '0.25rem' }}
+        >
           {b.squares.map((sq) => {
             const here = rows.filter((r) => r.pos === sq.i && r.pawn);
             const isCur = b.players[b.currentPlayerId]?.pos === sq.i;
             return (
               <motion.div
                 key={sq.i}
-                className={`relative flex-shrink-0 w-11 rounded-lg text-center py-1.5 ${
-                  sq.kind === 'partida' ? 'bg-pink-500/25' : sq.kind === 'evento' ? 'bg-fuchsia-500/15' : sq.kind === 'gamble' ? 'bg-amber-500/15' : 'bg-white/5'
+                ref={isCur ? curCellRef : null}
+                className={`relative rounded-lg min-h-[2.7rem] flex flex-col items-center justify-center ${
+                  sq.kind === 'partida'
+                    ? 'bg-pink-500/25'
+                    : sq.kind === 'evento'
+                      ? 'bg-fuchsia-500/15'
+                      : sq.kind === 'gamble'
+                        ? 'bg-amber-500/15'
+                        : sq.kind === 'blackjack'
+                          ? 'bg-emerald-500/15'
+                          : 'bg-white/5'
                 } ${isCur ? 'ring-2 ring-pink-500' : ''}`}
                 animate={
                   isCur
@@ -415,9 +470,9 @@ export default function Board({ room, youId, onPickPawn, onRoll, onAdvance, onRe
                 }
                 transition={isCur ? { duration: 1.7, repeat: Infinity, ease: 'easeInOut' } : { duration: 0.3 }}
               >
-                <div className="text-lg leading-none">{squareIcon(sq)}</div>
-                <div className="text-[9px] text-white/30">{sq.i}</div>
-                <div className="text-sm leading-tight min-h-[20px] flex flex-wrap justify-center gap-0.5">
+                <span className="absolute top-0.5 left-1 text-[8px] text-white/25">{sq.i}</span>
+                <span className="text-base leading-none">{squareIcon(sq)}</span>
+                <span className="flex flex-wrap justify-center gap-0.5 leading-none text-[11px] min-h-[11px]">
                   {here.map((r) => (
                     <motion.span
                       key={r.id}
@@ -428,7 +483,7 @@ export default function Board({ room, youId, onPickPawn, onRoll, onAdvance, onRe
                       {r.pawn}
                     </motion.span>
                   ))}
-                </div>
+                </span>
               </motion.div>
             );
           })}
@@ -459,7 +514,7 @@ export default function Board({ room, youId, onPickPawn, onRoll, onAdvance, onRe
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0 }}
             transition={{ type: 'spring', stiffness: 300, damping: 18 }}
-            className="text-center text-sm text-amber-200"
+            className={`text-center text-sm ${ev.greed ? 'text-rose-300 font-semibold' : 'text-amber-200'}`}
           >
             {ev.text}
           </motion.p>
@@ -470,8 +525,68 @@ export default function Board({ room, youId, onPickPawn, onRoll, onAdvance, onRe
         ) : null}
       </AnimatePresence>
 
-      {/* Resolver a casa onde caiu (mini / gamble — o ?? tem overlay próprio) */}
-      {pending && !eventoPending && isMyTurn && (
+      {/* Blackjack — mesa (jogador da vez joga; os outros veem). Inline (nunca bloqueia o ecrã). */}
+      {bjPending && (
+        <motion.div
+          initial={{ opacity: 0, scale: 0.92, y: 12 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          transition={{ type: 'spring', stiffness: 280, damping: 20 }}
+          className="fd-card p-3.5 flex flex-col gap-2.5 text-center"
+          style={{ boxShadow: '0 10px 30px -12px #1fd3b699' }}
+        >
+          <p className="text-sm font-bold uppercase tracking-wide text-emerald-300">🃏 Blackjack contra a casa</p>
+          <div>
+            <p className="text-[11px] text-white/40 mb-1">🏠 Casa</p>
+            <div className="flex gap-1.5 justify-center">
+              {bjPending.dealer.map((c, i) => <PlayingCard key={i} card={c} />)}
+              {bjPending.dealerHidden && <PlayingCard hidden />}
+            </div>
+          </div>
+          <div>
+            <p className="text-[11px] text-white/40 mb-1">{isMyTurn ? '🫵 Tu' : `${currentPlayer?.pawn} ${currentPlayer?.name}`} · {bjPending.pv}</p>
+            <div className="flex gap-1.5 justify-center flex-wrap">
+              {bjPending.player.map((c, i) => <PlayingCard key={i} card={c} />)}
+            </div>
+          </div>
+          {isMyTurn ? (
+            <div className="flex gap-2 mt-1">
+              <button onClick={() => { sfx.click(); onBlackjack('hit'); }} className="fd-btn fd-btn-primary flex-1">🃏 Mais uma</button>
+              <button onClick={() => { sfx.click(); onBlackjack('stand'); }} className="fd-btn fd-btn-ghost flex-1">✋ Plantar</button>
+            </div>
+          ) : (
+            <p className="text-xs text-white/40">{currentPlayer?.name} está a jogar…</p>
+          )}
+          <p className="text-[11px] text-white/35">Bate a casa (≤21 e mais que o dealer) → avanças + recompensa da sorte 🍀</p>
+        </motion.div>
+      )}
+
+      {/* Resultado do Blackjack (mãos finais reveladas) */}
+      {ev?.blackjack && !bjPending && (
+        <motion.div
+          key={'bjres' + ev.text}
+          initial={{ opacity: 0, scale: 0.92 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="fd-card p-3 flex flex-col gap-2 text-center"
+          style={{ boxShadow: ev.blackjack.result === 'win' ? '0 10px 30px -12px #1fd3b6cc' : '0 10px 30px -12px #ff4d6d99' }}
+        >
+          <p className="text-sm font-bold">
+            {ev.blackjack.result === 'win' ? '🏆 Bateste a casa!' : ev.blackjack.result === 'push' ? '🤝 Empate' : '🏠 A casa venceu'}
+          </p>
+          <div className="flex justify-center gap-6">
+            <div>
+              <p className="text-[11px] text-white/40 mb-1">Casa · {ev.blackjack.dv}</p>
+              <div className="flex gap-1 justify-center">{ev.blackjack.dealer.map((c, i) => <PlayingCard key={i} card={c} small />)}</div>
+            </div>
+            <div>
+              <p className="text-[11px] text-white/40 mb-1">Jogador · {ev.blackjack.pv}</p>
+              <div className="flex gap-1 justify-center flex-wrap">{ev.blackjack.player.map((c, i) => <PlayingCard key={i} card={c} small />)}</div>
+            </div>
+          </div>
+        </motion.div>
+      )}
+
+      {/* Resolver a casa onde caiu (mini / gamble — o ?? e o Blackjack têm UI própria) */}
+      {miniGamblePending && isMyTurn && (
         <motion.div
           initial={{ opacity: 0, scale: 0.9, y: 12 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -479,27 +594,27 @@ export default function Board({ room, youId, onPickPawn, onRoll, onAdvance, onRe
           className="fd-card p-4 flex flex-col gap-3 text-center"
           style={{ boxShadow: '0 10px 30px -12px #ffb02099' }}
         >
-          {pending.kind === 'mini' && pending.variant === 'dare' && (
+          {miniGamblePending.kind === 'mini' && miniGamblePending.variant === 'dare' && (
             <>
-              <p className="text-xs font-bold uppercase tracking-wide text-white/50">{pending.gameLabel}</p>
-              <p className="text-base">{pending.text}</p>
+              <p className="text-xs font-bold uppercase tracking-wide text-white/50">{miniGamblePending.gameLabel}</p>
+              <p className="text-base">{miniGamblePending.text}</p>
               <div className="flex gap-2">
                 <button onClick={() => { sfx.click(); onResolve({ action: 'do' }); }} className="fd-btn fd-btn-success flex-1">✅ Faço!</button>
                 <button onClick={() => { sfx.click(); onResolve({ action: 'drink' }); }} className="fd-btn fd-btn-danger flex-1">🍺 Bebo 3</button>
               </div>
             </>
           )}
-          {pending.kind === 'mini' && pending.variant === 'choice' && (
+          {miniGamblePending.kind === 'mini' && miniGamblePending.variant === 'choice' && (
             <>
               <p className="text-xs font-bold uppercase tracking-wide text-white/50">⚖️ Isto ou Aquilo?</p>
-              {pending.options.map((o, i) => (
+              {miniGamblePending.options.map((o, i) => (
                 <button key={i} onClick={() => { sfx.click(); onResolve({ choice: i }); }} className="fd-btn fd-btn-ghost text-left py-3">
                   {i === 0 ? '👈 ' : '👉 '}{o}
                 </button>
               ))}
             </>
           )}
-          {pending.kind === 'gamble' && (
+          {miniGamblePending.kind === 'gamble' && (
             <>
               <p className="text-lg font-bold text-amber-300">🎲 Gamble!</p>
               <p className="text-sm text-white/60">Aposta 2 golos: 50/50 → avanças 2 ou recuas 2. Passar = ficas.</p>
@@ -511,7 +626,7 @@ export default function Board({ room, youId, onPickPawn, onRoll, onAdvance, onRe
           )}
         </motion.div>
       )}
-      {pending && !eventoPending && !isMyTurn && (
+      {miniGamblePending && !isMyTurn && (
         <p className="text-center text-sm text-white/40">{currentPlayer?.name} está a resolver a casa…</p>
       )}
 
@@ -561,7 +676,10 @@ export default function Board({ room, youId, onPickPawn, onRoll, onAdvance, onRe
               </motion.button>
             ))}
           </div>
-          <p className="text-center text-[11px] text-white/35">Andar só 1 casa 3× seguidas → prisão 🚔</p>
+          {myFastStreak >= 1 && (
+            <p className="text-center text-[11px] text-rose-300">🐍 Cuidado: outra de 3 casas seguidas e a ganância castiga-te!</p>
+          )}
+          <p className="text-center text-[11px] text-white/35">Andar só 1 casa 3× seguidas → prisão 🚔 · andar 3 casas 2× seguidas → azar 🐍</p>
         </div>
       )}
       {!isMyTurn && !pending && (
