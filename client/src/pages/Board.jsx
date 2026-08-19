@@ -273,7 +273,6 @@ export default function Board({ room, youId, onPickPawn, onRoll, onAdvance, onRe
   const wonRef = useRef(false);
   const moveRef = useRef(null);
   const bjRef = useRef(null);
-  const curCellRef = useRef(null);
   const trackRef = useRef(null);
   const prevPhaseRef = useRef(b?.phase);
   useEffect(() => {
@@ -307,17 +306,25 @@ export default function Board({ room, youId, onPickPawn, onRoll, onAdvance, onRe
     else if (bj.result === 'push') sfx.click();
     else { sfx.shot(); haptic([80, 50, 120]); }
   }, [b?.lastEvent]);
-  // Segue o ritmo: centra a casa do jogador da vez na tira (scroll SÓ da tira, nunca da página).
+  // Segue o ritmo: centra a casa do jogador da vez na tira (scroll SÓ da tira, nunca
+  // da página). Acede à célula pelo índice (track.children[pos]) — robusto, sem refs
+  // por célula (partilhar 1 ref entre células dava current=null às vezes).
   const curPos = b?.players?.[b?.currentPlayerId]?.pos;
   useEffect(() => {
-    const cell = curCellRef.current;
     const track = trackRef.current;
-    if (!cell || !track) return;
-    const c = cell.getBoundingClientRect();
-    const t = track.getBoundingClientRect();
-    const delta = c.left + c.width / 2 - (t.left + t.width / 2);
-    if (Math.abs(delta) > 2) track.scrollBy({ left: delta, behavior: 'smooth' });
-  }, [curPos, b?.currentPlayerId]);
+    if (!track || curPos == null) return;
+    let raf = 0;
+    const doScroll = () => {
+      const cell = track.children[curPos];
+      if (!cell) return;
+      const target = cell.offsetLeft - (track.clientWidth - cell.offsetWidth) / 2;
+      const max = track.scrollWidth - track.clientWidth;
+      track.scrollTo({ left: Math.max(0, Math.min(target, max)), behavior: 'smooth' });
+    };
+    // rAF: garante que corre depois do layout/animação de posição assentar.
+    raf = requestAnimationFrame(doScroll);
+    return () => cancelAnimationFrame(raf);
+  }, [curPos, b?.currentPlayerId, b?.phase]);
 
   // Revelação da ordem: quando a fase salta order → playing, mostra os dados + quem
   // começa por ~2,8s. Depende só de b.phase (edge) → broadcasts não re-armam o timer.
@@ -533,14 +540,13 @@ export default function Board({ room, youId, onPickPawn, onRoll, onAdvance, onRe
       {/* Pista em linha — tira horizontal que faz auto-scroll a seguir o jogador da vez */}
       <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} className="fd-card p-2.5 mt-1">
         <p className="text-[10px] uppercase tracking-widest text-white/35 mb-1.5 px-1">Pista</p>
-        <div ref={trackRef} className="flex gap-1 overflow-x-auto pb-1.5 px-0.5">
+        <div ref={trackRef} className="relative flex gap-1 overflow-x-auto pb-1.5 px-0.5">
           {b.squares.map((sq) => {
             const here = rows.filter((r) => r.pos === sq.i && r.pawn);
             const isCur = b.players[b.currentPlayerId]?.pos === sq.i;
             return (
               <motion.div
                 key={sq.i}
-                ref={isCur ? curCellRef : null}
                 className={`relative flex-shrink-0 w-11 rounded-lg text-center py-1.5 ${
                   sq.kind === 'partida'
                     ? 'bg-pink-500/25'
