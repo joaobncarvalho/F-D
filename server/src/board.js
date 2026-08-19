@@ -170,9 +170,8 @@ export async function advance(room, playerId, squares) {
     return { board: b, over: false };
   }
   if (sq.kind === 'evento') {
-    applyEvento(room, playerId);
-    if (b.phase !== 'over') advanceBoardTurn(room);
-    return { board: b, over: b.phase === 'over' };
+    openEvento(room, playerId); // 3 cartas viradas ao contrário; a vez só passa ao escolher (board_evento_pick)
+    return { board: b, over: false };
   }
   advanceBoardTurn(room); // partida
   return { board: b, over: false };
@@ -238,41 +237,99 @@ export function boardGamble(room, playerId, bet) {
   return b;
 }
 
-function giveCard(room, playerId) {
-  const key = CARD_KEYS[Math.floor(Math.random() * CARD_KEYS.length)];
-  room.board.players[playerId].cards.push({ id: randomUUID(), key });
+// Casa ?? ("mistério"): 3 cartas viradas ao contrário. Cada uma esconde uma
+// "trait" (efeito) ou uma carta jogável. Cada maker devolve o descritor JÁ
+// resolvido (ex.: qual a carta) + um apply(room, id) que muta o estado e
+// devolve o texto de revelação. Só o escolhido é aplicado.
+const EVENTO_POOL = [
+  () => ({
+    emoji: '🚀',
+    title: 'Sorte!',
+    desc: 'Avanças 2 casas',
+    apply: (room, id) => {
+      const b = room.board;
+      b.players[id].pos = Math.min(b.size, b.players[id].pos + 2);
+      checkWin(room, id);
+      return `🚀 ${nameOf(room, id)} teve sorte — avança 2 casas!`;
+    },
+  }),
+  () => ({
+    emoji: '💨',
+    title: 'Azar',
+    desc: 'Recuas 2 casas',
+    apply: (room, id) => {
+      const me = room.board.players[id];
+      me.pos = Math.max(0, me.pos - 2);
+      return `💨 ${nameOf(room, id)} azar — recua 2 casas!`;
+    },
+  }),
+  () => ({
+    emoji: '🍺',
+    title: 'Golada',
+    desc: 'Bebes 3 golos',
+    apply: (room, id) => {
+      room.board.players[id].golos += 3;
+      return `🍺 ${nameOf(room, id)} bebe 3 golos!`;
+    },
+  }),
+  () => {
+    const key = CARD_KEYS[Math.floor(Math.random() * CARD_KEYS.length)];
+    const m = CARD_META[key];
+    return {
+      emoji: m.emoji,
+      title: m.name,
+      desc: m.desc,
+      card: key,
+      apply: (room, id) => {
+        room.board.players[id].cards.push({ id: randomUUID(), key });
+        return `🎴 ${nameOf(room, id)} ganhou a carta ${m.name}!`;
+      },
+    };
+  },
+  () => ({
+    emoji: '🚔',
+    title: 'Preso!',
+    desc: 'Vais direto para a prisão',
+    apply: (room, id) => {
+      applyPrison(room, id, 'sorte tramada'); // já escreve o lastEvent detalhado
+      return room.board.lastEvent.text;
+    },
+  }),
+  () => ({
+    emoji: '👯',
+    title: 'Ronda geral',
+    desc: 'Todos os outros bebem 2',
+    apply: (room, id) => {
+      const b = room.board;
+      for (const oid of Object.keys(b.players)) if (oid !== id) b.players[oid].golos += 2;
+      return `👯 Todos menos ${nameOf(room, id)} bebem 2 golos!`;
+    },
+  }),
+];
+
+function openEvento(room, playerId) {
+  const cards = shuffle(EVENTO_POOL.slice())
+    .slice(0, 3)
+    .map((make) => make());
+  room.board.pending = { kind: 'evento', playerId, cards };
 }
 
-function applyEvento(room, playerId) {
-  const b = room.board;
-  const me = b.players[playerId];
-  const nm = nameOf(room, playerId);
-  switch (Math.floor(Math.random() * 6)) {
-    case 0:
-      me.pos = Math.min(b.size, me.pos + 2);
-      b.lastEvent = { text: `❓ ${nm} teve sorte — avança 2 casas!` };
-      checkWin(room, playerId);
-      break;
-    case 1:
-      me.pos = Math.max(0, me.pos - 2);
-      b.lastEvent = { text: `❓ ${nm} azar — recua 2 casas!` };
-      break;
-    case 2:
-      me.golos += 3;
-      b.lastEvent = { text: `❓ ${nm} bebe 3 golos!` };
-      break;
-    case 3:
-      giveCard(room, playerId);
-      b.lastEvent = { text: `❓ ${nm} ganhou uma carta! 🎴` };
-      break;
-    case 4:
-      applyPrison(room, playerId, 'sorte tramada');
-      break;
-    case 5:
-      for (const id of Object.keys(b.players)) if (id !== playerId) b.players[id].golos += 2;
-      b.lastEvent = { text: `❓ Todos menos ${nm} bebem 2 golos!` };
-      break;
-  }
+/** Casa ??: revela a carta escolhida (0-2), aplica o efeito e passa a vez. */
+export function boardEventoPick(room, playerId, index) {
+  const b = requireBoard(room, ['playing']);
+  if (!b.pending || b.pending.kind !== 'evento') throw new AppError('Nada para revelar.');
+  if (b.currentPlayerId !== playerId) throw new AppError('Não é a tua vez.');
+  const i = Number(index);
+  const chosen = b.pending.cards[i];
+  if (!chosen) throw new AppError('Escolha inválida.');
+  const text = chosen.apply(room, playerId); // muta o estado; devolve o texto de revelação
+  b.pending = null;
+  b.lastEvent = {
+    text,
+    evento: { pickedIndex: i, emoji: chosen.emoji, title: chosen.title, desc: chosen.desc, card: chosen.card || null },
+  };
+  if (b.phase !== 'over') advanceBoardTurn(room);
+  return b;
 }
 
 function applyPrison(room, playerId, reason = 'prisão') {
@@ -424,7 +481,11 @@ export function serializeBoard(room) {
     dice: b.dice,
     order: b.order,
     currentPlayerId: b.currentPlayerId,
-    pending: b.pending,
+    // Casa ??: só enviamos QUANTAS cartas há — o conteúdo fica escondido até escolher.
+    pending:
+      b.pending && b.pending.kind === 'evento'
+        ? { kind: 'evento', playerId: b.pending.playerId, count: b.pending.cards.length }
+        : b.pending,
     lastMove: b.lastMove,
     lastEvent: b.lastEvent,
     winner: b.winnerId ? { id: b.winnerId, name: nameOf(room, b.winnerId) } : null,

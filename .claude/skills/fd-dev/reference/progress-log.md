@@ -5,6 +5,35 @@
 
 ---
 
+## 2026-08-19 — Tabuleiro: casa ?? interativa + animações
+
+Pedido do João: pista deixa de estar colada ao topo, mais animações no tabuleiro,
+e a casa **??** passa a ser uma escolha animada de **1 de 3 cartas viradas** que
+faz **flip** a revelar a trait/carta.
+
+- **Casa ?? (servidor `board.js`):** deixou de resolver automaticamente. Ao cair,
+  `openEvento` gera **3 resultados virados** (`EVENTO_POOL`: 🚀 avança 2 · 💨 recua 2 ·
+  🍺 bebe 3 · 🎴 carta nova · 🚔 prisão · 👯 todos bebem 2) e fica `pending.kind='evento'`
+  (a vez só passa ao escolher). Novo **`boardEventoPick(room, pid, index)`** aplica o
+  efeito da carta escolhida, revela em `lastEvent.evento {pickedIndex,emoji,title,desc,card}`
+  e passa a vez. **Serialização esconde o conteúdo** das 3 cartas (só envia `count`) —
+  surpresa real, sem batota. Removidos `applyEvento`/`giveCard` (substituídos).
+- **`socket.js`:** handler `board_evento_pick`. **`App.jsx`:** emitter `onEventoPick`.
+- **Cliente (`Board.jsx`):**
+  - **Pista com respiro:** agora num cartão com label "Pista" e `mt-1` (já não colada
+    à margem superior).
+  - **Overlay da ??:** `EventoOverlay` — 3 cartas viradas a flutuar; o jogador da vez
+    escolhe uma → **flip 3D** (`rotateY`) revela emoji/título/descrição; as outras
+    esbatem. Espectadores veem "X está a escolher…" e a revelação. sfx.reveal + haptics
+    + confetti (sorte/carta). Auto-fecha ~3.6s.
+  - **Mais animações:** peões que **deslizam entre casas** (`layoutId` do framer-motion),
+    **casa atual a pulsar** (glow em loop), texto de evento com pop (AnimatePresence),
+    **dado a rolar** na fase de ordem, peões a entrar com spring, botões com `whileTap`,
+    cartão de mini/gamble com entrada em spring.
+- **Verificação:** smoke do motor (?? → 3 cartas · serialização esconde conteúdo ·
+  só a vez escolhe · efeito aplicado · vez passa · índice inválido rejeitado · 40
+  tentativas de todos os resultados) ✓. Client build ✓. Server arranca + `/health` ✓.
+
 ## 2026-08-19 — Modo Tabuleiro (Fase 1: motor + servidor)
 
 Novo modo à parte da roda (spec em `reference/board-mode.md`). Fundação:
