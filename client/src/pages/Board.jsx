@@ -14,6 +14,7 @@ const GAME_EMOJI = {
   isto_ou_aquilo: '⚖️',
 };
 const squareIcon = (sq) => (sq.kind === 'mini' ? GAME_EMOJI[sq.gameKey] || '🎮' : KIND_ICON[sq.kind] || '⬜');
+const BOARD_COLS = 6; // colunas do tabuleiro em S (serpentina)
 const ADVANCE = [
   { n: 1, golos: 2 },
   { n: 2, golos: 4 },
@@ -438,21 +439,27 @@ export default function Board({ room, youId, onPickPawn, onRoll, onAdvance, onRe
         onPick={onEventoPick}
       />
 
-      {/* Tabuleiro inteiro (grelha) — com respiro no topo e auto-scroll à casa da vez */}
+      {/* Tabuleiro em S (serpentina) — as linhas ímpares invertem o sentido, dando um
+          percurso contínuo tipo caminho (não um calendário). Auto-scroll à casa da vez. */}
       <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} className="fd-card p-2.5 mt-1">
         <p className="text-[10px] uppercase tracking-widest text-white/35 mb-1.5 px-1">Tabuleiro</p>
         <div
           className="overflow-y-auto pr-0.5"
-          style={{ maxHeight: '34vh', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(2.5rem, 1fr))', gap: '0.25rem' }}
+          style={{ maxHeight: '38vh', display: 'grid', gridTemplateColumns: `repeat(${BOARD_COLS}, 1fr)`, gap: '0.3rem' }}
         >
           {b.squares.map((sq) => {
             const here = rows.filter((r) => r.pos === sq.i && r.pawn);
             const isCur = b.players[b.currentPlayerId]?.pos === sq.i;
+            const row = Math.floor(sq.i / BOARD_COLS);
+            const colInRow = sq.i % BOARD_COLS;
+            // Serpentina: linhas pares esquerda→direita, ímpares direita→esquerda.
+            const col = row % 2 === 0 ? colInRow : BOARD_COLS - 1 - colInRow;
             return (
               <motion.div
                 key={sq.i}
                 ref={isCur ? curCellRef : null}
-                className={`relative rounded-lg min-h-[2.7rem] flex flex-col items-center justify-center ${
+                style={{ gridColumn: col + 1, gridRow: row + 1 }}
+                className={`relative rounded-lg min-h-[3.1rem] flex flex-col items-center justify-center ${
                   sq.kind === 'partida'
                     ? 'bg-pink-500/25'
                     : sq.kind === 'evento'
@@ -471,8 +478,8 @@ export default function Board({ room, youId, onPickPawn, onRoll, onAdvance, onRe
                 transition={isCur ? { duration: 1.7, repeat: Infinity, ease: 'easeInOut' } : { duration: 0.3 }}
               >
                 <span className="absolute top-0.5 left-1 text-[8px] text-white/25">{sq.i}</span>
-                <span className="text-base leading-none">{squareIcon(sq)}</span>
-                <span className="flex flex-wrap justify-center gap-0.5 leading-none text-[11px] min-h-[11px]">
+                <span className="text-lg leading-none">{squareIcon(sq)}</span>
+                <span className="flex flex-wrap justify-center gap-0.5 leading-none text-xs min-h-[13px]">
                   {here.map((r) => (
                     <motion.span
                       key={r.id}

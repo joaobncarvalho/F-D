@@ -5,6 +5,16 @@
 
 ---
 
+## 2026-08-19 — Tabuleiro em S (serpentina)
+
+Pedido do João: a grelha parecia um calendário. Passou a **serpentina (S)** — as
+linhas ímpares invertem o sentido (esq→dir, dir→esq…), dando um percurso contínuo
+tipo caminho de jogo de tabuleiro. `BOARD_COLS = 6`; posição de cada casa calculada
+com `gridColumn/gridRow` (linha par = normal, ímpar = espelhada). Peões continuam a
+deslizar (`layoutId`) e o auto-scroll segue a casa da vez. Só cliente
+(`client/src/pages/Board.jsx`). Alternativa "anel do Monopólio" descartada: para 60
+casas dava 16×16 com centro vazio e casas minúsculas no telemóvel. Client build ✓.
+
 ## 2026-08-19 — Tabuleiro: fix jogada final + Blackjack + 60 casas + ganância
 
 Pedidos do João (troubleshooting + updates).
