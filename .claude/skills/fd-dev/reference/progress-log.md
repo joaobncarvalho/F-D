@@ -5,6 +5,17 @@
 
 ---
 
+## 2026-08-19 — Blackjack: revelação animada (carta a carta)
+
+Pedido do João: a casa não mostra logo o resultado — vira a carta tapada e vai
+**puxando cartas uma a uma** (com animação + som) até ao desfecho. Só cliente
+(`client/src/pages/Board.jsx`): novo `BlackjackReveal` remonta a cada resultado
+(`key=text`); a carta tapada faz flip 3D (`FlipDealerCard`), os hits entram a
+deslizar (~750ms cada), o total da casa sobe em direto, e só no fim aparece o
+banner (win/push/lose) + consequência, com o som/confetti a disparar aí (saíram
+do efeito imediato antigo). **Toca para saltar.** `bjValue` no cliente = servidor.
+Correção da pista (auto-scroll) mantida. Client build ✓.
+
 ## 2026-08-19 — Tabuleiro: revelação da ordem + pista em linha auto-scroll
 
 Dois pedidos do João.
