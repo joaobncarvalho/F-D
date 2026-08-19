@@ -14,7 +14,6 @@ const GAME_EMOJI = {
   isto_ou_aquilo: '⚖️',
 };
 const squareIcon = (sq) => (sq.kind === 'mini' ? GAME_EMOJI[sq.gameKey] || '🎮' : KIND_ICON[sq.kind] || '⬜');
-const BOARD_COLS = 6; // colunas do tabuleiro em S (serpentina)
 const ADVANCE = [
   { n: 1, golos: 2 },
   { n: 2, golos: 4 },
@@ -43,6 +42,63 @@ function PlayingCard({ card, hidden, small }) {
       <span>{card.rank}</span>
       <span>{card.suit}</span>
     </div>
+  );
+}
+
+// ---------- Revelação da ordem (todos veem os dados + quem começa) ----------
+// Corrige o "salto" para o tabuleiro no instante do último lançamento: dá a todos
+// (sobretudo ao último a rodar) o momento de ver o dado antes da corrida começar.
+function OrderReveal({ data, players, boardPlayers, onClose }) {
+  return (
+    <motion.div
+      key="order-reveal"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      onClick={onClose}
+      className="fixed inset-0 z-50 grid place-items-center px-6"
+      style={{ background: 'rgba(6,6,12,0.75)', backdropFilter: 'blur(6px)' }}
+    >
+      <div className="w-full max-w-sm flex flex-col items-center gap-4">
+        <motion.p
+          initial={{ scale: 0.6, opacity: 0, y: -12 }}
+          animate={{ scale: 1, opacity: 1, y: 0 }}
+          transition={{ type: 'spring', stiffness: 300, damping: 16 }}
+          className="text-3xl font-extrabold fd-neon text-center"
+        >
+          🎲 Ordem de jogo
+        </motion.p>
+        <div className="fd-card p-4 w-full flex flex-col gap-2.5">
+          {data.order.map((id, i) => {
+            const p = players.find((pp) => pp.id === id);
+            return (
+              <motion.div
+                key={id}
+                initial={{ opacity: 0, x: -24 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.2 + i * 0.35 }}
+                className={`flex items-center justify-between ${i === 0 ? 'text-emerald-300 font-bold' : ''}`}
+              >
+                <span className="text-base">
+                  {i === 0 ? '🥇' : `${i + 1}º`} {boardPlayers[id]?.pawn} {p?.name}
+                </span>
+                <motion.span
+                  initial={{ rotate: -220, scale: 0.2, opacity: 0 }}
+                  animate={{ rotate: 0, scale: 1, opacity: 1 }}
+                  transition={{ delay: 0.2 + i * 0.35, type: 'spring', stiffness: 240, damping: 12 }}
+                  className="text-2xl"
+                >
+                  🎲 {data.dice[id]}
+                </motion.span>
+              </motion.div>
+            );
+          })}
+        </div>
+        <p className="text-xs text-white/45 text-center">
+          Começa {boardPlayers[data.order[0]]?.pawn} {players.find((p) => p.id === data.order[0])?.name}! <span className="block text-white/30 mt-0.5">(toca para continuar)</span>
+        </p>
+      </div>
+    </motion.div>
   );
 }
 
@@ -211,12 +267,15 @@ export default function Board({ room, youId, onPickPawn, onRoll, onAdvance, onRe
   const you = room.players.find((p) => p.id === youId);
   const isHost = you?.isHost;
   const [selCard, setSelCard] = useState(null); // carta selecionada p/ jogar (à espera de alvo)
+  const [orderReveal, setOrderReveal] = useState(null); // { dice, order } — revelação da ordem
 
   // Efeitos por evento (vitória / prisão / passo / blackjack).
   const wonRef = useRef(false);
   const moveRef = useRef(null);
   const bjRef = useRef(null);
   const curCellRef = useRef(null);
+  const trackRef = useRef(null);
+  const prevPhaseRef = useRef(b?.phase);
   useEffect(() => {
     if (b?.phase === 'over' && !wonRef.current) {
       wonRef.current = true;
@@ -248,11 +307,31 @@ export default function Board({ room, youId, onPickPawn, onRoll, onAdvance, onRe
     else if (bj.result === 'push') sfx.click();
     else { sfx.shot(); haptic([80, 50, 120]); }
   }, [b?.lastEvent]);
-  // Segue o ritmo: mantém a casa do jogador da vez à vista.
+  // Segue o ritmo: centra a casa do jogador da vez na tira (scroll SÓ da tira, nunca da página).
   const curPos = b?.players?.[b?.currentPlayerId]?.pos;
   useEffect(() => {
-    curCellRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    const cell = curCellRef.current;
+    const track = trackRef.current;
+    if (!cell || !track) return;
+    const c = cell.getBoundingClientRect();
+    const t = track.getBoundingClientRect();
+    const delta = c.left + c.width / 2 - (t.left + t.width / 2);
+    if (Math.abs(delta) > 2) track.scrollBy({ left: delta, behavior: 'smooth' });
   }, [curPos, b?.currentPlayerId]);
+
+  // Revelação da ordem: quando a fase salta order → playing, mostra os dados + quem
+  // começa por ~2,8s. Depende só de b.phase (edge) → broadcasts não re-armam o timer.
+  useEffect(() => {
+    const prev = prevPhaseRef.current;
+    prevPhaseRef.current = b?.phase;
+    if (prev === 'order' && b?.phase === 'playing' && b?.order?.length) {
+      setOrderReveal({ dice: { ...b.dice }, order: [...b.order] });
+      sfx.spin();
+      const t = setTimeout(() => setOrderReveal(null), 2800);
+      return () => clearTimeout(t);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [b?.phase]);
 
   if (!b) return null;
   const rows = room.players.map((p) => ({ ...p, ...(b.players[p.id] || {}) }));
@@ -439,27 +518,30 @@ export default function Board({ room, youId, onPickPawn, onRoll, onAdvance, onRe
         onPick={onEventoPick}
       />
 
-      {/* Tabuleiro em S (serpentina) — as linhas ímpares invertem o sentido, dando um
-          percurso contínuo tipo caminho (não um calendário). Auto-scroll à casa da vez. */}
+      {/* Revelação da ordem (breve, no arranque da corrida) */}
+      <AnimatePresence>
+        {orderReveal && (
+          <OrderReveal
+            data={orderReveal}
+            players={room.players}
+            boardPlayers={b.players}
+            onClose={() => setOrderReveal(null)}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Pista em linha — tira horizontal que faz auto-scroll a seguir o jogador da vez */}
       <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} className="fd-card p-2.5 mt-1">
-        <p className="text-[10px] uppercase tracking-widest text-white/35 mb-1.5 px-1">Tabuleiro</p>
-        <div
-          className="overflow-y-auto pr-0.5"
-          style={{ maxHeight: '38vh', display: 'grid', gridTemplateColumns: `repeat(${BOARD_COLS}, 1fr)`, gap: '0.3rem' }}
-        >
+        <p className="text-[10px] uppercase tracking-widest text-white/35 mb-1.5 px-1">Pista</p>
+        <div ref={trackRef} className="flex gap-1 overflow-x-auto pb-1.5 px-0.5">
           {b.squares.map((sq) => {
             const here = rows.filter((r) => r.pos === sq.i && r.pawn);
             const isCur = b.players[b.currentPlayerId]?.pos === sq.i;
-            const row = Math.floor(sq.i / BOARD_COLS);
-            const colInRow = sq.i % BOARD_COLS;
-            // Serpentina: linhas pares esquerda→direita, ímpares direita→esquerda.
-            const col = row % 2 === 0 ? colInRow : BOARD_COLS - 1 - colInRow;
             return (
               <motion.div
                 key={sq.i}
                 ref={isCur ? curCellRef : null}
-                style={{ gridColumn: col + 1, gridRow: row + 1 }}
-                className={`relative rounded-lg min-h-[3.1rem] flex flex-col items-center justify-center ${
+                className={`relative flex-shrink-0 w-11 rounded-lg text-center py-1.5 ${
                   sq.kind === 'partida'
                     ? 'bg-pink-500/25'
                     : sq.kind === 'evento'
@@ -477,9 +559,9 @@ export default function Board({ room, youId, onPickPawn, onRoll, onAdvance, onRe
                 }
                 transition={isCur ? { duration: 1.7, repeat: Infinity, ease: 'easeInOut' } : { duration: 0.3 }}
               >
-                <span className="absolute top-0.5 left-1 text-[8px] text-white/25">{sq.i}</span>
-                <span className="text-lg leading-none">{squareIcon(sq)}</span>
-                <span className="flex flex-wrap justify-center gap-0.5 leading-none text-xs min-h-[13px]">
+                <div className="text-lg leading-none">{squareIcon(sq)}</div>
+                <div className="text-[9px] text-white/30">{sq.i}</div>
+                <div className="text-sm leading-tight min-h-[18px] flex flex-wrap justify-center gap-0.5">
                   {here.map((r) => (
                     <motion.span
                       key={r.id}
@@ -490,7 +572,7 @@ export default function Board({ room, youId, onPickPawn, onRoll, onAdvance, onRe
                       {r.pawn}
                     </motion.span>
                   ))}
-                </span>
+                </div>
               </motion.div>
             );
           })}

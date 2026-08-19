@@ -5,6 +5,23 @@
 
 ---
 
+## 2026-08-19 — Tabuleiro: revelação da ordem + pista em linha auto-scroll
+
+Dois pedidos do João.
+
+- **BUG do dado (corrigido):** o último a lançar não via o seu dado — o servidor
+  passa a `playing` no instante do último lançamento e o tabuleiro aparecia logo.
+  Fix (só cliente): novo overlay **`OrderReveal`** que, ao detetar a transição
+  `order → playing`, mostra a todos os **dados + a ordem (quem começa)** por ~2,8s
+  (com tap para continuar) antes da corrida. Sem alterar o servidor (a ordem já
+  estava certa). Timer depende só do *edge* de `b.phase` → não fica preso.
+- **Pista "em linha" (voltou):** substituí a grelha em S pela **tira horizontal**
+  original, mas agora com **auto-scroll a seguir o jogador da vez** (centra a casa
+  atual via `scrollBy` calculado por `getBoundingClientRect` — scroll SÓ da tira,
+  nunca da página). Sem scroll manual. Peões continuam a deslizar (`layoutId`) e a
+  casa atual a pulsar.
+- **Ficheiros:** `client/src/pages/Board.jsx`. Client build ✓.
+
 ## 2026-08-19 — Tabuleiro em S (serpentina)
 
 Pedido do João: a grelha parecia um calendário. Passou a **serpentina (S)** — as
