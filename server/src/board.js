@@ -280,13 +280,13 @@ export function boardGamble(room, playerId, bet) {
     if (Math.random() < 0.5) {
       me.pos = Math.min(b.size, me.pos + 2);
       me.golos += 4;
-      b.lastEvent = { text: `🎲 ${nm} apostou e GANHOU — avança 2 (bebe 4)! 🎉` };
+      b.lastEvent = { text: `🎲 ${nm} apostou e GANHOU — avança 2 (bebe 4)! 🎉`, gamble: { result: 'win' } };
     } else {
       me.pos = Math.max(0, me.pos - 2);
-      b.lastEvent = { text: `🎲 ${nm} apostou e PERDEU — recua 2! 😬` };
+      b.lastEvent = { text: `🎲 ${nm} apostou e PERDEU — recua 2! 😬`, gamble: { result: 'lose' } };
     }
   } else {
-    b.lastEvent = { text: `🎲 ${nm} não apostou — fica na mesma.` };
+    b.lastEvent = { text: `🎲 ${nm} não apostou — fica na mesma.`, gamble: { result: 'pass' } };
   }
   b.pending = null;
   if (!checkWin(room, playerId)) advanceBoardTurn(room);
@@ -538,10 +538,13 @@ export function playCard(room, playerId, cardId, targetId) {
   const meta = CARD_META[card.key];
   const nm = nameOf(room, playerId);
 
+  // Info para a animação de "carta a ser usada" (mostrada a todos).
+  const cardInfo = { key: card.key, emoji: meta.emoji, name: meta.name, by: nm };
+
   if (card.key === 'shield') {
     me.shield = true;
     me.cards.splice(idx, 1);
-    b.lastEvent = { text: `🛡️ ${nm} ativou um Escudo` };
+    b.lastEvent = { text: `🛡️ ${nm} ativou um Escudo`, card: { ...cardInfo, target: null } };
     return b;
   }
 
@@ -553,7 +556,7 @@ export function playCard(room, playerId, cardId, targetId) {
 
   if (target.shield) {
     target.shield = false;
-    b.lastEvent = { text: `🛡️ ${tnm} bloqueou a ${meta.name} de ${nm}!` };
+    b.lastEvent = { text: `🛡️ ${tnm} bloqueou a ${meta.name} de ${nm}!`, card: { ...cardInfo, target: tnm, blocked: true } };
     return b;
   }
 
@@ -589,6 +592,8 @@ export function playCard(room, playerId, cardId, targetId) {
       }
       break;
   }
+  // Anexa a info da carta ao evento (applyPrison já escreveu o texto no caso 'prison').
+  if (b.lastEvent) b.lastEvent.card = { ...cardInfo, target: tnm };
   return b;
 }
 

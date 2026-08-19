@@ -159,6 +159,92 @@ function BlackjackReveal({ data, text }) {
   );
 }
 
+// ---------- Gamble: dado a girar antes de revelar o resultado ----------
+function GambleReveal({ result, text }) {
+  const [spinning, setSpinning] = useState(result !== 'pass');
+  const [face, setFace] = useState('🎲');
+  useEffect(() => {
+    if (result === 'pass') return;
+    sfx.spin();
+    const faces = ['🎲', '🎰', '❓', '🪙'];
+    let i = 0;
+    const iv = setInterval(() => { i += 1; setFace(faces[i % faces.length]); }, 110);
+    const t = setTimeout(() => {
+      clearInterval(iv);
+      setSpinning(false);
+      if (result === 'win') { sfx.win(); confetti({ count: 70, power: 12 }); haptic([20, 40, 80]); }
+      else { sfx.shot(); haptic([80, 50, 120]); }
+    }, 1300);
+    return () => { clearInterval(iv); clearTimeout(t); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const win = result === 'win';
+  return (
+    <motion.div
+      initial={{ opacity: 0, scale: 0.9 }}
+      animate={{ opacity: 1, scale: 1 }}
+      className="fd-card p-4 flex flex-col items-center gap-2 text-center"
+      style={{ boxShadow: spinning ? '0 10px 30px -12px #ffb02099' : win ? '0 10px 30px -12px #1fd3b6cc' : result === 'pass' ? '0 10px 30px -12px #ffffff33' : '0 10px 30px -12px #ff4d6d99' }}
+    >
+      <p className="text-xs font-bold uppercase tracking-wide text-amber-300">🎲 Gamble</p>
+      {spinning ? (
+        <>
+          <motion.div animate={{ rotate: 360, scale: [1, 1.15, 1] }} transition={{ rotate: { duration: 0.5, repeat: Infinity, ease: 'linear' }, scale: { duration: 0.5, repeat: Infinity } }} className="text-6xl leading-none">
+            {face}
+          </motion.div>
+          <p className="text-sm text-white/50">A apostar…</p>
+        </>
+      ) : (
+        <>
+          <motion.div initial={{ scale: 0.4, rotate: -20 }} animate={{ scale: 1, rotate: 0 }} transition={{ type: 'spring', stiffness: 260, damping: 12 }} className="text-6xl leading-none">
+            {result === 'pass' ? '✋' : win ? '🎉' : '💥'}
+          </motion.div>
+          <p className={`text-sm font-semibold ${win ? 'text-emerald-300' : result === 'pass' ? 'text-white/60' : 'text-rose-300'}`}>{text}</p>
+        </>
+      )}
+    </motion.div>
+  );
+}
+
+// ---------- Carta a ser usada: banner flutuante para TODOS (não bloqueia toques) ----------
+function CardPlayReveal({ card }) {
+  const [visible, setVisible] = useState(true);
+  useEffect(() => {
+    sfx.reveal();
+    haptic(15);
+    const t = setTimeout(() => setVisible(false), 2100);
+    return () => clearTimeout(t);
+  }, []);
+  return (
+    <AnimatePresence>
+      {visible && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0, y: -30 }}
+          className="fixed inset-x-0 top-[13vh] flex justify-center pointer-events-none z-50 px-4"
+        >
+          <motion.div
+            initial={{ scale: 0.3, y: 24, rotate: -12 }}
+            animate={{ scale: 1, y: 0, rotate: 0 }}
+            transition={{ type: 'spring', stiffness: 240, damping: 14 }}
+            className="fd-card px-6 py-4 flex flex-col items-center gap-1 text-center"
+            style={{ background: 'linear-gradient(160deg, rgba(155,92,255,0.3), rgba(255,61,139,0.22))', boxShadow: '0 16px 44px -10px rgba(0,0,0,0.7)' }}
+          >
+            <motion.span animate={{ rotate: [0, -10, 10, -6, 6, 0] }} transition={{ duration: 0.7, repeat: 1 }} className="text-5xl leading-none">
+              {card.emoji}
+            </motion.span>
+            <span className="text-base font-extrabold">{card.name}</span>
+            <span className="text-xs text-white/75">
+              {card.blocked ? `🛡️ ${card.target} bloqueou!` : card.target ? `${card.by} → ${card.target}` : card.by}
+            </span>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+}
+
 // ---------- Revelação da ordem (todos veem os dados + quem começa) ----------
 // Corrige o "salto" para o tabuleiro no instante do último lançamento: dá a todos
 // (sobretudo ao último a rodar) o momento de ver o dado antes da corrida começar.
@@ -447,6 +533,8 @@ export default function Board({ room, youId, onPickPawn, onRoll, onAdvance, onRe
   if (!b) return null;
   const rows = room.players.map((p) => ({ ...p, ...(b.players[p.id] || {}) }));
   const currentPlayer = room.players.find((p) => p.id === b.currentPlayerId);
+  // O peão vive no estado do TABULEIRO (b.players), não em room.players — senão dava "undefined".
+  const currentPawn = b.players?.[b.currentPlayerId]?.pawn || '';
   const isMyTurn = b.currentPlayerId === youId;
 
   const Header = ({ children, sub }) => (
@@ -552,7 +640,7 @@ export default function Board({ room, youId, onPickPawn, onRoll, onAdvance, onRe
     const board = [...rows].sort((a, c) => c.pos - a.pos);
     const mostGolos = [...rows].sort((a, c) => c.golos - a.golos)[0];
     return (
-      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="flex-1 flex flex-col gap-4">
+      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="relative z-10 flex-1 flex flex-col gap-4">
         <motion.h1
           initial={{ scale: 0.4, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
@@ -617,7 +705,7 @@ export default function Board({ room, youId, onPickPawn, onRoll, onAdvance, onRe
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex-1 flex flex-col gap-3">
       <Header sub={`corrida até dar a volta (${b.size} casas)`}>
-        {isMyTurn ? '🎯 É a tua vez!' : `Vez de ${currentPlayer?.pawn} ${currentPlayer?.name || ''}`}
+        {isMyTurn ? '🎯 É a tua vez!' : `Vez de ${currentPawn} ${currentPlayer?.name || ''}`.trim()}
       </Header>
 
       {/* Casa ?? — overlay de 3 cartas viradas + flip */}
@@ -628,6 +716,9 @@ export default function Board({ room, youId, onPickPawn, onRoll, onAdvance, onRe
         currentName={currentPlayer?.name}
         onPick={onEventoPick}
       />
+
+      {/* Carta a ser usada — banner flutuante para todos (não bloqueia toques) */}
+      {ev?.card && !pending && <CardPlayReveal key={'card' + ev.text} card={ev.card} />}
 
       {/* Revelação da ordem (breve, no arranque da corrida) */}
       <AnimatePresence>
@@ -651,7 +742,7 @@ export default function Board({ room, youId, onPickPawn, onRoll, onAdvance, onRe
             return (
               <motion.div
                 key={sq.i}
-                className={`relative flex-shrink-0 w-11 rounded-lg text-center py-1.5 ${
+                className={`relative flex-shrink-0 w-14 rounded-xl text-center py-2 ${
                   sq.kind === 'partida'
                     ? 'bg-pink-500/25'
                     : sq.kind === 'evento'
@@ -664,14 +755,14 @@ export default function Board({ room, youId, onPickPawn, onRoll, onAdvance, onRe
                 } ${isCur ? 'ring-2 ring-pink-500' : ''}`}
                 animate={
                   isCur
-                    ? { boxShadow: ['0 0 0 0 rgba(255,61,139,0)', '0 0 14px 3px rgba(255,61,139,0.55)', '0 0 0 0 rgba(255,61,139,0)'] }
+                    ? { boxShadow: ['0 0 0 0 rgba(255,61,139,0)', '0 0 16px 4px rgba(255,61,139,0.55)', '0 0 0 0 rgba(255,61,139,0)'] }
                     : { boxShadow: '0 0 0 0 rgba(255,61,139,0)' }
                 }
                 transition={isCur ? { duration: 1.7, repeat: Infinity, ease: 'easeInOut' } : { duration: 0.3 }}
               >
-                <div className="text-lg leading-none">{squareIcon(sq)}</div>
-                <div className="text-[9px] text-white/30">{sq.i}</div>
-                <div className="text-sm leading-tight min-h-[18px] flex flex-wrap justify-center gap-0.5">
+                <div className="text-2xl leading-none">{squareIcon(sq)}</div>
+                <div className="text-[10px] text-white/30">{sq.i}</div>
+                <div className="text-base leading-tight min-h-[20px] flex flex-wrap justify-center gap-0.5">
                   {here.map((r) => (
                     <motion.span
                       key={r.id}
@@ -706,7 +797,7 @@ export default function Board({ room, youId, onPickPawn, onRoll, onAdvance, onRe
       </div>
 
       <AnimatePresence mode="wait">
-        {ev ? (
+        {ev && !ev.blackjack && !ev.gamble ? (
           <motion.p
             key={ev.text}
             initial={{ opacity: 0, scale: 0.85, y: 6 }}
@@ -717,7 +808,7 @@ export default function Board({ room, youId, onPickPawn, onRoll, onAdvance, onRe
           >
             {ev.text}
           </motion.p>
-        ) : lm ? (
+        ) : lm && !ev ? (
           <motion.p key={'lm' + (moveRef.current || '')} initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center text-xs text-white/50">
             {lm.name} andou {lm.squares} casa{lm.squares > 1 ? 's' : ''} (🍺 {lm.golos})
           </motion.p>
@@ -742,7 +833,7 @@ export default function Board({ room, youId, onPickPawn, onRoll, onAdvance, onRe
             </div>
           </div>
           <div>
-            <p className="text-[11px] text-white/40 mb-1">{isMyTurn ? '🫵 Tu' : `${currentPlayer?.pawn} ${currentPlayer?.name}`} · {bjPending.pv}</p>
+            <p className="text-[11px] text-white/40 mb-1">{isMyTurn ? '🫵 Tu' : `${currentPawn} ${currentPlayer?.name || ''}`.trim()} · {bjPending.pv}</p>
             <div className="flex gap-1.5 justify-center flex-wrap">
               {bjPending.player.map((c, i) => <PlayingCard key={i} card={c} />)}
             </div>
@@ -763,6 +854,9 @@ export default function Board({ room, youId, onPickPawn, onRoll, onAdvance, onRe
       {ev?.blackjack && !bjPending && (
         <BlackjackReveal key={'bjres' + ev.text} data={ev.blackjack} text={ev.text} />
       )}
+
+      {/* Gamble — dado a girar antes de revelar */}
+      {ev?.gamble && !pending && <GambleReveal key={'gam' + ev.text} result={ev.gamble.result} text={ev.text} />}
 
       {/* Resolver a casa onde caiu (mini / gamble — o ?? e o Blackjack têm UI própria) */}
       {miniGamblePending && isMyTurn && (

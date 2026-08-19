@@ -5,6 +5,30 @@
 
 ---
 
+## 2026-08-19 — Gamble animado + pista maior + carta usada + fix "undefined"
+
+Updates + bugs do João.
+
+- **BUG "undefined" (corrigido):** o cabeçalho `Vez de …` e a mesa de blackjack liam
+  `currentPlayer?.pawn` de `room.players` (que NÃO tem peão — está em `b.players`),
+  e num template literal isso renderiza a string "undefined". Passa a usar
+  `currentPawn = b.players[currentPlayerId]?.pawn`.
+- **Gamble com animação:** servidor manda `lastEvent.gamble.result` (win/lose/pass);
+  novo `GambleReveal` (inline) mostra um **dado a girar** (~1,3s) antes de revelar o
+  desfecho (🎉/💥) + som/confetti. Já não é instantâneo.
+- **Carta a ser usada → animação para todos:** servidor manda `lastEvent.card`
+  (emoji, nome, quem, alvo, blocked) no `playCard`; novo `CardPlayReveal` — banner
+  **flutuante `pointer-events-none`** (nunca bloqueia toques) que mostra a carta a
+  entrar com flourish, para toda a gente, e desaparece ~2,1s.
+- **Pista maior:** casas `w-11 → w-14`, ícones `text-lg → text-2xl`, peões maiores.
+- **Ecrã final "não dá para fazer nada":** investigado a fundo — o fluxo
+  `over → Jogar outra vez/Sair` está **verificado por e2e** (2 clientes jogam até dar
+  a volta; `reset_game` → `back_to_lobby` + lobby + board limpo ✓). Não reproduzi bug
+  de lógica; os overlays estão todos protegidos por fase. Reforço defensivo:
+  `relative z-10` no ecrã de fim. (Se persistir, é preciso repro do device.)
+- **Ficheiros:** `server/src/board.js` (gamble/card structured), `client/src/pages/Board.jsx`.
+  Verificação: e2e fim-de-jogo + reset ✓ · smoke do motor prévio ✓ · client build ✓.
+
 ## 2026-08-19 — Blackjack: revelação animada (carta a carta)
 
 Pedido do João: a casa não mostra logo o resultado — vira a carta tapada e vai
