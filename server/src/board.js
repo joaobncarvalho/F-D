@@ -7,6 +7,11 @@
 // aleatória) por ABUSO (andar 1 casa 3× seguidas), por ?? ou por carta "Denúncia".
 // GANÂNCIA: andar 3 casas 2× seguidas → evento de azar quase garantido.
 // Vitória: dar a volta (pos ≥ 60).
+//
+// CONTEÚDO EM DADOS: os bancos ?? / prisão / cartas vêm do repo (BD ou fallback em
+// código, ver content/board.data.js) e são "fotografados" para `b.banks` no
+// initBoard — assim os handlers síncronos leem-nos sem `await`. As cartas são
+// PRIVADAS: o broadcast só leva a contagem; a mão vai por canal privado.
 import { randomUUID } from 'node:crypto';
 import * as repo from './repo.js';
 import { AppError } from './errors.js';
@@ -24,16 +29,10 @@ const PAWNS = ['🦊', '🐸', '🐵', '🦄', '🐙', '🐝', '🦁', '🐨', '
 // Casas de mini-jogo: só os jogos RÁPIDOS single-player (os de grupo ficam na Roda).
 const BOARD_MINI_TYPES = ['boca_calada', 'desafio', 'isto_ou_aquilo'];
 
-export const CARD_META = {
-  swap: { emoji: '🔁', name: 'Troca', desc: 'Trocas de casa com um jogador' },
-  back2: { emoji: '⬅️', name: 'Empurrão', desc: 'Mandas alguém recuar 2 casas' },
-  prison: { emoji: '⛓️', name: 'Denúncia', desc: 'Mandas alguém para a prisão' },
-  skip: { emoji: '⏭️', name: 'Salta-vez', desc: 'Um jogador perde a próxima vez' },
-  shield: { emoji: '🛡️', name: 'Escudo', desc: 'Bloqueia a próxima carta contra ti' },
-  drink3: { emoji: '🍺', name: 'Ronda', desc: 'Obrigas alguém a beber 3 golos' },
-  steal: { emoji: '🎁', name: 'Roubo', desc: 'Roubas uma carta a alguém' },
-};
-const CARD_KEYS = Object.keys(CARD_META);
+// Mecânica das cartas jogáveis (o CATÁLOGO — emoji/nome/desc — vem dos bancos/BD).
+// Só estas keys podem ser distribuídas; uma carta na admin com key desconhecida
+// nunca entra no baralho (defensivo).
+const KNOWN_CARD_KEYS = ['swap', 'back2', 'prison', 'skip', 'shield', 'drink3', 'steal'];
 
 const nameOf = (room, id) => room.players.get(id)?.name;
 function shuffle(a) {
@@ -47,6 +46,45 @@ function activeOrder(room) {
   return [...room.players.values()]
     .filter((p) => p.connected)
     .sort((a, b) => a.joinedAt.localeCompare(b.joinedAt));
+}
+
+// ----- Bancos (?? / prisão / cartas) -----------------------------------------
+// `b.banks` é o snapshot lido no initBoard. Estas helpers leem sempre dele.
+
+/** Mapa key→{emoji,name,desc} para o cliente desenhar as cartas. */
+function cardMeta(b) {
+  const meta = {};
+  for (const c of b.banks.cards) meta[c.key] = { emoji: c.emoji, name: c.name, desc: c.desc };
+  return meta;
+}
+/** Escolha ponderada (pesos ≥1) de 1 item. */
+function weightedPick(items) {
+  const total = items.reduce((s, it) => s + Math.max(1, it.weight || 1), 0);
+  let r = Math.random() * total;
+  for (const it of items) {
+    r -= Math.max(1, it.weight || 1);
+    if (r < 0) return it;
+  }
+  return items[items.length - 1];
+}
+/** Amostra ponderada SEM reposição de n itens distintos. */
+function weightedSample(items, n) {
+  const pool = items.slice();
+  const out = [];
+  while (out.length < n && pool.length) {
+    const pick = weightedPick(pool);
+    out.push(pick);
+    pool.splice(pool.indexOf(pick), 1);
+  }
+  return out;
+}
+/** Dá uma carta aleatória do catálogo (só keys com mecânica). Devolve a meta. */
+function giveRandomCard(b, player) {
+  const pool = b.banks.cards.filter((c) => KNOWN_CARD_KEYS.includes(c.key));
+  if (!pool.length) return null;
+  const c = weightedPick(pool);
+  player.cards.push({ id: randomUUID(), key: c.key });
+  return c;
 }
 
 async function generateSquares() {
@@ -68,9 +106,14 @@ async function generateSquares() {
 
 export async function initBoard(room, { intensity = 'leve' } = {}) {
   const squares = await generateSquares();
+  const banks = await repo.getBoardBanks(); // { events, prison, cards } — snapshot p/ os handlers síncronos
   const players = {};
   for (const p of room.players.values()) {
-    players[p.id] = { pawn: null, pos: 0, golos: 0, slowStreak: 0, fastStreak: 0, skipTurns: 0, finished: false, cards: [], shield: false };
+    players[p.id] = {
+      pawn: null, pos: 0, golos: 0, slowStreak: 0, fastStreak: 0, skipTurns: 0,
+      finished: false, cards: [], shield: false,
+      prisonCount: 0, cardsPlayed: 0, // estatísticas do fim
+    };
   }
   room.mode = 'board';
   room.board = {
@@ -78,6 +121,7 @@ export async function initBoard(room, { intensity = 'leve' } = {}) {
     intensity: ['picante', 'hardcore', 'caos'].includes(intensity) ? intensity : 'leve',
     size: BOARD_SIZE,
     squares,
+    banks,
     players,
     dice: {},
     order: [],
@@ -338,9 +382,10 @@ function positiveReward(room, playerId) {
   const me = b.players[playerId];
   switch (Math.floor(Math.random() * 3)) {
     case 0: {
-      const key = CARD_KEYS[Math.floor(Math.random() * CARD_KEYS.length)];
-      me.cards.push({ id: randomUUID(), key });
-      return `ganha a carta ${CARD_META[key].name} ${CARD_META[key].emoji}`;
+      const c = giveRandomCard(b, me);
+      if (c) return `ganha a carta ${c.name} ${c.emoji}`;
+      me.pos = Math.min(b.size, me.pos + 1); // sem cartas no catálogo → avança na mesma
+      return 'avança +1 casa extra 🚀';
     }
     case 1:
       for (const oid of Object.keys(b.players)) if (oid !== playerId) b.players[oid].golos += 2;
@@ -472,18 +517,14 @@ export function boardBeerpong(room, playerId, power) {
     case 'others':
       for (const oid of Object.keys(b.players)) if (oid !== playerId) b.players[oid].golos += cup.value;
       break;
-    case 'card': {
-      const key = CARD_KEYS[Math.floor(Math.random() * CARD_KEYS.length)];
-      me.cards.push({ id: randomUUID(), key });
+    case 'card':
+      giveRandomCard(b, me);
       break;
-    }
-    case 'jackpot': {
+    case 'jackpot':
       me.pos = Math.min(b.size, me.pos + 3);
-      const key = CARD_KEYS[Math.floor(Math.random() * CARD_KEYS.length)];
-      me.cards.push({ id: randomUUID(), key });
+      giveRandomCard(b, me);
       checkWin(room, playerId);
       break;
-    }
     case 'prison':
       applyPrison(room, playerId, 'copo maldito');
       break;
@@ -501,81 +542,56 @@ export function boardBeerpong(room, playerId, power) {
   return b;
 }
 
-// Casa ?? ("mistério"): 3 cartas viradas ao contrário. Cada uma esconde uma
-// "trait" (efeito) ou uma carta jogável. Cada maker devolve o descritor JÁ
-// resolvido (ex.: qual a carta) + um apply(room, id) que muta o estado e
-// devolve o texto de revelação. Só o escolhido é aplicado.
-const EVENTO_POOL = [
-  () => ({
-    emoji: '🚀',
-    title: 'Sorte!',
-    desc: 'Avanças 2 casas',
-    apply: (room, id) => {
-      const b = room.board;
-      b.players[id].pos = Math.min(b.size, b.players[id].pos + 2);
-      checkWin(room, id);
-      return `🚀 ${nameOf(room, id)} teve sorte — avança 2 casas!`;
-    },
-  }),
-  () => ({
-    emoji: '💨',
-    title: 'Azar',
-    desc: 'Recuas 2 casas',
-    apply: (room, id) => {
-      const me = room.board.players[id];
-      me.pos = Math.max(0, me.pos - 2);
-      return `💨 ${nameOf(room, id)} azar — recua 2 casas!`;
-    },
-  }),
-  () => ({
-    emoji: '🍺',
-    title: 'Golada',
-    desc: 'Bebes 3 golos',
-    apply: (room, id) => {
-      room.board.players[id].golos += 3;
-      return `🍺 ${nameOf(room, id)} bebe 3 golos!`;
-    },
-  }),
-  () => {
-    const key = CARD_KEYS[Math.floor(Math.random() * CARD_KEYS.length)];
-    const m = CARD_META[key];
-    return {
-      emoji: m.emoji,
-      title: m.name,
-      desc: m.desc,
-      card: key,
-      apply: (room, id) => {
-        room.board.players[id].cards.push({ id: randomUUID(), key });
-        return `🎴 ${nameOf(room, id)} ganhou a carta ${m.name}!`;
-      },
-    };
-  },
-  () => ({
-    emoji: '🚔',
-    title: 'Preso!',
-    desc: 'Vais direto para a prisão',
-    apply: (room, id) => {
-      applyPrison(room, id, 'sorte tramada'); // já escreve o lastEvent detalhado
-      return room.board.lastEvent.text;
-    },
-  }),
-  () => ({
-    emoji: '👯',
-    title: 'Ronda geral',
-    desc: 'Todos os outros bebem 2',
-    apply: (room, id) => {
-      const b = room.board;
-      for (const oid of Object.keys(b.players)) if (oid !== id) b.players[oid].golos += 2;
-      return `👯 Todos menos ${nameOf(room, id)} bebem 2 golos!`;
-    },
-  }),
-];
-
+// Casa ?? ("mistério"): 3 cartas viradas ao contrário. Cada uma esconde um efeito
+// tipado do banco `evento` (b.banks.events). O conteúdo fica escondido no payload
+// (serializePending) até o jogador escolher — surpresa real. Se o efeito for
+// "card", resolve-se já uma carta concreta (para a revelação mostrar qual é).
 function openEvento(room, playerId) {
-  const cards = shuffle(EVENTO_POOL.slice())
-    .slice(0, 3)
-    .map((make) => make());
-  room.board.pending = { kind: 'evento', playerId, cards };
+  const b = room.board;
+  const chosen = weightedSample(b.banks.events, 3).map((e) => {
+    if (e.effect === 'card') {
+      const pool = b.banks.cards.filter((c) => KNOWN_CARD_KEYS.includes(c.key));
+      const c = pool.length ? weightedPick(pool) : null;
+      return c
+        ? { effect: 'card', card: c.key, emoji: c.emoji, title: c.name, desc: c.desc }
+        : { effect: 'advance', value: 2, emoji: '🚀', title: 'Sorte!', desc: 'Avanças 2 casas' };
+    }
+    return { effect: e.effect, value: e.value, emoji: e.emoji, title: e.title, desc: e.desc };
+  });
+  b.pending = { kind: 'evento', playerId, cards: chosen };
+}
+
+// Aplica um efeito tipado do ?? ao jogador; devolve o texto de revelação.
+function applyEventoEffect(room, playerId, ev) {
+  const b = room.board;
+  const me = b.players[playerId];
+  const nm = nameOf(room, playerId);
+  switch (ev.effect) {
+    case 'advance':
+      me.pos = Math.min(b.size, me.pos + (ev.value || 0));
+      checkWin(room, playerId);
+      return `🚀 ${nm} teve sorte — avança ${ev.value} casa${ev.value > 1 ? 's' : ''}!`;
+    case 'back':
+      me.pos = Math.max(0, me.pos - (ev.value || 0));
+      return `💨 ${nm} azar — recua ${ev.value} casa${ev.value > 1 ? 's' : ''}!`;
+    case 'drink':
+      me.golos += ev.value || 0;
+      return `🍺 ${nm} bebe ${ev.value} golos!`;
+    case 'others_drink':
+      for (const oid of Object.keys(b.players)) if (oid !== playerId) b.players[oid].golos += ev.value || 0;
+      return `👯 Todos menos ${nm} bebem ${ev.value} golos!`;
+    case 'card': {
+      // A carta concreta já foi decidida em openEvento (ev.card); dá exatamente essa.
+      const meta = b.banks.cards.find((c) => c.key === ev.card);
+      if (meta) me.cards.push({ id: randomUUID(), key: meta.key });
+      return `🎴 ${nm} ganhou a carta ${meta?.name || 'sorte'}!`;
+    }
+    case 'prison':
+      applyPrison(room, playerId, 'sorte tramada'); // escreve o lastEvent detalhado
+      return b.lastEvent.text;
+    default:
+      return `${nm} não teve nada.`;
+  }
 }
 
 /** Casa ??: revela a carta escolhida (0-2), aplica o efeito e passa a vez. */
@@ -586,7 +602,7 @@ export function boardEventoPick(room, playerId, index) {
   const i = Number(index);
   const chosen = b.pending.cards[i];
   if (!chosen) throw new AppError('Escolha inválida.');
-  const text = chosen.apply(room, playerId); // muta o estado; devolve o texto de revelação
+  const text = applyEventoEffect(room, playerId, chosen); // muta o estado
   b.pending = null;
   b.lastEvent = {
     text,
@@ -601,33 +617,13 @@ function applyPrison(room, playerId, reason = 'prisão') {
   const me = b.players[playerId];
   const nm = nameOf(room, playerId);
   me.slowStreak = 0;
-  let note;
-  switch (Math.floor(Math.random() * 5)) {
-    case 0:
-      me.skipTurns += 1;
-      note = 'perde 1 vez';
-      break;
-    case 1:
-      me.skipTurns += 2;
-      note = 'perde 2 vezes';
-      break;
-    case 2:
-      me.golos += 4;
-      me.skipTurns += 1;
-      note = 'bebe 4 golos + perde 1 vez';
-      break;
-    case 3:
-      me.pos = Math.max(0, me.pos - 3);
-      me.skipTurns += 1;
-      note = 'recua 3 + perde 1 vez';
-      break;
-    case 4:
-      if (me.cards.length) me.cards.shift();
-      me.skipTurns += 1;
-      note = 'perde 1 carta + 1 vez';
-      break;
-  }
-  b.lastEvent = { text: `🚔 ${nm} foi PRESO (${reason}): ${note}` };
+  me.prisonCount += 1;
+  const p = weightedPick(b.banks.prison);
+  if (p.skipTurns) me.skipTurns += p.skipTurns;
+  if (p.drink) me.golos += p.drink;
+  if (p.back) me.pos = Math.max(0, me.pos - p.back);
+  if (p.loseCard && me.cards.length) me.cards.shift();
+  b.lastEvent = { text: `🚔 ${nm} foi PRESO (${reason}): ${p.note}` };
 }
 
 /** Jogar uma carta na tua vez (antes de avançar). */
@@ -639,7 +635,7 @@ export function playCard(room, playerId, cardId, targetId) {
   const idx = me.cards.findIndex((c) => c.id === cardId);
   if (idx < 0) throw new AppError('Não tens essa carta.');
   const card = me.cards[idx];
-  const meta = CARD_META[card.key];
+  const meta = cardMeta(b)[card.key] || { emoji: '🎴', name: 'Carta', desc: '' };
   const nm = nameOf(room, playerId);
 
   // Info para a animação de "carta a ser usada" (mostrada a todos).
@@ -648,6 +644,7 @@ export function playCard(room, playerId, cardId, targetId) {
   if (card.key === 'shield') {
     me.shield = true;
     me.cards.splice(idx, 1);
+    me.cardsPlayed += 1;
     b.lastEvent = { text: `🛡️ ${nm} ativou um Escudo`, card: { ...cardInfo, target: null } };
     return b;
   }
@@ -656,6 +653,7 @@ export function playCard(room, playerId, cardId, targetId) {
   if (!target || targetId === playerId || !room.players.get(targetId)?.connected)
     throw new AppError('Escolhe um alvo válido.');
   me.cards.splice(idx, 1); // consome
+  me.cardsPlayed += 1;
   const tnm = nameOf(room, targetId);
 
   if (target.shield) {
@@ -818,6 +816,13 @@ export function boardHostKick(room, hostId, targetId) {
   return b;
 }
 
+/** Mão privada de um jogador (nunca vai no broadcast — entregue por canal próprio). */
+export function boardHand(room, playerId) {
+  const b = room.board;
+  if (!b || !b.players[playerId]) return null;
+  return b.players[playerId].cards;
+}
+
 // Serializa o pending escondendo o que não pode vazar:
 //  - ?? : só o número de cartas (o conteúdo é surpresa até escolher).
 //  - blackjack: a carta tapada do dealer fica escondida enquanto o jogador decide.
@@ -851,7 +856,7 @@ export function serializeBoard(room) {
     intensity: b.intensity,
     squares: b.squares,
     pawns: PAWNS,
-    cardMeta: CARD_META,
+    cardMeta: cardMeta(b),
     players: Object.fromEntries(
       Object.entries(b.players).map(([id, p]) => [
         id,
@@ -864,7 +869,9 @@ export function serializeBoard(room) {
           skipTurns: p.skipTurns,
           finished: p.finished,
           shield: p.shield,
-          cards: p.cards, // públicas (MVP)
+          cardCount: p.cards.length, // cartas PRIVADAS: só a contagem no broadcast
+          prisonCount: p.prisonCount,
+          cardsPlayed: p.cardsPlayed,
         },
       ])
     ),

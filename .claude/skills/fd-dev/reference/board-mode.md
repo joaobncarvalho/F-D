@@ -54,12 +54,21 @@
   sorte auto) · Gamble (aposta 50/50). Prisão passou a ter **consequência aleatória**.
 - **Fase 3 — cartas/traits ✅:** inventário (ganhas em ??), joga na tua vez contra
   outros: 🔁 Troca · ⬅️ Empurrão · ⛓️ Denúncia · ⏭️ Salta-vez · 🛡️ Escudo (bloqueia)
-  · 🍺 Ronda · 🎁 Roubo. Cartas **públicas** (MVP). Bancos (??/prisão/cartas) em
-  código — mover para a admin/BD é melhoria futura.
+  · 🍺 Ronda · 🎁 Roubo.
+- **Fase 4 — bancos na BD + cartas privadas ✅ (2026-08-20):**
+  - Bancos **??/prisão/cartas** movidos para `board_items` (Prisma) + CRUD na /admin
+    (separador 🎲 Tabuleiro). Fallback em `content/board.data.js`. Snapshot em
+    `b.banks` no `initBoard` (os handlers síncronos leem-no sem `await`). Os efeitos
+    do ?? são **tipados** (`advance|back|drink|card|prison|others_drink` + `value`);
+    a prisão são efeitos combinados; as cartas são um catálogo (mecânica fixa por `key`).
+  - Cartas **privadas**: a mão vai por `board_hand` (canal do jogador); o broadcast
+    só leva `cardCount`. O `serializeBoard` já não expõe as cartas dos outros.
+  - Estatísticas de fim: `prisonCount` + `cardsPlayed` → ecrã de fim com "prémios".
 
 ## Arquitetura (notas)
 - Estado do tabuleiro em memória (`room.board` / `game`), como os outros modos.
 - Novo conjunto de eventos socket (escolher peão, lançar ordem, avançar, apostar,
   jogar carta, resolver casa…). Documentar em `architecture.md` à medida.
 - Reusa o motor dos mini-jogos para as casas de jogo (sem duplicar).
-- Conteúdo (??/prisão/cartas) como bancos → mais tarde na BD/admin.
+- Conteúdo (??/prisão/cartas) como bancos **na BD/admin** (`board_items`), com fallback
+  em código (`content/board.data.js`). ✅ feito na Fase 4.

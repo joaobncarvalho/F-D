@@ -4,6 +4,7 @@
 
 import { PrismaClient } from '@prisma/client';
 import { GAME_TYPES } from '../src/content/prompts.data.js';
+import { boardItemsForSeed } from '../src/content/board.data.js';
 
 const prisma = new PrismaClient();
 
@@ -31,7 +32,18 @@ async function main() {
     console.log(`  ${gt.label}: ${gt.prompts.length} prompts`);
   }
 
-  console.log(`Seed concluído: ${GAME_TYPES.length} tipos, ${totalPrompts} prompts.`);
+  // Bancos do Tabuleiro (?? / prisão / cartas) — idempotente por (category, title).
+  const boardRows = boardItemsForSeed();
+  for (const r of boardRows) {
+    await prisma.boardItem.upsert({
+      where: { category_title: { category: r.category, title: r.title } },
+      update: { ...r, active: true },
+      create: { ...r, active: true },
+    });
+  }
+  console.log(`  Tabuleiro: ${boardRows.length} itens de banco (??/prisão/cartas)`);
+
+  console.log(`Seed concluído: ${GAME_TYPES.length} tipos, ${totalPrompts} prompts, ${boardRows.length} itens de tabuleiro.`);
 }
 
 main()

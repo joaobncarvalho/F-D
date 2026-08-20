@@ -83,5 +83,65 @@ export function createAdminRouter() {
     res.json(await repo.adminDeletePrompt(req.params.id));
   }));
 
+  // ----- Bancos do Tabuleiro (?? / prisão / cartas) -----
+  const CATEGORIES = ['evento', 'prisao', 'carta'];
+  const EVENT_EFFECTS = ['advance', 'back', 'drink', 'card', 'prison', 'others_drink'];
+  const CARD_KEYS = ['swap', 'back2', 'prison', 'skip', 'shield', 'drink3', 'steal'];
+  const intOr = (v, def = 0) => {
+    const n = parseInt(v, 10);
+    return Number.isFinite(n) ? n : def;
+  };
+
+  // Normaliza + valida o corpo consoante a categoria. Devolve os dados p/ Prisma.
+  function cleanBoardItem(body, { partial = false } = {}) {
+    const out = {};
+    const cat = body.category;
+    if (!partial || body.category !== undefined) {
+      if (!CATEGORIES.includes(cat)) throw new Error('Categoria inválida.');
+      out.category = cat;
+    }
+    if (body.emoji !== undefined) out.emoji = String(body.emoji || '🎲').slice(0, 8);
+    if (body.title !== undefined) out.title = String(body.title || '').trim().slice(0, 120);
+    if (body.desc !== undefined) out.desc = String(body.desc || '').trim().slice(0, 200);
+    if (body.weight !== undefined) out.weight = Math.max(1, Math.min(20, intOr(body.weight, 1)));
+    if (body.active !== undefined) out.active = !!body.active;
+    // Campos por categoria (aceita quando presentes).
+    if (body.effect !== undefined) out.effect = body.effect || null;
+    if (body.value !== undefined) out.value = body.value === '' || body.value == null ? null : intOr(body.value, 0);
+    if (body.skipTurns !== undefined) out.skipTurns = Math.max(0, intOr(body.skipTurns, 0));
+    if (body.drink !== undefined) out.drink = Math.max(0, intOr(body.drink, 0));
+    if (body.back !== undefined) out.back = Math.max(0, intOr(body.back, 0));
+    if (body.loseCard !== undefined) out.loseCard = !!body.loseCard;
+    return out;
+  }
+
+  function validateNew(data) {
+    if (!data.title || data.title.length < 1) throw new Error('Falta o título/nota.');
+    if (data.category === 'evento') {
+      if (!EVENT_EFFECTS.includes(data.effect)) throw new Error('Efeito de ?? inválido.');
+    } else if (data.category === 'carta') {
+      if (!CARD_KEYS.includes(data.effect)) throw new Error('Carta (key) inválida.');
+    }
+  }
+
+  router.get('/api/board-items', wrap(async (req, res) => {
+    res.json(await repo.adminListBoardItems(req.query.category || undefined));
+  }));
+
+  router.post('/api/board-items', wrap(async (req, res) => {
+    const data = cleanBoardItem(req.body || {});
+    validateNew(data);
+    res.json(await repo.adminCreateBoardItem(data));
+  }));
+
+  router.patch('/api/board-items/:id', wrap(async (req, res) => {
+    const data = cleanBoardItem(req.body || {}, { partial: true });
+    res.json(await repo.adminUpdateBoardItem(req.params.id, data));
+  }));
+
+  router.delete('/api/board-items/:id', wrap(async (req, res) => {
+    res.json(await repo.adminDeleteBoardItem(req.params.id));
+  }));
+
   return router;
 }

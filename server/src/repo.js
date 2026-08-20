@@ -7,6 +7,7 @@
 // chamam estas funções (mesma assinatura async de sempre).
 
 import { GAME_TYPES, VASCO_BOARDS } from './content/prompts.data.js';
+import { BOARD_EVENTS, BOARD_PRISON, BOARD_CARDS } from './content/board.data.js';
 
 // Cliente Prisma lazy: só carrega se houver DATABASE_URL. Cacheado (promessa).
 let prismaPromise = null;
@@ -91,6 +92,41 @@ export async function getRandomVascoBoard() {
   return VASCO_BOARDS[Math.floor(Math.random() * VASCO_BOARDS.length)];
 }
 
+// Bancos do Modo Tabuleiro (?? / prisão / cartas). Lê de board_items (BD) quando
+// disponível; senão cai para o conteúdo em código (board.data.js). O board.js
+// "fotografa" isto no initBoard (b.banks) — daí ser async só aqui.
+const FALLBACK_BANKS = {
+  events: BOARD_EVENTS.map((e) => ({ ...e, weight: 1 })),
+  prison: BOARD_PRISON.map((p) => ({ ...p, weight: 1 })),
+  cards: BOARD_CARDS.map((c) => ({ ...c, weight: 1 })),
+};
+
+export async function getBoardBanks() {
+  const prisma = await client();
+  if (prisma) {
+    try {
+      const rows = await prisma.boardItem.findMany({ where: { active: true } });
+      if (rows.length) {
+        const events = rows.filter((r) => r.category === 'evento')
+          .map((r) => ({ emoji: r.emoji, title: r.title, desc: r.desc, effect: r.effect, value: r.value, weight: r.weight }));
+        const prison = rows.filter((r) => r.category === 'prisao')
+          .map((r) => ({ note: r.title, skipTurns: r.skipTurns, drink: r.drink, back: r.back, loseCard: r.loseCard, weight: r.weight }));
+        const cards = rows.filter((r) => r.category === 'carta')
+          .map((r) => ({ key: r.effect, emoji: r.emoji, name: r.title, desc: r.desc, weight: r.weight }));
+        // Só usa a BD se cada banco tiver conteúdo (senão o jogo ficava sem opções).
+        if (events.length && prison.length && cards.length) return { events, prison, cards };
+      }
+    } catch (e) {
+      console.error('[repo] getBoardBanks DB falhou, uso memória:', e.message);
+    }
+  }
+  return {
+    events: FALLBACK_BANKS.events.map((e) => ({ ...e })),
+    prison: FALLBACK_BANKS.prison.map((p) => ({ ...p })),
+    cards: FALLBACK_BANKS.cards.map((c) => ({ ...c })),
+  };
+}
+
 // ----- CRUD de conteúdo (página de admin) — exige BD ------------------------
 
 export async function adminGameTypes() {
@@ -146,5 +182,35 @@ export async function adminUpdatePrompt(id, { text, intensity, active, buddy, du
 export async function adminDeletePrompt(id) {
   const prisma = await requirePrisma();
   await prisma.prompt.delete({ where: { id } });
+  return { ok: true };
+}
+
+// ----- CRUD dos bancos do Tabuleiro (board_items) — exige BD -----------------
+
+const BOARD_ITEM_SELECT = {
+  id: true, category: true, emoji: true, title: true, desc: true,
+  effect: true, value: true, skipTurns: true, drink: true, back: true,
+  loseCard: true, weight: true, active: true,
+};
+
+export async function adminListBoardItems(category) {
+  const prisma = await requirePrisma();
+  const where = category ? { category } : {};
+  return prisma.boardItem.findMany({ where, orderBy: [{ category: 'asc' }], select: BOARD_ITEM_SELECT });
+}
+
+export async function adminCreateBoardItem(data) {
+  const prisma = await requirePrisma();
+  return prisma.boardItem.create({ data, select: BOARD_ITEM_SELECT });
+}
+
+export async function adminUpdateBoardItem(id, data) {
+  const prisma = await requirePrisma();
+  return prisma.boardItem.update({ where: { id }, data, select: BOARD_ITEM_SELECT });
+}
+
+export async function adminDeleteBoardItem(id) {
+  const prisma = await requirePrisma();
+  await prisma.boardItem.delete({ where: { id } });
   return { ok: true };
 }

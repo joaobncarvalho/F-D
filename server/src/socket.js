@@ -590,6 +590,14 @@ function broadcastState(io, code) {
   const room = rooms.getRoom(code);
   if (!room) return; // sala já foi removida (ficou vazia)
   io.to(code).emit('room_state', { room: serializeRoom(room) });
+  // Tabuleiro: as cartas são PRIVADAS — entrega a cada jogador ligado a SUA mão
+  // (o broadcast só leva a contagem). Cobre advance/jogar carta/ganhar/reconexão.
+  if (room.mode === 'board' && room.board) {
+    for (const p of room.players.values()) {
+      if (!p.connected) continue;
+      io.to(p.id).emit('board_hand', { cards: board.boardHand(room, p.id) || [] });
+    }
+  }
 }
 
 function respond(ack, socket, event, payload) {

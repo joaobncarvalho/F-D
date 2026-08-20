@@ -99,13 +99,22 @@ Legenda: ✅ feito · 🚧 em curso · ⬜ por fazer · 🔗 ponto de integraç�
 ## Semana 4 (8–11 set) — Polimento + playtest + deploy
 
 **João**
-- [ ] Polimento de animações e transições
-- [ ] Ecrã de fim de jogo: estatísticas ("quem bebeu mais", "quem recusou mais")
+- [x] Polimento de animações e transições (roda feito; **tabuleiro**: ecrã de fim
+      animado — coroa do vencedor, prémios em stagger, classificação a entrar)
+- [x] Ecrã de fim de jogo: estatísticas — **Roda** (pódio "bebeu mais/recusou mais");
+      **Tabuleiro** agora com "prémios" (🍺 Rei da Golada, 🚔 Preso Habitual, 🎴
+      Maquiavélico) + classificação final animada. Contadores `prisonCount`/`cardsPlayed`.
 - [x] Controlos do host: saltar jogador, remover quem saiu, terminar jogo (roda já
       tinha `skip_turn`/`end_game`; **tabuleiro** agora tem `board_skip`/`board_end`/
       `board_kick` + auto-skip de quem se desliga — anti-deadlock)
-- [ ] Playtest real com amigos → correção de bugs
-- [ ] Deploy: backend (Railway/Render/Fly — WebSockets persistentes) + frontend (Vercel/Netlify)
+- [ ] Playtest real com amigos → correção de bugs (o único P0 restante do tabuleiro)
+- [x] Deploy no ar (Railway, imagem única) — inclui **ambos os modos**. Falta só o
+      `db push`+seed da tabela `board_items` na Supabase p/ ativar a edição na admin.
+- [x] **Bancos do tabuleiro em dados/BD** (melhoria): ?? / prisão / cartas passam a
+      `board_items` (Prisma) + CRUD na /admin (separador 🎲 Tabuleiro), com fallback
+      em código (`content/board.data.js`). Efeitos do ?? passam a **tipados**.
+- [x] **Cartas privadas** (melhoria): a mão só chega a cada dono (`board_hand`); o
+      broadcast leva só a contagem (🎴×N). Deixaram de ser públicas.
 
 **Colega (BD)**
 - [ ] Troubleshooting de queries/performance durante os testes

@@ -31,6 +31,7 @@ export default function App() {
   const [intrigasReason, setIntrigasReason] = useState(null); // { roundId, reason }
   const [piramideHand, setPiramideHand] = useState(null); // { roundId, cards } — PRIVADO
   const [vascoRole, setVascoRole] = useState(null); // { roundId, isImpostor, word } — PRIVADO
+  const [boardHand, setBoardHand] = useState(null); // { cards } — mão de cartas do tabuleiro (PRIVADA)
   const [intensityResult, setIntensityResult] = useState(null); // { intensity, randomized, candidates, counts }
   const [muted, setMuted] = useState(sfx.isMuted());
 
@@ -69,6 +70,7 @@ export default function App() {
       setIntrigasReason(null);
       setPiramideHand(null);
       setVascoRole(null);
+      setBoardHand(null);
       setIntensityResult(intensityResult || null);
       // Tabuleiro vai direto ao ecrã do jogo; a roda passa pela roleta + countdown.
       setScreen(mode === 'board' ? 'board' : 'intensity_reveal');
@@ -78,6 +80,7 @@ export default function App() {
       setIntrigasReason(null);
       setPiramideHand(null);
       setVascoRole(null);
+      setBoardHand(null);
       setScreen('lobby');
     }
     function onYouAreAuthor({ roundId }) {
@@ -91,6 +94,9 @@ export default function App() {
     }
     function onVascoRole({ roundId, isImpostor, word }) {
       setVascoRole({ roundId, isImpostor, word });
+    }
+    function onBoardHand({ cards }) {
+      setBoardHand({ cards: cards || [] });
     }
     function onError({ message }) {
       setError(message);
@@ -113,6 +119,7 @@ export default function App() {
     socket.on('intrigas_reason', onIntrigasReason);
     socket.on('piramide_hand', onPiramideHand);
     socket.on('vasco_role', onVascoRole);
+    socket.on('board_hand', onBoardHand);
     socket.on('error_msg', onError);
     socket.on('session_invalid', onSessionInvalid);
 
@@ -126,6 +133,7 @@ export default function App() {
       socket.off('intrigas_reason', onIntrigasReason);
       socket.off('piramide_hand', onPiramideHand);
       socket.off('vasco_role', onVascoRole);
+      socket.off('board_hand', onBoardHand);
       socket.off('error_msg', onError);
       socket.off('session_invalid', onSessionInvalid);
     };
@@ -241,6 +249,7 @@ export default function App() {
     setIntrigasReason(null);
     setPiramideHand(null);
     setVascoRole(null);
+    setBoardHand(null);
     setScreen('home');
   }, []);
 
@@ -288,6 +297,7 @@ export default function App() {
             key="board"
             room={room}
             youId={youId}
+            myHand={boardHand?.cards}
             onPickPawn={boardPickPawn}
             onRoll={boardRoll}
             onAdvance={boardAdvance}

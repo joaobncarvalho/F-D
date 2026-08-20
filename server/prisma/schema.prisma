@@ -36,6 +36,12 @@ enum LifeEventType {
   shot
 }
 
+enum BoardItemCategory {
+  evento // casa ?? (efeito tipado)
+  prisao // consequência de prisão (efeitos combinados)
+  carta  // catálogo de cartas jogáveis
+}
+
 model Room {
   id           String     @id @default(uuid()) @db.Uuid
   code         String     @unique
@@ -134,6 +140,30 @@ model GameRound {
 
   @@index([roomId])
   @@map("game_rounds")
+}
+
+// Bancos do Modo Tabuleiro (?? / prisão / cartas) — conteúdo editável na /admin.
+// Uma só tabela discriminada por `category`; as colunas usadas variam por banco:
+//   evento → effect + value ; prisao → skipTurns/drink/back/loseCard ; carta → effect (=key).
+model BoardItem {
+  id        String            @id @default(uuid()) @db.Uuid
+  category  BoardItemCategory
+  emoji     String            @default("🎲")
+  title     String // evento: título · prisao: nota · carta: nome
+  desc      String            @default("") @map("description")
+  effect    String? // evento: advance|back|drink|card|prison|others_drink · carta: key da mecânica
+  value     Int? // evento: magnitude (casas/golos)
+  skipTurns Int               @default(0) @map("skip_turns") // prisao
+  drink     Int               @default(0) // prisao: golos
+  back      Int               @default(0) // prisao: recua casas
+  loseCard  Boolean           @default(false) @map("lose_card") // prisao
+  weight    Int               @default(1) // peso na escolha aleatória
+  active    Boolean           @default(true)
+  createdAt DateTime          @default(now()) @map("created_at")
+
+  @@unique([category, title]) // permite seed idempotente (upsert)
+  @@index([category, active])
+  @@map("board_items")
 }
 
 model LifeEvent {

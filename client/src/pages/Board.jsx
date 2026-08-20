@@ -594,7 +594,7 @@ function EventoOverlay({ pending, reveal, isMyTurn, currentName, onPick }) {
   );
 }
 
-export default function Board({ room, youId, onPickPawn, onRoll, onAdvance, onResolve, onGamble, onEventoPick, onBlackjack, onBeerpong, onPlayCard, onSkip, onEnd, onKick, onReset, onLeave }) {
+export default function Board({ room, youId, myHand, onPickPawn, onRoll, onAdvance, onResolve, onGamble, onEventoPick, onBlackjack, onBeerpong, onPlayCard, onSkip, onEnd, onKick, onReset, onLeave }) {
   const b = room.board;
   const you = room.players.find((p) => p.id === youId);
   const isHost = you?.isHost;
@@ -770,7 +770,17 @@ export default function Board({ room, youId, onPickPawn, onRoll, onAdvance, onRe
   // ---------- Fim ----------
   if (b.phase === 'over') {
     const board = [...rows].sort((a, c) => c.pos - a.pos);
-    const mostGolos = [...rows].sort((a, c) => c.golos - a.golos)[0];
+    // "Prémios" da corrida — só mostramos os que fazem sentido (valor > 0).
+    const top = (key) => [...rows].filter((r) => (r[key] || 0) > 0).sort((a, c) => (c[key] || 0) - (a[key] || 0))[0];
+    const mostGolos = top('golos');
+    const mostPrison = top('prisonCount');
+    const mostCards = top('cardsPlayed');
+    const awards = [
+      mostGolos && { emoji: '🍺', title: 'Rei da Golada', who: mostGolos, val: `${mostGolos.golos} golos` },
+      mostPrison && { emoji: '🚔', title: 'Preso Habitual', who: mostPrison, val: `${mostPrison.prisonCount}× preso` },
+      mostCards && { emoji: '🎴', title: 'Maquiavélico', who: mostCards, val: `${mostCards.cardsPlayed} cartas` },
+    ].filter(Boolean);
+    const medal = ['🥇', '🥈', '🥉'];
     return (
       <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="relative z-10 flex-1 flex flex-col gap-4">
         <motion.h1
@@ -782,30 +792,70 @@ export default function Board({ room, youId, onPickPawn, onRoll, onAdvance, onRe
           Fim da corrida! 🏁
         </motion.h1>
         {b.winner && (
-          <div className="fd-card p-3 text-center" style={{ background: 'rgba(31,211,182,0.12)' }}>
+          <motion.div
+            initial={{ scale: 0.7, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ delay: 0.15, type: 'spring', stiffness: 220, damping: 14 }}
+            className="fd-card p-4 text-center"
+            style={{ background: 'rgba(31,211,182,0.12)', boxShadow: '0 12px 34px -14px rgba(31,211,182,0.7)' }}
+          >
             <p className="text-sm text-white/60">🏆 Deu a volta primeiro</p>
-            <p className="text-2xl font-extrabold text-emerald-300">
-              {b.players[b.winner.id]?.pawn} {b.winner.name}
-            </p>
+            <motion.p
+              className="text-3xl font-extrabold text-emerald-300 leading-tight mt-1"
+              animate={{ scale: [1, 1.06, 1] }}
+              transition={{ duration: 1.8, repeat: Infinity, ease: 'easeInOut' }}
+            >
+              <motion.span
+                className="inline-block"
+                animate={{ rotate: [0, -12, 12, 0] }}
+                transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+              >
+                {b.players[b.winner.id]?.pawn}
+              </motion.span>{' '}
+              {b.winner.name}
+            </motion.p>
+          </motion.div>
+        )}
+
+        {awards.length > 0 && (
+          <div className="grid grid-cols-3 gap-2">
+            {awards.map((a, i) => (
+              <motion.div
+                key={a.title}
+                initial={{ opacity: 0, y: 16 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.3 + i * 0.12, type: 'spring', stiffness: 260, damping: 18 }}
+                className="fd-card p-2.5 text-center"
+              >
+                <div className="text-2xl leading-none">{a.emoji}</div>
+                <p className="text-[10px] text-white/50 mt-1 leading-tight">{a.title}</p>
+                <p className="text-xs font-bold leading-tight mt-0.5">{a.who.pawn} {a.who.name}</p>
+                <p className="text-[10px] text-amber-300/90">{a.val}</p>
+              </motion.div>
+            ))}
           </div>
         )}
+
         <div className="fd-card p-3">
-          <h2 className="text-sm font-semibold text-white/60 mb-2">Classificação</h2>
+          <h2 className="text-sm font-semibold text-white/60 mb-2">Classificação final</h2>
           <ul className="flex flex-col gap-1 text-sm">
             {board.map((r, i) => (
-              <li key={r.id} className="flex justify-between">
+              <motion.li
+                key={r.id}
+                initial={{ opacity: 0, x: -18 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.4 + i * 0.07 }}
+                className={`flex justify-between ${i === 0 ? 'text-emerald-300 font-semibold' : ''}`}
+              >
                 <span>
-                  {i + 1}. {r.pawn} {r.name}
+                  {medal[i] || `${i + 1}.`} {r.pawn} {r.name}
                 </span>
                 <span className="text-white/60">
                   {r.pos}/{b.size} · 🍺 {r.golos}
                 </span>
-              </li>
+              </motion.li>
             ))}
           </ul>
-          {mostGolos?.golos > 0 && (
-            <p className="text-xs text-amber-300 mt-2">🍺 Bebeu mais: {mostGolos.pawn} {mostGolos.name} ({mostGolos.golos} golos)</p>
-          )}
         </div>
         <div className="flex flex-col gap-2 mt-auto">
           {isHost && (
@@ -824,7 +874,10 @@ export default function Board({ room, youId, onPickPawn, onRoll, onAdvance, onRe
   const lm = b.lastMove;
   const ev = b.lastEvent;
   const meta = b.cardMeta || {};
-  const myCards = b.players[youId]?.cards || [];
+  // Cartas PRIVADAS: a minha mão chega por canal próprio (myHand). Fallback ao
+  // estado do board para o showroom/demo (que injeta cards diretamente).
+  const myCards = myHand ?? b.players[youId]?.cards ?? [];
+  const cardCountOf = (r) => r.cardCount ?? (r.cards?.length || 0);
   const myFastStreak = b.players[youId]?.fastStreak || 0;
   const pending = b.pending;
   const eventoPending = pending?.kind === 'evento' ? pending : null;
@@ -930,7 +983,7 @@ export default function Board({ room, youId, onPickPawn, onRoll, onAdvance, onRe
               )}
             </span>
             <span className="text-white/60">
-              {(r.cards || []).map((c) => meta[c.key]?.emoji).join('')} {r.pos}/{b.size} · 🍺 {r.golos}
+              {cardCountOf(r) > 0 && <span title="cartas na mão">🎴{cardCountOf(r)} </span>}{r.pos}/{b.size} · 🍺 {r.golos}
             </span>
           </div>
         ))}

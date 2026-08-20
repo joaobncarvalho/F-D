@@ -34,9 +34,9 @@ const mkPlayers = () => [
   { id: 'p3', name: 'Rui', connected: false, isHost: false },
 ];
 const mkBoardPlayers = () => ({
-  me: { pawn: '🦊', pos: 12, golos: 8, slowStreak: 0, fastStreak: 1, skipTurns: 0, finished: false, shield: true, cards: [{ id: 'c1', key: 'swap' }, { id: 'c2', key: 'drink3' }] },
-  p2: { pawn: '🐸', pos: 20, golos: 14, slowStreak: 0, fastStreak: 0, skipTurns: 0, finished: false, shield: false, cards: [] },
-  p3: { pawn: '🐵', pos: 7, golos: 22, slowStreak: 0, fastStreak: 0, skipTurns: 1, finished: false, shield: false, cards: [] },
+  me: { pawn: '🦊', pos: 12, golos: 8, slowStreak: 0, fastStreak: 1, skipTurns: 0, finished: false, shield: true, cardCount: 2, cards: [{ id: 'c1', key: 'swap' }, { id: 'c2', key: 'drink3' }], prisonCount: 1, cardsPlayed: 3 },
+  p2: { pawn: '🐸', pos: 20, golos: 14, slowStreak: 0, fastStreak: 0, skipTurns: 0, finished: false, shield: false, cardCount: 1, cards: [], prisonCount: 0, cardsPlayed: 1 },
+  p3: { pawn: '🐵', pos: 7, golos: 22, slowStreak: 0, fastStreak: 0, skipTurns: 1, finished: false, shield: false, cardCount: 0, cards: [], prisonCount: 3, cardsPlayed: 0 },
 });
 
 function boardMock(patch = {}) {

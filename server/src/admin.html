@@ -161,6 +161,7 @@
 
         <nav class="tabs">
           <button id="tabbtn-content" class="tab active">📋 Conteúdo</button>
+          <button id="tabbtn-board" class="tab">🎲 Tabuleiro</button>
           <button id="tabbtn-demos" class="tab">🎮 Demos</button>
         </nav>
 
@@ -212,6 +213,26 @@
           <span id="count" class="count"></span>
         </div>
         <div id="list"></div>
+        </section>
+
+        <section id="tab-board" class="hidden">
+          <nav class="tabs" style="margin-top: 10px">
+            <button class="tab active" data-bcat="evento">❓ Casa ??</button>
+            <button class="tab" data-bcat="prisao">🚔 Prisão</button>
+            <button class="tab" data-bcat="carta">🎴 Cartas</button>
+          </nav>
+          <p class="muted" id="boardHint" style="margin: 8px 2px"></p>
+          <div class="card">
+            <h2 id="boardNewTitle">➕ Novo</h2>
+            <div id="boardForm"></div>
+            <div class="row" style="margin-top: 12px; align-items: center">
+              <span class="spacer"></span>
+              <button id="boardAdd" class="btn-primary">Adicionar</button>
+            </div>
+            <p id="boardErr" class="err"></p>
+          </div>
+          <div class="toolbar"><span class="spacer"></span><span id="boardCount" class="count"></span></div>
+          <div id="boardList"></div>
         </section>
 
         <section id="tab-demos" class="hidden">
@@ -392,16 +413,179 @@
         demoLoaded = true;
       }
       function switchTab(name) {
-        $("tab-content").classList.toggle("hidden", name !== "content");
-        $("tab-demos").classList.toggle("hidden", name !== "demos");
-        $("tabbtn-content").classList.toggle("active", name === "content");
-        $("tabbtn-demos").classList.toggle("active", name === "demos");
+        for (const t of ["content", "board", "demos"]) {
+          $("tab-" + t).classList.toggle("hidden", name !== t);
+          $("tabbtn-" + t).classList.toggle("active", name === t);
+        }
         if (name === "demos" && !demoLoaded) loadDemo();
+        if (name === "board" && !boardLoaded) loadBoard();
       }
       $("tabbtn-content").onclick = () => switchTab("content");
+      $("tabbtn-board").onclick = () => switchTab("board");
       $("tabbtn-demos").onclick = () => switchTab("demos");
       $("demoLoad").onclick = () => { demoLoaded = false; loadDemo(); };
       $("demoOpen").onclick = () => window.open(demoBase() + "/?demo=1", "_blank");
+
+      // ----- Banco do Tabuleiro (?? / prisão / cartas) -----
+      let boardLoaded = false;
+      let bcat = "evento";
+      let bcache = [];
+      const EVENT_EFFECTS = [
+        { key: "advance", label: "🚀 Avançar N casas" },
+        { key: "back", label: "💨 Recuar N casas" },
+        { key: "drink", label: "🍺 Beber N golos" },
+        { key: "others_drink", label: "👯 Os outros bebem N" },
+        { key: "card", label: "🎴 Ganhar carta" },
+        { key: "prison", label: "🚔 Ir preso" },
+      ];
+      const CARD_KEYS = [
+        { key: "swap", label: "🔁 Troca" }, { key: "back2", label: "⬅️ Empurrão" },
+        { key: "prison", label: "⛓️ Denúncia" }, { key: "skip", label: "⏭️ Salta-vez" },
+        { key: "shield", label: "🛡️ Escudo" }, { key: "drink3", label: "🍺 Ronda" },
+        { key: "steal", label: "🎁 Roubo" },
+      ];
+      const BHINT = {
+        evento: "Casas ?? — o jogador escolhe 1 de 3 cartas viradas. `value` = magnitude (casas/golos).",
+        prisao: "Consequências de prisão (sorteadas). Combina golos + recuar + perder vezes/carta.",
+        carta: "Catálogo de cartas jogáveis. A mecânica é fixa (por key); aqui editas aspeto e se está ativa.",
+      };
+      const numField = (id, ph, val) => `<div style="flex:0 0 92px"><label>${ph}</label><input id="${id}" type="number" min="0" value="${val ?? ""}" /></div>`;
+
+      function boardFormHtml(cat) {
+        if (cat === "evento")
+          return `<div class="row form-row">
+              <div style="flex:0 0 70px"><label>Emoji</label><input id="bEmoji" maxlength="4" value="🎲" /></div>
+              <div class="grow"><label>Título</label><input id="bTitle" maxlength="60" placeholder="Sorte!" /></div>
+            </div>
+            <div style="margin-top:10px"><label>Descrição (o que a carta diz)</label><input id="bDesc" maxlength="120" placeholder="Avanças 2 casas" /></div>
+            <div class="row form-row" style="margin-top:10px">
+              <div class="grow"><label>Efeito</label><select id="bEffect">${EVENT_EFFECTS.map((e) => `<option value="${e.key}">${e.label}</option>`).join("")}</select></div>
+              ${numField("bValue", "Valor (N)", "")}
+              ${numField("bWeight", "Peso", 1)}
+            </div>`;
+        if (cat === "prisao")
+          return `<div><label>Nota (resumo mostrado ao jogador)</label><input id="bTitle" maxlength="80" placeholder="bebe 4 golos + perde 1 vez" /></div>
+            <div class="row form-row" style="margin-top:10px">
+              ${numField("bDrink", "🍺 Golos", 0)}
+              ${numField("bBack", "⬅️ Recua", 0)}
+              ${numField("bSkip", "⏭️ Perde vezes", 1)}
+              <div style="flex:0 0 120px"><label>🎴 Perde carta</label><label style="display:flex;gap:6px;align-items:center;margin:0;height:44px"><input type="checkbox" id="bLose" style="width:auto" /> sim</label></div>
+              ${numField("bWeight", "Peso", 1)}
+            </div>`;
+        return `<div class="row form-row">
+            <div class="grow"><label>Carta (mecânica)</label><select id="bEffect">${CARD_KEYS.map((c) => `<option value="${c.key}">${c.label}</option>`).join("")}</select></div>
+            <div style="flex:0 0 70px"><label>Emoji</label><input id="bEmoji" maxlength="4" value="🎴" /></div>
+            ${numField("bWeight", "Peso", 1)}
+          </div>
+          <div class="row form-row" style="margin-top:10px">
+            <div class="grow"><label>Nome</label><input id="bTitle" maxlength="60" placeholder="Troca" /></div>
+            <div class="grow"><label>Descrição</label><input id="bDesc" maxlength="120" placeholder="Trocas de casa com um jogador" /></div>
+          </div>`;
+      }
+
+      function readBoardForm() {
+        const g = (id) => ($(id) ? $(id).value : undefined);
+        const gi = (id) => ($(id) ? $(id).checked : undefined);
+        const base = { category: bcat, weight: g("bWeight") };
+        if (bcat === "evento") return { ...base, emoji: g("bEmoji"), title: g("bTitle"), desc: g("bDesc"), effect: g("bEffect"), value: g("bValue") };
+        if (bcat === "prisao") return { ...base, title: g("bTitle"), drink: g("bDrink"), back: g("bBack"), skipTurns: g("bSkip"), loseCard: gi("bLose") };
+        return { ...base, effect: g("bEffect"), emoji: g("bEmoji"), title: g("bTitle"), desc: g("bDesc") };
+      }
+
+      function renderBoardForm() {
+        $("boardHint").textContent = BHINT[bcat];
+        $("boardForm").innerHTML = boardFormHtml(bcat);
+      }
+
+      function bItemSummary(it) {
+        if (it.category === "evento") {
+          const ef = (EVENT_EFFECTS.find((e) => e.key === it.effect) || {}).label || it.effect;
+          return `${ef}${it.value != null ? " · N=" + it.value : ""}`;
+        }
+        if (it.category === "prisao") {
+          const bits = [];
+          if (it.drink) bits.push("🍺" + it.drink);
+          if (it.back) bits.push("⬅️" + it.back);
+          if (it.skipTurns) bits.push("⏭️" + it.skipTurns);
+          if (it.loseCard) bits.push("🎴−1");
+          return bits.join(" · ") || "sem efeito";
+        }
+        return (CARD_KEYS.find((c) => c.key === it.effect) || {}).label || it.effect;
+      }
+
+      function boardRow(it) {
+        const wrap = el("div", { className: "prompt-card" + (it.active ? "" : " off") });
+        const title = el("input", { value: it.title, maxLength: 120 });
+        const desc = el("input", { value: it.desc || "", maxLength: 200, placeholder: "descrição" });
+        const emoji = el("input", { value: it.emoji || "", maxLength: 4, style: "width:56px;text-align:center" });
+        const weight = el("input", { type: "number", min: "1", max: "20", value: it.weight, style: "width:60px", title: "Peso" });
+        const value = it.category === "evento" ? el("input", { type: "number", value: it.value ?? "", style: "width:66px", title: "Valor N", placeholder: "N" }) : null;
+        const chip = el("span", { className: "type-chip", textContent: bItemSummary(it) });
+        const actLbl = el("label", { style: "display:flex;gap:5px;align-items:center;margin:0;font-size:.8rem;color:#8fe" });
+        const actCb = el("input", { type: "checkbox", checked: !!it.active, style: "width:auto" });
+        actLbl.append(actCb, "ativa");
+        const save = el("button", { className: "btn-ghost small", textContent: "💾" });
+        const del = el("button", { className: "btn-danger small", textContent: "🗑" });
+
+        save.onclick = async () => {
+          save.disabled = true;
+          try {
+            const body = { emoji: emoji.value, title: title.value, desc: desc.value, weight: weight.value, active: actCb.checked };
+            if (value) body.value = value.value;
+            await api("/board-items/" + it.id, { method: "PATCH", body: JSON.stringify(body) });
+            toast("Guardado ✓");
+          } catch (e) { toast(e.message, false); }
+          save.disabled = false;
+        };
+        del.onclick = async () => {
+          if (!confirm("Apagar este item do banco?")) return;
+          try { await api("/board-items/" + it.id, { method: "DELETE" }); bcache = bcache.filter((x) => x.id !== it.id); renderBoardList(); toast("Apagado"); }
+          catch (e) { toast(e.message, false); }
+        };
+
+        const topRow = el("div", { className: "row", style: "align-items:center;gap:8px" }, [emoji, title]);
+        if (it.category !== "prisao") topRow.append(desc);
+        const acts = [chip, weight];
+        if (value) acts.push(value);
+        acts.push(actLbl, el("span", { className: "spacer" }), save, del);
+        wrap.append(topRow, el("div", { className: "prompt-actions" }, acts));
+        return wrap;
+      }
+
+      function renderBoardList() {
+        $("boardCount").textContent = bcache.length + (bcache.length === 1 ? " item" : " itens");
+        const box = $("boardList");
+        box.replaceChildren();
+        if (!bcache.length) { box.append(el("div", { className: "empty", textContent: "Sem itens (usa o fallback em código)." })); return; }
+        for (const it of bcache) box.append(boardRow(it));
+      }
+
+      async function loadBoard() {
+        renderBoardForm();
+        try {
+          bcache = await api("/board-items?category=" + bcat);
+          renderBoardList();
+          boardLoaded = true;
+        } catch (e) { $("boardErr").textContent = e.message; }
+      }
+
+      document.querySelectorAll("[data-bcat]").forEach((btn) => {
+        btn.onclick = () => {
+          bcat = btn.dataset.bcat;
+          document.querySelectorAll("[data-bcat]").forEach((b) => b.classList.toggle("active", b === btn));
+          $("boardNewTitle").textContent = "➕ Novo (" + (bcat === "evento" ? "Casa ??" : bcat === "prisao" ? "Prisão" : "Carta") + ")";
+          loadBoard();
+        };
+      });
+
+      $("boardAdd").onclick = async () => {
+        $("boardErr").textContent = "";
+        try {
+          await api("/board-items", { method: "POST", body: JSON.stringify(readBoardForm()) });
+          toast("Item adicionado ✓");
+          await loadBoard();
+        } catch (e) { $("boardErr").textContent = e.message; }
+      };
 
       // Eventos
       $("enter").onclick = () => { pass = $("pass").value.trim(); boot(); };

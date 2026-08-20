@@ -5,6 +5,40 @@
 
 ---
 
+## 2026-08-20 — Tabuleiro sai de beta: bancos na BD + cartas privadas + fim com stats
+
+Fecha o polish (#3) e as melhorias (#4) do tabuleiro. Só falta o playtest real.
+
+- **Bancos ??/prisão/cartas → dados/BD (`board_items`):** novo `content/board.data.js`
+  (fonte única, fallback) + modelo Prisma `BoardItem` (enum `BoardItemCategory`
+  evento/prisao/carta; `@@unique([category,title])`) + `repo.getBoardBanks()` (BD com
+  fallback, como o resto do `repo.js`). O `initBoard` **fotografa** os bancos para
+  `b.banks` — os handlers síncronos leem-nos sem `await`. Os efeitos do **??** passam a
+  **tipados** (`advance|back|drink|card|prison|others_drink` + `value`); removidos os
+  closures `EVENTO_POOL`/`applyEvento`/`giveCard`. Prisão = efeitos combinados
+  (`skipTurns/drink/back/loseCard`, escolha ponderada). Cartas = catálogo (mecânica
+  fixa por `key`, só metadados editáveis). `giveRandomCard` centraliza dar cartas
+  (?? / blackjack / beer pinga) e respeita o catálogo ativo + pesos.
+- **Admin (`/admin`) separador 🎲 Tabuleiro:** CRUD dos 3 bancos (form adapta-se à
+  categoria) — `admin.js` (rotas `board-items` + validação) + `repo.js` (CRUD) +
+  `admin.html` (UI). Sem BD/tabela → mostra erro e o jogo usa o fallback.
+- **Cartas PRIVADAS:** `serializeBoard` deixa de enviar `cards` (só `cardCount`); a
+  mão de cada jogador vai por `board_hand` (emitido no `broadcastState` a cada jogador
+  ligado — cobre advance/jogar/ganhar/reconexão). Cliente: `App.jsx` (estado+listener,
+  passa `myHand`), `Board.jsx` (usa `myHand`; outros mostram 🎴×N).
+- **Ecrã de fim com estatísticas + animação:** contadores `prisonCount`/`cardsPlayed`;
+  "prémios" (🍺 Rei da Golada · 🚔 Preso Habitual · 🎴 Maquiavélico) + classificação
+  final; vencedor com coroa a pulsar, entradas em stagger.
+- **SQL standalone:** novo `server/db/03_board_items.sql` (schema + seed idempotente,
+  autocontido) para o colega correr sem Prisma. `prisma/seed.js` também semeia os itens.
+- **Docs:** README reescrito (estado atual, 2 modos, admin, deploy, BD); roadmap S4 +
+  `board-mode.md` (nova Fase 4) atualizados.
+- **Verificação:** smoke do motor (bancos em fallback, ?? tipado advance/card, prisão
+  conta, serialização esconde cartas+?? e traz stats, `boardHand`) ✓ · `prisma validate`
+  + `generate` ✓ · client build (505 módulos) ✓ · server `/health` 200 + `/admin` 200 +
+  API 401 sem password ✓. (BD real: falta o colega correr `db push`+seed da `board_items`;
+  até lá corre no fallback em código.)
+
 ## 2026-08-20 — /admin vira dashboard + showroom de demos dos mini-jogos
 
 Pedido do João: secção no /admin só com "demos" dos mini-jogos/eventos (tabuleiro e
