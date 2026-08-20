@@ -5,6 +5,26 @@
 
 ---
 
+## 2026-08-20 — Nova casa "Beer Pinga" (beer pong interativo)
+
+Pedido do João: mini-jogo de beer pong super interativo e festivo.
+
+- **Servidor (`board.js`):** nova casa `beerpong` (3 casas). Ao cair → `pending`
+  `{kind:'beerpong'}`. **`boardBeerpong(room, pid, power)`** — a **força (0..1)**
+  escolhe a fila: <0.45 frente · <0.8 meio · ≥0.8 trás (timing preciso). **Acerta
+  sempre**; sorteia um copo dessa fila (`BEERPONG_OUTCOMES`). **Nunca neutro:** bebe
+  sempre a **base** (2/3/4 golos por fila) e o copo agrava/recompensa (avança · carta ·
+  os outros bebem · +golos · recua · prisão · JACKPOT avança 3+carta). `lastEvent.beerpong`
+  = {row, base, emoji, title, desc, good}. Servidor é a autoridade (cliente só manda a força).
+- **`socket.js`:** `board_beerpong`. **`App.jsx`:** emitter `onBeerpong`.
+- **Cliente (`Board.jsx`):** componente `Beerpong` — mesa em perspetiva (clip-path) com
+  copos em pirâmide 🥤 (3/2/1), **medidor de força a oscilar** (zonas Perto/Médio/Longe),
+  botão Atirar; a bola faz **arco** até à fila e o copo **abre com a revelação** (emoji +
+  consequência, verde/vermelho) + som/confetti. Espectadores veem "X está a apontar" e a
+  revelação. Casa na pista: 🏓 / `bg-sky-500/15`.
+- **Verificação:** smoke do motor (dist 60 c/ 3 beerpong · força→fila · base sempre bebida ·
+  nunca neutro · 60 lançamentos aleatórios) ✓ · client build ✓.
+
 ## 2026-08-19 — Gamble animado + pista maior + carta usada + fix "undefined"
 
 Updates + bugs do João.

@@ -182,6 +182,17 @@ export function registerSocketHandlers(io) {
       }
     });
 
+    socket.on('board_beerpong', ({ power } = {}, ack) => {
+      try {
+        const room = requireRoom(socket);
+        board.boardBeerpong(room, socket.data.playerId, power);
+        broadcastState(io, room.code);
+        if (typeof ack === 'function') ack({ ok: true });
+      } catch (err) {
+        handleError(socket, ack, err);
+      }
+    });
+
     socket.on('board_evento_pick', ({ index } = {}, ack) => {
       try {
         const room = requireRoom(socket);
