@@ -56,6 +56,7 @@ export function registerSocketHandlers(io) {
       try {
         const { room, player } = rooms.reconnect(code, playerId);
         bindSocketToRoom(socket, room.code, player.id);
+        if (room.mode === 'board' && room.board) board.boardOnReconnect(room); // devolve o turno se ficou sem dono
         respond(ack, socket, 'room_joined', {
           room: serializeRoom(room),
           you: player.id,
@@ -124,6 +125,8 @@ export function registerSocketHandlers(io) {
     // ----- Modo Tabuleiro -----
     const boardEvents = {
       board_roll: (room, pid) => board.rollOrder(room, pid),
+      board_skip: (room, pid) => board.boardHostSkip(room, pid), // host: saltar vez
+      board_end: (room, pid) => board.boardHostEnd(room, pid), // host: terminar jogo
     };
     for (const [event, fn] of Object.entries(boardEvents)) {
       socket.on(event, (_payload, ack) => {
@@ -175,6 +178,17 @@ export function registerSocketHandlers(io) {
       try {
         const room = requireRoom(socket);
         board.boardBlackjack(room, socket.data.playerId, action);
+        broadcastState(io, room.code);
+        if (typeof ack === 'function') ack({ ok: true });
+      } catch (err) {
+        handleError(socket, ack, err);
+      }
+    });
+
+    socket.on('board_kick', ({ targetId } = {}, ack) => {
+      try {
+        const room = requireRoom(socket);
+        board.boardHostKick(room, socket.data.playerId, targetId);
         broadcastState(io, room.code);
         if (typeof ack === 'function') ack({ ok: true });
       } catch (err) {
@@ -551,6 +565,9 @@ export function registerSocketHandlers(io) {
       const { code, playerId } = socket.data;
       if (!code || !playerId) return;
       rooms.handleDisconnect(code, playerId);
+      // Tabuleiro: se quem saiu estava a jogar, não deixar o turno preso.
+      const room = rooms.getRoom(code);
+      if (room && room.mode === 'board' && room.board) board.boardOnDisconnect(room, playerId);
       broadcastState(io, code);
     });
   });

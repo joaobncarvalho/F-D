@@ -5,6 +5,32 @@
 
 ---
 
+## 2026-08-20 — Tabuleiro P0: anti-deadlock + controlos de host
+
+Tirar o tabuleiro de "beta": robustez a desconexões + controlos de host (era o único
+grupo que é bug de fiabilidade — um telemóvel a cair congelava o jogo todo).
+
+- **Anti-deadlock (`board.js`):** `boardOnDisconnect` trata TODAS as fases — pawn/order
+  desbloqueiam se os restantes ligados já escolheram/lançaram (`finalizeOrder` extraído
+  de `rollOrder`); em playing, se o **jogador da vez sai**, limpa o `pending` dele e
+  passa a vez. `boardOnReconnect`/`boardEnsureCurrent` devolvem o turno se ficou sem dono.
+  **Fix** em `advanceBoardTurn`: quando o atual já não está na lista (saiu/expulso) o
+  `idx` era forçado a 0 e saltava o primeiro — agora começa correto (`-1 → 0`).
+- **Controlos de host (`board.js` + `socket.js`):** `board_skip` (saltar vez AFK),
+  `board_end` (terminar → over, vencedor = quem está mais à frente), `board_kick`
+  (expulsar quem JÁ saiu — remove da sala e da corrida). Todos com `requireHost`.
+- **Ligações (`socket.js`):** `disconnect` → `boardOnDisconnect`; `rejoin_room` →
+  `boardOnReconnect`. **`App.jsx`/`Board.jsx`:** emitters `onSkip/onEnd/onKick`; barra
+  de host (Saltar vez · Terminar); classificação mostra desligados 📴 esbatidos + botão
+  "expulsar" (host); cabeçalho "À espera de jogadores…" quando não há vez.
+- **Entradas a meio:** já protegidas — `joinRoom` recusa com status ≠ lobby; `initBoard`
+  cria entrada para todos os do lobby. Sem trabalho extra além da reconexão.
+- **Verificação:** smoke do motor (desconexão em ordem/playing, reconexão, skip/end/kick,
+  não-host recusado) ✓ · **e2e socket** (3 clientes: jogador da vez desliga → turno passa
+  sozinho · host expulsa · salta · termina) ✓ · client build ✓.
+- **Falta do P0 (não codificável):** playtest real + afinar números (ritmo 60 casas,
+  golos, odds ??/blackjack/beer pinga, dureza da ganância) — depende de jogar a sério.
+
 ## 2026-08-20 — Nova casa "Beer Pinga" (beer pong interativo)
 
 Pedido do João: mini-jogo de beer pong super interativo e festivo.

@@ -594,7 +594,7 @@ function EventoOverlay({ pending, reveal, isMyTurn, currentName, onPick }) {
   );
 }
 
-export default function Board({ room, youId, onPickPawn, onRoll, onAdvance, onResolve, onGamble, onEventoPick, onBlackjack, onBeerpong, onPlayCard, onReset, onLeave }) {
+export default function Board({ room, youId, onPickPawn, onRoll, onAdvance, onResolve, onGamble, onEventoPick, onBlackjack, onBeerpong, onPlayCard, onSkip, onEnd, onKick, onReset, onLeave }) {
   const b = room.board;
   const you = room.players.find((p) => p.id === youId);
   const isHost = you?.isHost;
@@ -839,7 +839,7 @@ export default function Board({ room, youId, onPickPawn, onRoll, onAdvance, onRe
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex-1 flex flex-col gap-3">
       <Header sub={`corrida até dar a volta (${b.size} casas)`}>
-        {isMyTurn ? '🎯 É a tua vez!' : `Vez de ${currentPawn} ${currentPlayer?.name || ''}`.trim()}
+        {isMyTurn ? '🎯 É a tua vez!' : b.currentPlayerId ? `Vez de ${currentPawn} ${currentPlayer?.name || ''}`.trim() : '⏳ À espera de jogadores…'}
       </Header>
 
       {/* Casa ?? — overlay de 3 cartas viradas + flip */}
@@ -919,17 +919,27 @@ export default function Board({ room, youId, onPickPawn, onRoll, onAdvance, onRe
       {/* Classificação + cartas (públicas) */}
       <div className="fd-card p-2.5 flex flex-col gap-1">
         {leaderboard.map((r) => (
-          <div key={r.id} className={`flex items-center justify-between text-xs ${r.id === b.currentPlayerId ? 'text-pink-300 font-semibold' : ''}`}>
-            <span>
+          <div key={r.id} className={`flex items-center justify-between text-xs ${r.id === b.currentPlayerId ? 'text-pink-300 font-semibold' : ''} ${r.connected === false ? 'opacity-40' : ''}`}>
+            <span className="flex items-center gap-1">
               {r.pawn} {r.name}
+              {r.connected === false && ' 📴'}
               {r.shield && ' 🛡️'}
               {r.skipTurns > 0 && <span className="text-rose-300"> 🚔</span>}
+              {isHost && r.connected === false && r.id !== youId && (
+                <button onClick={() => { sfx.click(); onKick(r.id); }} className="ml-1 text-rose-300 underline underline-offset-2">expulsar</button>
+              )}
             </span>
             <span className="text-white/60">
               {(r.cards || []).map((c) => meta[c.key]?.emoji).join('')} {r.pos}/{b.size} · 🍺 {r.golos}
             </span>
           </div>
         ))}
+        {isHost && (
+          <div className="flex gap-2 mt-1.5 pt-1.5" style={{ borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+            <button onClick={() => { sfx.click(); onSkip(); }} className="fd-btn fd-btn-ghost flex-1 py-1.5 text-[11px]">⏭️ Saltar vez</button>
+            <button onClick={() => { sfx.click(); if (window.confirm('Terminar o jogo agora?')) onEnd(); }} className="fd-btn fd-btn-ghost flex-1 py-1.5 text-[11px]">🏁 Terminar</button>
+          </div>
+        )}
       </div>
 
       <AnimatePresence mode="wait">

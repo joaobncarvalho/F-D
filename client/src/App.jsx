@@ -191,6 +191,9 @@ export default function App() {
   const boardEventoPick = useCallback((index) => socket.emit('board_evento_pick', { index }), []);
   const boardBlackjack = useCallback((action) => socket.emit('board_blackjack', { action }), []);
   const boardBeerpong = useCallback((power) => socket.emit('board_beerpong', { power }), []);
+  const boardSkip = useCallback(() => socket.emit('board_skip'), []);
+  const boardEnd = useCallback(() => socket.emit('board_end'), []);
+  const boardKick = useCallback((targetId) => socket.emit('board_kick', { targetId }), []);
   const boardPlayCard = useCallback((cardId, targetId) => socket.emit('board_play_card', { cardId, targetId }), []);
   const addQuestion = useCallback(
     (targetPlayerId, text) => socket.emit('add_question', { targetPlayerId, text }),
@@ -294,6 +297,9 @@ export default function App() {
             onBlackjack={boardBlackjack}
             onBeerpong={boardBeerpong}
             onPlayCard={boardPlayCard}
+            onSkip={boardSkip}
+            onEnd={boardEnd}
+            onKick={boardKick}
             onReset={resetGame}
             onLeave={leaveRoom}
           />

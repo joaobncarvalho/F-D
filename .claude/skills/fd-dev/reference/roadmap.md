@@ -101,7 +101,9 @@ Legenda: ✅ feito · 🚧 em curso · ⬜ por fazer · 🔗 ponto de integraç�
 **João**
 - [ ] Polimento de animações e transições
 - [ ] Ecrã de fim de jogo: estatísticas ("quem bebeu mais", "quem recusou mais")
-- [ ] Controlos do host: saltar jogador, remover quem saiu, terminar jogo
+- [x] Controlos do host: saltar jogador, remover quem saiu, terminar jogo (roda já
+      tinha `skip_turn`/`end_game`; **tabuleiro** agora tem `board_skip`/`board_end`/
+      `board_kick` + auto-skip de quem se desliga — anti-deadlock)
 - [ ] Playtest real com amigos → correção de bugs
 - [ ] Deploy: backend (Railway/Render/Fly — WebSockets persistentes) + frontend (Vercel/Netlify)
 

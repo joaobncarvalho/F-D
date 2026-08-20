@@ -114,15 +114,20 @@ export function rollOrder(room, playerId) {
   if (b.dice[playerId] != null) throw new AppError('Já lançaste o dado.');
   b.dice[playerId] = 1 + Math.floor(Math.random() * 6);
   const active = activeOrder(room);
-  if (active.every((p) => b.dice[p.id] != null)) {
-    b.order = active
-      .slice()
-      .sort((a, c) => b.dice[c.id] - b.dice[a.id] || a.joinedAt.localeCompare(c.joinedAt))
-      .map((p) => p.id);
-    b.currentPlayerId = b.order[0];
-    b.phase = 'playing';
-  }
+  if (active.length && active.every((p) => b.dice[p.id] != null)) finalizeOrder(room);
   return b;
+}
+
+// Ordena por dado (desempate por ordem de entrada) e arranca a corrida.
+function finalizeOrder(room) {
+  const b = room.board;
+  const active = activeOrder(room);
+  b.order = active
+    .slice()
+    .sort((a, c) => b.dice[c.id] - b.dice[a.id] || a.joinedAt.localeCompare(c.joinedAt))
+    .map((p) => p.id);
+  b.currentPlayerId = b.order[0];
+  b.phase = 'playing';
 }
 
 function checkWin(room, playerId) {
@@ -696,16 +701,22 @@ export function playCard(room, playerId, cardId, targetId) {
   return b;
 }
 
+function activeIds(room) {
+  const b = room.board;
+  return b.order.filter((id) => room.players.get(id)?.connected && b.players[id] && !b.players[id].finished);
+}
+
 function advanceBoardTurn(room) {
   const b = room.board;
-  const order = b.order.filter((id) => room.players.get(id)?.connected && !b.players[id].finished);
+  const order = activeIds(room);
   if (!order.length) {
     b.currentPlayerId = null;
     return;
   }
-  let idx = Math.max(0, order.indexOf(b.currentPlayerId));
+  // idx = -1 se o jogador da vez já não está ativo (saiu/expulso) → começa no primeiro.
+  let idx = order.indexOf(b.currentPlayerId);
   for (let step = 0; step < order.length; step++) {
-    idx = (idx + 1) % order.length;
+    idx = (idx + 1 + order.length) % order.length;
     const id = order[idx];
     if (b.players[id].skipTurns > 0) {
       b.players[id].skipTurns -= 1;
@@ -714,7 +725,97 @@ function advanceBoardTurn(room) {
     b.currentPlayerId = id;
     return;
   }
-  b.currentPlayerId = order[(order.indexOf(b.currentPlayerId) + 1) % order.length];
+  b.currentPlayerId = order[0]; // todos tinham salta-vez → recomeça no primeiro
+}
+
+// Garante que há um jogador da vez válido (ligado e não terminado). Usado após
+// desconexões/reconexões/expulsões para o tabuleiro nunca ficar preso.
+function boardEnsureCurrent(room) {
+  const b = room.board;
+  if (!b || b.phase !== 'playing') return;
+  const active = activeIds(room);
+  if (!active.length) { b.currentPlayerId = null; return; }
+  if (!b.currentPlayerId || !active.includes(b.currentPlayerId)) b.currentPlayerId = active[0];
+}
+
+/** Desconexão: nunca deixar o tabuleiro preso (em qualquer fase). */
+export function boardOnDisconnect(room, playerId) {
+  const b = room.board;
+  if (!b) return;
+  if (b.phase === 'pawn') {
+    const act = activeOrder(room);
+    if (act.length && act.every((p) => b.players[p.id]?.pawn)) b.phase = 'order';
+    return;
+  }
+  if (b.phase === 'order') {
+    const act = activeOrder(room);
+    if (act.length && act.every((p) => b.dice[p.id] != null)) finalizeOrder(room);
+    return;
+  }
+  if (b.phase === 'playing') {
+    if (b.currentPlayerId === playerId) {
+      b.pending = null; // limpa a casa pendente de quem saiu (senão bloqueia todos)
+      b.lastEvent = { text: `👋 ${nameOf(room, playerId) || 'Um jogador'} saiu — a vez passa.` };
+      advanceBoardTurn(room);
+    }
+    boardEnsureCurrent(room);
+  }
+}
+
+/** Reconexão: se o turno tinha ficado sem dono, entrega-o a alguém ligado. */
+export function boardOnReconnect(room) {
+  boardEnsureCurrent(room);
+}
+
+function requireHost(room, playerId) {
+  const p = room.players.get(playerId);
+  if (!p || !p.isHost) throw new AppError('Só o host pode fazer isso.');
+}
+
+/** Host: salta a vez do jogador atual (AFK / preso numa casa). */
+export function boardHostSkip(room, hostId) {
+  const b = requireBoard(room, ['playing']);
+  requireHost(room, hostId);
+  const who = nameOf(room, b.currentPlayerId);
+  b.pending = null;
+  b.lastEvent = { text: `⏭️ O host saltou a vez${who ? ' de ' + who : ''}.` };
+  advanceBoardTurn(room);
+  boardEnsureCurrent(room);
+  return b;
+}
+
+/** Host: termina o jogo já (vencedor = quem está mais à frente). */
+export function boardHostEnd(room, hostId) {
+  const b = requireBoard(room);
+  requireHost(room, hostId);
+  let winner = null;
+  for (const id of Object.keys(b.players)) {
+    if (!room.players.get(id)) continue;
+    if (winner === null || b.players[id].pos > b.players[winner].pos) winner = id;
+  }
+  b.pending = null;
+  b.winnerId = winner;
+  b.phase = 'over';
+  return b;
+}
+
+/** Host: expulsa um jogador que JÁ saiu (desligado) — remove-o da sala e da corrida. */
+export function boardHostKick(room, hostId, targetId) {
+  const b = requireBoard(room);
+  requireHost(room, hostId);
+  const target = room.players.get(targetId);
+  if (!target) throw new AppError('Jogador não encontrado.');
+  if (target.connected) throw new AppError('Só podes expulsar quem já saiu.');
+  const wasCurrent = b.currentPlayerId === targetId;
+  room.players.delete(targetId);
+  delete b.players[targetId];
+  b.order = b.order.filter((id) => id !== targetId);
+  if (wasCurrent) {
+    b.pending = null;
+    advanceBoardTurn(room);
+  }
+  boardEnsureCurrent(room);
+  return b;
 }
 
 // Serializa o pending escondendo o que não pode vazar:
