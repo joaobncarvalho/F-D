@@ -530,7 +530,7 @@ function BuddyBlock({ round, room, youId, isMyTurn, onChooseBuddy }) {
   return <p className="text-sm text-white/50">🤝 {round.currentPlayerName} está a escolher o buddy…</p>;
 }
 
-function PromptCard({ round, room, youId, isMyTurn, onAction, onChooseBuddy }) {
+export function PromptCard({ round, room, youId, isMyTurn, onAction, onChooseBuddy }) {
   const isBoca = round.gameTypeKey === 'boca_calada';
   const buddyPending = round.needsBuddy && !round.buddyId;
   return (
@@ -569,7 +569,7 @@ function PromptCard({ round, room, youId, isMyTurn, onAction, onChooseBuddy }) {
   );
 }
 
-function ChoiceCard({ round, room, youId, canControl, onChooseBuddy, onChooseOption, onContinue }) {
+export function ChoiceCard({ round, room, youId, canControl, onChooseBuddy, onChooseOption, onContinue }) {
   const isMyTurn = round.currentPlayerId === youId;
   const buddyPending = round.needsBuddy && !round.buddyId;
   const resolved = round.status === 'resolved' && round.chosen != null;
@@ -636,7 +636,7 @@ const RPS = [
   ['tesoura', '✌️'],
 ];
 
-function IntrigasCard({
+export function IntrigasCard({
   round,
   room,
   youId,

@@ -5,6 +5,29 @@
 
 ---
 
+## 2026-08-20 — /admin vira dashboard + showroom de demos dos mini-jogos
+
+Pedido do João: secção no /admin só com "demos" dos mini-jogos/eventos (tabuleiro e
+roda) para confirmar o aspeto sem começar um jogo.
+
+- **Showroom no CLIENTE (sem drift):** `client/src/pages/Demo.jsx` renderiza os
+  **componentes reais** com dados fictícios. Acede-se via **`?demo`** (routing em
+  `main.jsx`: `?demo` → `<Demo/>`, offline, sem socket).
+  - **Tabuleiro:** conduz o `<Board>` real com `room`/`board` mock para ~21 cenas —
+    escolher peão, ordem, a-tua-vez (cartas+avançar), Desafio, Isto/Aquilo, ?? (escolher
+    + revelado sorte/carta/preso), Gamble (apostar/ganhou/perdeu), Blackjack (mesa/
+    ganhou/perdeu), Beer Pinga (apontar/jackpot/afogado), carta usada, ganância, fim.
+  - **Roda:** exportei `PromptCard`/`ChoiceCard`/`IntrigasCard` de `Game.jsx` e mostro
+    Boca Calada, Desafio, Isto ou Aquilo, Intrigas com rounds mock.
+  - Botões de ação são só visuais (handlers no-op); "← Sair" volta à lista.
+- **`/admin` agora é DASHBOARD** (`server/src/admin.html`): separadores **📋 Conteúdo**
+  (o CRUD de sempre) e **🎮 Demos** (iframe da app em `?demo=1`). Campo "URL do cliente"
+  (default = mesma origem; em dev aponta p/ Vite :5173, persistido em localStorage) +
+  "Abrir em nova aba". Sem alterar a API/auth.
+- **Verificação:** client build ✓; servidor serve `/admin` (dashboard) e `/?demo=1`
+  (SPA em modo demo) ✓. As roda-restantes (Segredos/Pirâmide/Vasco) ficam para acrescentar
+  (multi-passo — precisam de mais scaffolding de mock).
+
 ## 2026-08-20 — Tabuleiro P0: anti-deadlock + controlos de host
 
 Tirar o tabuleiro de "beta": robustez a desconexões + controlos de host (era o único

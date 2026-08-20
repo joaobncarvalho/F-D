@@ -124,6 +124,15 @@
       @media (max-width: 560px) {
         .row.form-row > * { flex: 1 1 100%; }
       }
+
+      /* Dashboard: separadores + showroom */
+      .tabs { display: flex; gap: 8px; margin: 16px 0 4px; }
+      .tab { background: rgba(255, 255, 255, 0.06); border: 1px solid var(--border); color: rgba(255, 255, 255, 0.6); padding: 9px 16px; border-radius: 12px; font-weight: 600; }
+      .tab.active { background: linear-gradient(135deg, var(--pink), var(--purple)); color: #fff; border-color: transparent; }
+      .demobar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+      .demobar input { flex: 1 1 220px; }
+      .phone { margin: 14px auto 0; width: 100%; max-width: 412px; }
+      .phone iframe { display: block; width: 100%; height: 76vh; border: 1px solid var(--border); border-radius: 26px; background: var(--bg); box-shadow: 0 20px 50px -18px rgba(0, 0, 0, 0.8); }
     </style>
   </head>
   <body>
@@ -144,12 +153,18 @@
       <div id="app" class="hidden">
         <header style="display: flex; align-items: center; justify-content: space-between; gap: 10px">
           <div>
-            <h1 class="grad">F&D · Admin</h1>
-            <p class="muted">Desafios de Boca Calada, Intrigas e Desafio — guardados na base de dados.</p>
+            <h1 class="grad">F&D · Dashboard</h1>
+            <p class="muted">Conteúdo dos desafios + showroom de mini-jogos.</p>
           </div>
           <button id="logout" class="btn-ghost small">Sair</button>
         </header>
 
+        <nav class="tabs">
+          <button id="tabbtn-content" class="tab active">📋 Conteúdo</button>
+          <button id="tabbtn-demos" class="tab">🎮 Demos</button>
+        </nav>
+
+        <section id="tab-content">
         <!-- Novo -->
         <div class="card">
           <h2>➕ Novo desafio</h2>
@@ -197,6 +212,25 @@
           <span id="count" class="count"></span>
         </div>
         <div id="list"></div>
+        </section>
+
+        <section id="tab-demos" class="hidden">
+          <div class="card">
+            <h2>🎮 Showroom de mini-jogos</h2>
+            <p class="muted" style="margin-bottom: 12px">
+              Pré-visualiza os mini-jogos e eventos (tabuleiro e roda) sem começar um jogo — abre a app em modo demo.
+            </p>
+            <div class="demobar">
+              <input id="demoUrl" placeholder="http://localhost:5173" />
+              <button id="demoLoad" class="btn-ghost small">Carregar</button>
+              <button id="demoOpen" class="btn-primary small">Abrir em nova aba ↗</button>
+            </div>
+            <p class="muted" style="font-size: 0.78rem; margin-top: 8px">
+              Em produção usa a mesma origem. Em dev, aponta para o cliente Vite (ex.: http://localhost:5173).
+            </p>
+            <div class="phone"><iframe id="demoFrame" title="Demos F&D"></iframe></div>
+          </div>
+        </section>
       </div>
     </div>
 
@@ -280,6 +314,8 @@
         }
         $("login").classList.add("hidden");
         $("app").classList.remove("hidden");
+        try { $("demoUrl").value = localStorage.getItem("fd_demo_client") || location.origin; }
+        catch { $("demoUrl").value = location.origin; }
 
         types = (await api("/game-types")).filter((t) => !HIDE_TYPES.includes(t.key));
         $("newType").innerHTML = types.map((t) => `<option value="${t.key}">${t.label}</option>`).join("");
@@ -345,6 +381,27 @@
         wrap.append(ta, el("div", { className: "prompt-actions" }, [chip, seg.node, buddyLbl, dur, el("span", { className: "spacer" }), save, del]));
         return wrap;
       }
+
+      // ----- Dashboard: separadores + showroom de demos -----
+      let demoLoaded = false;
+      const demoBase = () => ($("demoUrl").value || location.origin).replace(/\/+$/, "");
+      function loadDemo() {
+        const base = demoBase();
+        try { localStorage.setItem("fd_demo_client", base); } catch { /* ignora */ }
+        $("demoFrame").src = base + "/?demo=1";
+        demoLoaded = true;
+      }
+      function switchTab(name) {
+        $("tab-content").classList.toggle("hidden", name !== "content");
+        $("tab-demos").classList.toggle("hidden", name !== "demos");
+        $("tabbtn-content").classList.toggle("active", name === "content");
+        $("tabbtn-demos").classList.toggle("active", name === "demos");
+        if (name === "demos" && !demoLoaded) loadDemo();
+      }
+      $("tabbtn-content").onclick = () => switchTab("content");
+      $("tabbtn-demos").onclick = () => switchTab("demos");
+      $("demoLoad").onclick = () => { demoLoaded = false; loadDemo(); };
+      $("demoOpen").onclick = () => window.open(demoBase() + "/?demo=1", "_blank");
 
       // Eventos
       $("enter").onclick = () => { pass = $("pass").value.trim(); boot(); };
