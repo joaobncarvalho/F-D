@@ -3,7 +3,7 @@
 // Acede-se via ?demo na app; embebido na dashboard /admin.
 import { useState } from 'react';
 import Board from './Board.jsx';
-import { PromptCard, ChoiceCard, IntrigasCard } from './Game.jsx';
+import { PromptCard, ChoiceCard, IntrigasCard } from './games/cards.jsx';
 
 const PAWNS = ['🦊', '🐸', '🐵', '🦄', '🐙', '🐝', '🦁', '🐨', '🐼', '🐷', '🐧', '🐢', '🐔', '🦖'];
 const CARD_META = {

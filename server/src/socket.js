@@ -1,8 +1,12 @@
 import { RoomManager, serializeRoom, AppError } from './rooms.js';
 import * as game from './game.js';
 import * as board from './board.js';
+import { sanitizeText, throttled } from './util.js';
+import { log } from './log.js';
+import * as bots from './bots.js';
 
 const rooms = new RoomManager();
+const botTicks = new Map(); // code -> intervalId (tick dos bots de playtest)
 
 /**
  * Regista os handlers de Socket.io.
@@ -97,6 +101,21 @@ export function registerSocketHandlers(io) {
         const { code, playerId } = socket.data;
         rooms.setMode(code, playerId, mode);
         broadcastState(io, code);
+        if (typeof ack === 'function') ack({ ok: true });
+      } catch (err) {
+        handleError(socket, ack, err);
+      }
+    });
+
+    // Bots de PLAYTEST (dev) — só se ENABLE_DEV_BOTS=1 no servidor.
+    socket.on('dev_add_bots', ({ count = 1 } = {}, ack) => {
+      try {
+        if (!bots.ENABLED) throw new AppError('Bots de dev não estão ativos no servidor.');
+        const room = requireRoom(socket);
+        const n = Math.max(1, Math.min(7, Number(count) || 1));
+        for (let i = 0; i < n; i++) rooms.addBot(room.code);
+        ensureBotTick(io, room.code);
+        broadcastState(io, room.code);
         if (typeof ack === 'function') ack({ ok: true });
       } catch (err) {
         handleError(socket, ack, err);
@@ -242,6 +261,7 @@ export function registerSocketHandlers(io) {
 
     socket.on('add_question', ({ targetPlayerId, text } = {}, ack) => {
       try {
+        if (throttled(socket, 'submit', 150)) return void (typeof ack === 'function' && ack({ ok: true })); // ignora duplo-toque/loop
         const room = requireRoom(socket);
         game.addQuestion(room, socket.data.playerId, targetPlayerId, text);
         broadcastState(io, room.code);
@@ -253,6 +273,7 @@ export function registerSocketHandlers(io) {
 
     socket.on('add_secret', ({ text } = {}, ack) => {
       try {
+        if (throttled(socket, 'submit', 150)) return void (typeof ack === 'function' && ack({ ok: true })); // ignora duplo-toque/loop
         const room = requireRoom(socket);
         game.addSecret(room, socket.data.playerId, text);
         broadcastState(io, room.code);
@@ -277,36 +298,7 @@ export function registerSocketHandlers(io) {
       try {
         const room = requireRoom(socket);
         const round = await game.spinWheel(room, socket.data.playerId);
-        // Aviso PRIVADO ao autor do segredo (nunca vai no broadcast).
-        if (round.gameTypeKey === 'segredos' && round.secretAuthorId) {
-          io.to(round.secretAuthorId).emit('you_are_author', { roundId: round.id });
-        }
-        // Intrigas: a pergunta só vai (privada) para quem girou; o acusado nunca a vê.
-        if (round.gameTypeKey === 'intrigas') {
-          io.to(round.currentPlayerId).emit('intrigas_reason', {
-            roundId: round.id,
-            reason: round.reason,
-          });
-        }
-        // Piramide: entrega a cada jogador a SUA mão (privada, nunca em broadcast).
-        if (round.gameTypeKey === 'piramide') {
-          for (const p of room.players.values()) {
-            if (!p.connected) continue;
-            const cards = game.piramideHand(room, p.id);
-            if (cards) io.to(p.id).emit('piramide_hand', { roundId: round.id, cards });
-          }
-        }
-        // Vasco: entrega a cada jogador o SEU papel (privado). O grupo recebe a
-        // palavra; o(s) Vasco(s) recebem só "és o Vasco" (word: null).
-        if (round.gameTypeKey === 'vasco') {
-          for (const p of room.players.values()) {
-            if (!p.connected) continue;
-            const role = game.vascoRole(room, p.id);
-            if (role) io.to(p.id).emit('vasco_role', { roundId: round.id, ...role });
-          }
-        }
-        // Só o tipo (para animações) — o resto vai no room_state já anonimizado.
-        io.to(room.code).emit('round_started', { gameTypeKey: round.gameTypeKey });
+        announceSpin(io, room, round); // round_started + entregas privadas
         broadcastState(io, room.code);
         if (typeof ack === 'function') ack({ ok: true });
       } catch (err) {
@@ -353,12 +345,7 @@ export function registerSocketHandlers(io) {
       try {
         const room = requireRoom(socket);
         const round = game.chooseTarget(room, socket.data.playerId, accusedPlayerId);
-        // A razão vai (privada) para os espectadores — todos menos acusador e acusado.
-        for (const p of room.players.values()) {
-          if (p.connected && p.id !== round.currentPlayerId && p.id !== round.accusedId) {
-            io.to(p.id).emit('intrigas_reason', { roundId: round.id, reason: round.reason });
-          }
-        }
+        announceIntrigasReason(io, room, round); // razão privada aos espectadores
         broadcastState(io, room.code);
         if (typeof ack === 'function') ack({ ok: true });
       } catch (err) {
@@ -549,9 +536,10 @@ export function registerSocketHandlers(io) {
     socket.on('send_message', ({ text } = {}) => {
       const { code, playerId } = socket.data;
       if (!code || !playerId) return;
+      if (throttled(socket, 'chat', 400)) return; // anti-spam: no máx. ~1 msg / 0,4s
       const room = rooms.getRoom(code);
       const player = room?.players.get(playerId);
-      const clean = String(text || '').trim().slice(0, 300);
+      const clean = sanitizeText(text, 300);
       if (!room || !player || !clean) return;
       io.to(code).emit('chat_message', {
         playerId,
@@ -564,11 +552,16 @@ export function registerSocketHandlers(io) {
     socket.on('disconnect', () => {
       const { code, playerId } = socket.data;
       if (!code || !playerId) return;
-      rooms.handleDisconnect(code, playerId);
-      // Tabuleiro: se quem saiu estava a jogar, não deixar o turno preso.
-      const room = rooms.getRoom(code);
-      if (room && room.mode === 'board' && room.board) board.boardOnDisconnect(room, playerId);
-      broadcastState(io, code);
+      try {
+        rooms.handleDisconnect(code, playerId);
+        // Tabuleiro: se quem saiu estava a jogar, não deixar o turno preso.
+        const room = rooms.getRoom(code);
+        if (room && room.mode === 'board' && room.board) board.boardOnDisconnect(room, playerId);
+        broadcastState(io, code);
+      } catch (err) {
+        // Um erro no disconnect não pode partir o servidor nem prender a sala.
+        log.error('erro no disconnect', { code, playerId, message: err?.message });
+      }
     });
   });
 }
@@ -600,6 +593,66 @@ function broadcastState(io, code) {
   }
 }
 
+/** Anuncia uma volta da roda: tipo (p/ animação) + entregas PRIVADAS (mãos,
+ *  papéis, autor do segredo, razão da intriga). Usado por humanos e por bots. */
+function announceSpin(io, room, round) {
+  if (round.gameTypeKey === 'segredos' && round.secretAuthorId) {
+    io.to(round.secretAuthorId).emit('you_are_author', { roundId: round.id });
+  }
+  if (round.gameTypeKey === 'intrigas') {
+    io.to(round.currentPlayerId).emit('intrigas_reason', { roundId: round.id, reason: round.reason });
+  }
+  if (round.gameTypeKey === 'piramide') {
+    for (const p of room.players.values()) {
+      if (!p.connected || p.isBot) continue;
+      const cards = game.piramideHand(room, p.id);
+      if (cards) io.to(p.id).emit('piramide_hand', { roundId: round.id, cards });
+    }
+  }
+  if (round.gameTypeKey === 'vasco') {
+    for (const p of room.players.values()) {
+      if (!p.connected || p.isBot) continue;
+      const role = game.vascoRole(room, p.id);
+      if (role) io.to(p.id).emit('vasco_role', { roundId: round.id, ...role });
+    }
+  }
+  io.to(room.code).emit('round_started', { gameTypeKey: round.gameTypeKey });
+}
+
+/** Intrigas: entrega a razão (privada) aos espectadores — nem acusador nem acusado. */
+function announceIntrigasReason(io, room, round) {
+  for (const p of room.players.values()) {
+    if (p.connected && !p.isBot && p.id !== round.currentPlayerId && p.id !== round.accusedId) {
+      io.to(p.id).emit('intrigas_reason', { roundId: round.id, reason: round.reason });
+    }
+  }
+}
+
+/** Arranca (se ainda não existir) o tick que faz os bots de playtest jogar. */
+function ensureBotTick(io, code) {
+  if (botTicks.has(code)) return;
+  const id = setInterval(async () => {
+    const room = rooms.getRoom(code);
+    const hasBots = room && [...room.players.values()].some((p) => p.isBot && p.connected);
+    if (!hasBots) {
+      clearInterval(id);
+      botTicks.delete(code);
+      return;
+    }
+    try {
+      const changed = await bots.driveBots(room, {
+        onSpin: (round) => announceSpin(io, room, round),
+        onIntrigasTarget: (round) => announceIntrigasReason(io, room, round),
+      });
+      if (changed) broadcastState(io, code);
+    } catch (err) {
+      log.error('erro no tick dos bots', { code, message: err?.message });
+    }
+  }, 850);
+  id.unref?.();
+  botTicks.set(code, id);
+}
+
 function respond(ack, socket, event, payload) {
   if (typeof ack === 'function') ack({ ok: true, ...payload });
   socket.emit(event, payload);
@@ -608,7 +661,15 @@ function respond(ack, socket, event, payload) {
 function handleError(socket, ack, err) {
   const message =
     err instanceof AppError ? err.message : 'Ocorreu um erro inesperado.';
-  if (!(err instanceof AppError)) console.error(err);
+  // AppError é erro "de negócio" (esperado) → não polui os logs. O resto é bug.
+  if (!(err instanceof AppError)) {
+    log.error('erro num handler de socket', {
+      code: socket.data?.code,
+      playerId: socket.data?.playerId,
+      message: err?.message,
+      stack: err?.stack,
+    });
+  }
   if (typeof ack === 'function') ack({ ok: false, message });
   socket.emit('error_msg', { message });
 }

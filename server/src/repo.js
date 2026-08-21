@@ -8,6 +8,7 @@
 
 import { GAME_TYPES, VASCO_BOARDS } from './content/prompts.data.js';
 import { BOARD_EVENTS, BOARD_PRISON, BOARD_CARDS } from './content/board.data.js';
+import { log } from './log.js';
 
 // Cliente Prisma lazy: só carrega se houver DATABASE_URL. Cacheado (promessa).
 let prismaPromise = null;
@@ -17,7 +18,7 @@ async function client() {
     prismaPromise = import('@prisma/client')
       .then(({ PrismaClient }) => new PrismaClient())
       .catch((e) => {
-        console.error('[repo] Prisma indisponível, uso conteúdo em memória:', e.message);
+        log.warn('repo: Prisma indisponível, uso conteúdo em memória:', { error: e.message });
         return null;
       });
   }
@@ -43,7 +44,7 @@ export async function getGameTypes() {
       });
       if (types.length) return types;
     } catch (e) {
-      console.error('[repo] getGameTypes DB falhou, uso memória:', e.message);
+      log.warn('repo: getGameTypes DB falhou, uso memória:', { error: e.message });
     }
   }
   return GAME_TYPES.map((g) => ({ key: g.key, label: g.label }));
@@ -70,7 +71,7 @@ export async function getRandomPrompt(gameTypeKey, intensity) {
       }
       return null;
     } catch (e) {
-      console.error('[repo] getRandomPrompt DB falhou, uso memória:', e.message);
+      log.warn('repo: getRandomPrompt DB falhou, uso memória:', { error: e.message });
     }
   }
   // Fallback estático.
@@ -117,7 +118,7 @@ export async function getBoardBanks() {
         if (events.length && prison.length && cards.length) return { events, prison, cards };
       }
     } catch (e) {
-      console.error('[repo] getBoardBanks DB falhou, uso memória:', e.message);
+      log.warn('repo: getBoardBanks DB falhou, uso memória:', { error: e.message });
     }
   }
   return {

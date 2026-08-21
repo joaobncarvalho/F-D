@@ -5,6 +5,47 @@
 
 ---
 
+## 2026-08-21 — Ronda de robustez pré-playtest: testes, hardening, bots, timer, modularização
+
+Sessão de melhoria de código a pedido do João ("faz tudo o que sugeriste"). 10 itens,
+cada um verificado (testes + build). Foco: proteger as Regras de Ouro durante o
+desenvolvimento rápido à volta do playtest.
+
+- **#1 Suite de testes (`server/test/*.test.js`, `npm test`):** node:test, 11 testes.
+  Invariantes críticos: autor de Segredos nunca no payload; mãos de Piramide/Vasco e
+  palavra/impostor do Vasco fora do broadcast; rotação salta desligados/eliminados;
+  vidas→0 elimina + auto-fim; cartas do tabuleiro privadas; sanitize/throttle.
+- **#3 Hardening de input (`util.js`):** `sanitizeText` (tira controlo, colapsa espaços,
+  limita) aplicado a nomes/chat/perguntas/segredos; `throttled` (chat 400ms, submissões
+  150ms) contra spam/duplo-toque.
+- **#5 Log + robustez (`log.js`):** logger estruturado (níveis via LOG_LEVEL);
+  `unhandledRejection`/`uncaughtException` já não deitam o servidor abaixo; `disconnect`
+  protegido; `repo.js` usa `log.warn` no fallback de BD.
+- **#4 Sessão em localStorage (`App.jsx`):** espelho do sessionStorage — sobrevive ao
+  browser matar o separador (comum no telemóvel); sem partir 2-separadores em dev.
+- **#6 Bots de playtest (`bots.js`, gated por `ENABLE_DEV_BOTS=1`):** enchem a sala e
+  jogam TODAS as mecânicas da Roda à vez (spin/aceitar/votar/adivinhar/RPS/piramide/
+  vasco). Botão "🤖 +bot" no lobby (só em `npm run dev` ou `?dev`). Tabuleiro = TODO.
+  Smoke: 413 rondas por todas as fases, sem encravar e sem fugas.
+- **#8 Timer Boca Calada (`components/Timer.jsx`):** anel de 20s, tiques + buzina;
+  pressão visual (não força ação). Sons `tick`/`timeout` em `sfx.js`.
+- **#10 UX de entrada tardia (`Home.jsx`):** painel amigável (emoji+dica) p/ "jogo já
+  começou" / nome repetido / sala inexistente.
+- **#9 Segurança:** `.env.example` passa a documentar `ADMIN_PASSWORD`/`LOG_LEVEL`/
+  `ENABLE_DEV_BOTS`; confirmado que não há segredos commitados e que `admin.js` bloqueia
+  (503) sem password. **Operacional (João):** rodar a password da Supabase que passou
+  pelo chat (log de 2026-08-18).
+- **#7 `npm run check` (root `package.json`):** um comando = testes do servidor + build
+  do cliente.
+- **#2 Modularização (1.º incremento):** `pages/games/shared.jsx` (TYPES/CardShell/
+  BuddyBlock) + `pages/games/cards.jsx` (PromptCard/ChoiceCard/IntrigasCard, reusados
+  pelo Demo). `Game.jsx` 1501→1203 linhas. Padrão estabelecido; falta extrair
+  Guessing/Vasco/Piramide (gradual — ver backlog).
+- **Decisões pendentes #3/#4/#5 fechadas** (ver roadmap): conteúdo fixo (só /admin);
+  salas do zero; Boca Calada com timer.
+- **Verificação:** `npm run check` ✓ (11 testes, build 508 módulos); smoke dos bots
+  (413 rondas, sem fugas) ✓; servidor arranca + `/health` 200 + logger estruturado ✓.
+
 ## 2026-08-20 — Tabuleiro sai de beta: bancos na BD + cartas privadas + fim com stats
 
 Fecha o polish (#3) e as melhorias (#4) do tabuleiro. Só falta o playtest real.

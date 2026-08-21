@@ -128,8 +128,10 @@ Legenda: ✅ feito · 🚧 em curso · ⬜ por fazer · 🔗 ponto de integraç�
    no lobby. Implementado. (Reabrir se a equipa quiser outro valor.)
 2. ✅ **DECIDIDO (default):** Vez **sequencial** (rotação). Implementado em `game.js`.
    Fácil trocar para aleatória (isolado em `spinWheel`). (Reabrir se necessário.)
-3. **Prompts do host** — o host pode editar/adicionar, ou só conteúdo fixo no MVP?
-   → afeta schema (`prompts.room_id`?) e UI.
-4. **Persistência entre sessões** — guardar o mesmo grupo para outro dia, ou
-   cada sala do zero? → afeta modelo de `players`/`rooms`.
-5. **Boca Calada** — confirmar mecânica exata com o João; precisa de timer visível.
+3. ✅ **DECIDIDO (2026-08-21):** Conteúdo **fixo** no MVP — só editável na `/admin`
+   (CRUD já existe). Sem prompts por sala; schema fica simples. (Reabrir pós-MVP.)
+4. ✅ **DECIDIDO (2026-08-21):** **Cada sala do zero** (efémero, estilo Jackbox).
+   Sem perfis persistentes/login. Menos PII, mais simples. (Reabrir pós-MVP.)
+5. ✅ **DECIDIDO/FEITO (2026-08-21):** Boca Calada tem **timer visível** de 20s
+   (`components/Timer.jsx`) — pressão social/visual; não força ação (servidor
+   continua autoridade).

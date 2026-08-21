@@ -2,6 +2,18 @@ import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { sfx } from '../sfx.js';
 
+// Traduz o erro do servidor num painel amigável (emoji + dica de o que fazer).
+function friendlyError(msg) {
+  const m = (msg || '').toLowerCase();
+  if (m.includes('já começou'))
+    return { emoji: '🎮', title: 'O jogo já está a decorrer', hint: 'Pede ao anfitrião para terminar a ronda e voltarem ao lobby — depois entra com o mesmo código.' };
+  if (m.includes('nome'))
+    return { emoji: '🙋', title: 'Esse nome já está ocupado', hint: 'Escolhe outro nome para esta sala.' };
+  if (m.includes('não encontrada') || m.includes('não existe'))
+    return { emoji: '🔍', title: 'Sala não encontrada', hint: 'Confirma o código (4 letras/números, sem espaços).' };
+  return { emoji: '⚠️', title: msg, hint: null };
+}
+
 export default function Home({ error, onCreate, onJoin }) {
   const [mode, setMode] = useState(null); // null | 'create' | 'join'
   const [name, setName] = useState('');
@@ -113,15 +125,20 @@ export default function Home({ error, onCreate, onJoin }) {
         </motion.form>
       )}
 
-      {error && (
-        <motion.p
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          className="text-center text-sm text-red-300 bg-red-500/10 rounded-lg py-2 px-3"
-        >
-          {error}
-        </motion.p>
-      )}
+      {error && (() => {
+        const fe = friendlyError(error);
+        return (
+          <motion.div
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="text-center bg-red-500/10 border border-red-500/20 rounded-xl py-3 px-4"
+          >
+            <div className="text-2xl mb-1">{fe.emoji}</div>
+            <p className="text-sm font-semibold text-red-200">{fe.title}</p>
+            {fe.hint && <p className="mt-1 text-xs text-red-200/70">{fe.hint}</p>}
+          </motion.div>
+        );
+      })()}
 
       <p className="text-center text-xs text-white/30 mt-2">
         Joguem com moderação, tenham água por perto. 💧

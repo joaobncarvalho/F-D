@@ -8,8 +8,20 @@ import cors from 'cors';
 import { Server } from 'socket.io';
 import { registerSocketHandlers } from './socket.js';
 import { createAdminRouter } from './admin.js';
+import { log } from './log.js';
 
 const PORT = process.env.PORT || 3001;
+
+// Rede de segurança: um erro solto num timer/promessa NÃO deve deitar o servidor
+// abaixo e fechar TODAS as salas. Registamos e seguimos (numa festa, manter o
+// jogo vivo vale mais do que reiniciar). Se um dia quiseres política de reinício,
+// é aqui.
+process.on('unhandledRejection', (reason) => {
+  log.error('unhandledRejection', { reason: reason instanceof Error ? reason.message : String(reason) });
+});
+process.on('uncaughtException', (err) => {
+  log.error('uncaughtException', { message: err?.message, stack: err?.stack });
+});
 
 // Origem(ns) permitida(s) no CORS/Socket.io:
 //   - CLIENT_ORIGIN por definir → '*' (útil no deploy de imagem única, mesma origem);
@@ -42,10 +54,9 @@ const clientDist = process.env.CLIENT_DIST
 if (existsSync(clientDist)) {
   app.use(express.static(clientDist));
   app.get('*', (_req, res) => res.sendFile(path.join(clientDist, 'index.html')));
-  console.log(`A servir frontend de ${clientDist}`);
+  log.info('A servir frontend', { dir: clientDist });
 }
 
 httpServer.listen(PORT, () => {
-  console.log(`F&D server a ouvir em http://localhost:${PORT}`);
-  console.log(`CORS: ${rawOrigin}`);
+  log.info('F&D server a ouvir', { url: `http://localhost:${PORT}`, cors: rawOrigin });
 });

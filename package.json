@@ -1,0 +1,14 @@
+{
+  "name": "fd",
+  "version": "0.1.0",
+  "private": true,
+  "description": "F&D — Friends and Drinking (party game multiplayer realtime). Monorepo server/ + client/.",
+  "scripts": {
+    "test": "npm --prefix server test",
+    "build": "npm --prefix client run build",
+    "check": "npm --prefix server test && npm --prefix client run build",
+    "dev:server": "npm --prefix server run dev",
+    "dev:client": "npm --prefix client run dev",
+    "install:all": "npm --prefix server install && npm --prefix client install"
+  }
+}

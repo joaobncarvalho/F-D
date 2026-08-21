@@ -47,6 +47,8 @@ pós-MVP / v2 · **💡** = ideia nova a validar.
 - [x] Som sintetizado (Web Audio) na roda/eventos + toggle mute (`sfx.js`)
 - [x] Vibração (haptics) em eventos-chave (`confetti.js` → haptic)
 - [x] Redesign tema de festa (fundo animado, glass, gradientes, fonte display)
+- [x] Timer visível/sonoro reutilizável (`components/Timer.jsx`) — usado no Boca Calada
+- [x] Entrada tardia: painel amigável no `Home.jsx` (jogo a decorrer / nome / sala)
 
 ## Estatísticas & social (P1)
 
@@ -56,9 +58,13 @@ pós-MVP / v2 · **💡** = ideia nova a validar.
 
 ## Anti-abuso / robustez (P1)
 
-- [ ] Servidor como autoridade em todas as validações
-- [ ] Rate-limit no chat e nas submissões
-- [ ] Sanitização de nomes e mensagens (já há trim/limite; rever XSS no render)
+- [x] Servidor como autoridade em todas as validações
+- [x] Rate-limit no chat e nas submissões (`util.throttled`: chat 400ms, submissões 150ms)
+- [x] Sanitização de nomes e mensagens (`util.sanitizeText`: controlo+espaços+limite).
+      Render é via React (escapa por defeito) — sem `dangerouslySetInnerHTML`.
+- [x] **Testes automatizados dos invariantes** (`server/test/*`, `npm test`) — anonimato,
+      rotação, eliminação, cartas privadas. Correr antes de cada commit.
+- [x] **Log estruturado** (`log.js`) + safety net de processo (não deita o servidor abaixo).
 - [ ] Recuperação de sala após crash do servidor (snapshot opcional na BD)
 
 ---
@@ -95,6 +101,17 @@ Estas vão além do FD — candidatas a diferenciar o jogo. Discutir prioridade.
 - 💡 **i18n** — PT primeiro, mas estrutura de conteúdo pronta para EN.
 
 ---
+
+## Dívida técnica / incrementos em curso (P1)
+
+- [ ] **Modularizar `Game.jsx`** (1203 linhas) — 1.º passo feito (`pages/games/shared.jsx`
+      + `cards.jsx` com Prompt/Choice/Intrigas). **Falta extrair** `GuessingCard`,
+      `VascoCard`, `PiramideCard` para `pages/games/*` (um por commit, sem mudar comportamento).
+- [ ] **Modularizar `Board.jsx`** (1173) e `server/game.js` (1125)/`board.js` — mesma
+      abordagem gradual, protegida pela suite de testes.
+- [ ] **Bots de playtest no Tabuleiro** (`bots.js` só faz a Roda) — pawn/roll/advance/
+      resolve/blackjack/beerpong/gamble/evento.
+- [ ] Alargar a suite de testes ao motor do Tabuleiro (`board.js`) e ao `repo.js`.
 
 ## Fase 2 / v2 (P2)
 

@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { AppError } from './errors.js';
 import { serializeGame } from './game.js';
 import { serializeBoard } from './board.js';
+import { sanitizeText } from './util.js';
 
 export { AppError }; // re-exportado para compatibilidade (socket.js importa daqui)
 
@@ -201,9 +202,26 @@ export class RoomManager {
       isHost,
       connected: true,
       eliminated: false, // sem vidas → espectador (telemóvel partido)
+      isBot: false, // bots de playtest (dev) — nunca host
       joinedAt: new Date().toISOString(),
     };
     room.players.set(player.id, player);
+    return player;
+  }
+
+  /** Adiciona um bot de playtest (dev). Nome único automático (Bot1, Bot2…). */
+  addBot(code) {
+    const room = this.getRoom(code);
+    if (!room) throw new AppError('Sala não encontrada.');
+    if (room.status !== 'lobby') throw new AppError('Só dá para adicionar bots no lobby.');
+    let n = 1;
+    let name;
+    const taken = (nm) => [...room.players.values()].some((p) => p.name.toLowerCase() === nm.toLowerCase());
+    do {
+      name = `Bot${n++}`;
+    } while (taken(name));
+    const player = this.#addPlayer(room, name, /* isHost */ false);
+    player.isBot = true;
     return player;
   }
 }
@@ -225,6 +243,7 @@ export function serializeRoom(room) {
         isHost: p.isHost,
         connected: p.connected,
         eliminated: p.eliminated,
+        isBot: !!p.isBot,
       })),
     intensityVotes: room.intensityVotes || {}, // votos no lobby (playerId -> intensidade)
     mode: room.mode || 'wheel',
@@ -235,5 +254,5 @@ export function serializeRoom(room) {
 }
 
 function normalizeName(name) {
-  return String(name || '').trim().slice(0, 20);
+  return sanitizeText(name, 20);
 }

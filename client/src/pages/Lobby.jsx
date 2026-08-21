@@ -10,7 +10,12 @@ const INTENSITY_OPTS = [
   { key: 'caos', label: '💥 Caos' },
 ];
 
-export default function Lobby({ room, youId, messages, error, onSendMessage, onStart, onVoteIntensity, onSetMode, onLeave }) {
+// Modo dev: mostra atalhos de playtest (bots). Ativo em `npm run dev` ou com ?dev.
+const DEV_MODE =
+  (typeof import.meta !== 'undefined' && import.meta.env?.DEV) ||
+  (typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('dev'));
+
+export default function Lobby({ room, youId, messages, error, onSendMessage, onStart, onVoteIntensity, onSetMode, onAddBots, onLeave }) {
   const [draft, setDraft] = useState('');
   const [showQR, setShowQR] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -108,6 +113,7 @@ export default function Lobby({ room, youId, messages, error, onSendMessage, onS
               >
                 <span className="font-semibold">
                   {p.isHost && '👑 '}
+                  {p.isBot && '🤖 '}
                   {p.name}
                   {p.id === youId && <span className="text-white/40"> (tu)</span>}
                   {!p.connected && <span className="text-amber-400/70 text-xs"> · offline</span>}
@@ -209,6 +215,17 @@ export default function Lobby({ room, youId, messages, error, onSendMessage, onS
           </div>
         );
       })()}
+
+      {/* Atalho de PLAYTEST (só dev): enche a sala com bots para testar sozinho. */}
+      {DEV_MODE && isHost && onAddBots && (
+        <div className="fd-card p-3 flex items-center justify-between border border-dashed border-white/15">
+          <span className="text-sm text-white/60">🤖 Playtest (dev)</span>
+          <div className="flex gap-2">
+            <button onClick={() => { sfx.click(); onAddBots(1); }} className="fd-chip">+1 bot</button>
+            <button onClick={() => { sfx.click(); onAddBots(3); }} className="fd-chip">+3 bots</button>
+          </div>
+        </div>
+      )}
 
       {isHost ? (
         <div className="flex flex-col gap-3">

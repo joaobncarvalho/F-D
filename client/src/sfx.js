@@ -86,4 +86,8 @@ export const sfx = {
   win: () => {
     [523, 659, 784, 1047].forEach((f, i) => tone(f, 0.16, 'triangle', 0.14, i * 0.12));
   },
+  // Tique curto do timer; `urgent` sobe o tom nos últimos segundos.
+  tick: (urgent = false) => tone(urgent ? 880 : 620, 0.05, 'square', urgent ? 0.12 : 0.07),
+  // Buzina de tempo esgotado.
+  timeout: () => slide(500, 120, 0.4, 'sawtooth', 0.16),
 };

@@ -12,9 +12,22 @@ import ErrorBoundary from './components/ErrorBoundary.jsx';
 
 const SESSION_KEY = 'fd_session';
 
+// Sessão: o sessionStorage é por-separador (2 separadores em dev = 2 jogadores)
+// e sobrevive a recarregar. Mas se o browser MATAR o separador (comum no
+// telemóvel em segundo plano) perde-se. Por isso espelhamos também em
+// localStorage: ao reabrir sem sessionStorage, recuperamos de lá e auto-religamos.
+// Em dev, cada separador escreve o SEU sessionStorage primeiro, por isso não
+// colidem; a recuperação do localStorage só acontece quando o separador é novo.
 function loadSession() {
   try {
-    return JSON.parse(sessionStorage.getItem(SESSION_KEY) || 'null');
+    const fromTab = sessionStorage.getItem(SESSION_KEY);
+    if (fromTab) return JSON.parse(fromTab);
+    const fromDevice = localStorage.getItem(SESSION_KEY);
+    if (fromDevice) {
+      sessionStorage.setItem(SESSION_KEY, fromDevice); // adota para este separador
+      return JSON.parse(fromDevice);
+    }
+    return null;
   } catch {
     return null;
   }
@@ -39,8 +52,18 @@ export default function App() {
 
   function saveSession(s) {
     sessionRef.current = s;
-    if (s) sessionStorage.setItem(SESSION_KEY, JSON.stringify(s));
-    else sessionStorage.removeItem(SESSION_KEY);
+    try {
+      if (s) {
+        const str = JSON.stringify(s);
+        sessionStorage.setItem(SESSION_KEY, str);
+        localStorage.setItem(SESSION_KEY, str); // espelho p/ sobreviver ao separador ser morto
+      } else {
+        sessionStorage.removeItem(SESSION_KEY);
+        localStorage.removeItem(SESSION_KEY);
+      }
+    } catch {
+      /* modo privado / storage cheio — a sessão fica só em memória */
+    }
   }
 
   // Desbloqueia o áudio no primeiro toque (política de autoplay dos browsers).
@@ -191,6 +214,7 @@ export default function App() {
   const startGame = useCallback((config) => socket.emit('start_game', config), []);
   const voteIntensity = useCallback((intensity) => socket.emit('vote_intensity', { intensity }), []);
   const setMode = useCallback((mode) => socket.emit('set_mode', { mode }), []);
+  const addBots = useCallback((count) => socket.emit('dev_add_bots', { count }), []); // playtest (dev)
   const boardPickPawn = useCallback((pawn) => socket.emit('board_pick_pawn', { pawn }), []);
   const boardRoll = useCallback(() => socket.emit('board_roll'), []);
   const boardAdvance = useCallback((squares) => socket.emit('board_advance', { squares }), []);
@@ -289,6 +313,7 @@ export default function App() {
             onStart={startGame}
             onVoteIntensity={voteIntensity}
             onSetMode={setMode}
+            onAddBots={addBots}
             onLeave={leaveRoom}
           />
         )}

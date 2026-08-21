@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import * as repo from './repo.js';
 import { AppError } from './errors.js';
+import { sanitizeText } from './util.js';
 
 // Motor de jogo. Opera sobre `room.game` (criado por initGame).
 //
@@ -463,7 +464,7 @@ export function addQuestion(room, authorId, targetPlayerId, text) {
   if (!author) throw new AppError('Jogador inválido.');
   if (!target) throw new AppError('Escolhe um jogador válido.');
   if (targetPlayerId === authorId) throw new AppError('Escolhe outro jogador (não tu).');
-  const clean = String(text || '').trim().slice(0, 200);
+  const clean = sanitizeText(text, 200);
   if (clean.length < 3) throw new AppError('Escreve uma pergunta.');
   g.questions.push({ id: randomUUID(), targetPlayerId, authorPlayerId: authorId, text: clean, used: false });
   return g.questions.length;
@@ -474,7 +475,7 @@ export function addSecret(room, authorId, text) {
   if (!g || g.phase !== 'prep') throw new AppError('Não é altura de escrever segredos.');
   const author = room.players.get(authorId);
   if (!author) throw new AppError('Jogador inválido.');
-  const clean = String(text || '').trim().slice(0, 200);
+  const clean = sanitizeText(text, 200);
   if (clean.length < 3) throw new AppError('Escreve um segredo.');
   g.secrets.push({ id: randomUUID(), authorPlayerId: authorId, text: clean, used: false });
   return g.secrets.length;
