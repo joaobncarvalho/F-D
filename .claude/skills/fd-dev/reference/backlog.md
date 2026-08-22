@@ -111,10 +111,12 @@ Estas vão além do FD — candidatas a diferenciar o jogo. Discutir prioridade.
 - [x] **Modularizar `Board.jsx`** (1173 → **603 linhas**) — overlays/mini-jogos em
       `pages/board/`: `blackjack.jsx` (PlayingCard/BlackjackReveal), `reveals.jsx`
       (Gamble/CardPlay/Order), `Beerpong.jsx`, `EventoOverlay.jsx`. Idêntico (build ✓).
-- [~] **Modularizar o servidor** — `game.js` **1125 → 509**: extraídos `game/helpers.js`,
-      `game/piramide.js`, `game/vasco.js`, `game/intrigas.js`, `game/segredos.js` (motor +
-      serialização de cada mini-jogo da Roda). **Falta:** modularizar `board.js` (886) e
-      `socket.js` (630). Protegido pela suite (invariantes + e2e Roda **e** Tabuleiro).
+- [x] **Modularizar o servidor** — `game.js` **1125 → 509** (`game/{helpers,piramide,vasco,
+      intrigas,segredos}.js`); `board.js` **886 → 530** (`board/{core,blackjack,beerpong,
+      evento}.js`); `socket.js` **630 → 561** (`socket/boardHandlers.js`). Protegido pela
+      suite (invariantes + e2e Roda **e** Tabuleiro; prova de código idêntico em cada passo).
+      _Opcional:_ extrair também os handlers da Roda do `socket.js` (mexem em emits privados —
+      melhor com um harness de socket primeiro).
 - [x] **Bots de playtest no Tabuleiro** — `driveBoardBots` (pawn/roll/advance/resolve/
       blackjack/beerpong/gamble/??). Teste `board-e2e.test.js` corre até ao fim.
 - [ ] Alargar a suite de testes ao motor do Tabuleiro (`board.js`) e ao `repo.js`.

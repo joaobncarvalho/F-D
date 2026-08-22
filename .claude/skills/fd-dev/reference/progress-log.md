@@ -5,6 +5,18 @@
 
 ---
 
+## 2026-08-22 — socket.js: handlers do Tabuleiro num módulo
+
+- `socket/boardHandlers.js` — `registerBoardHandlers(socket, ctx)` recebe os helpers
+  partilhados (`io`/`requireRoom`/`broadcastState`/`handleError`) e regista os 12
+  eventos `board_*`. Corpos byte-idênticos (prova: 0 linhas de código diferentes).
+- `socket.js` **630 → 561**; chama `registerBoardHandlers` no `connection`.
+- **Nota:** os handlers da Roda ficam inline (mexem nos emits privados —
+  `announceSpin`/`announceIntrigasReason` — e o `socket.js` não tem teste direto).
+  Extraí-los é um passo opcional, melhor com um harness de socket primeiro.
+- **Verificação:** todos os 12 `board_*` continuam registados; `socket.js` carrega;
+  `npm test` 13/13.
+
 ## 2026-08-22 — Modularização do board.js (motores das casas)
 
 Mesma abordagem: `board/core.js` partilhado PRIMEIRO (evita imports circulares
