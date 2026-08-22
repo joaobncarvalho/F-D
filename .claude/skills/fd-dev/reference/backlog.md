@@ -104,9 +104,10 @@ Estas vão além do FD — candidatas a diferenciar o jogo. Discutir prioridade.
 
 ## Dívida técnica / incrementos em curso (P1)
 
-- [ ] **Modularizar `Game.jsx`** (1203 linhas) — 1.º passo feito (`pages/games/shared.jsx`
-      + `cards.jsx` com Prompt/Choice/Intrigas). **Falta extrair** `GuessingCard`,
-      `VascoCard`, `PiramideCard` para `pages/games/*` (um por commit, sem mudar comportamento).
+- [x] **Modularizar `Game.jsx`** (1501 → **600 linhas**) — todas as cartas dos mini-jogos
+      em `pages/games/`: `shared.jsx` (TYPES/CardShell/BuddyBlock), `cards.jsx`
+      (Prompt/Choice/Intrigas), `GuessingCard.jsx`, `PiramideCard.jsx` (+PlayingCard/
+      PyramidBoard), `VascoCard.jsx`. Comportamento idêntico (build ✓).
 - [ ] **Modularizar `Board.jsx`** (1173) e `server/game.js` (1125)/`board.js` — mesma
       abordagem gradual, protegida pela suite de testes.
 - [ ] **Bots de playtest no Tabuleiro** (`bots.js` só faz a Roda) — pawn/roll/advance/

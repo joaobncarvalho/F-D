@@ -5,6 +5,19 @@
 
 ---
 
+## 2026-08-22 — Modularização do Game.jsx concluída (cartas restantes extraídas)
+
+Continuação do #2. Extraídas as cartas que faltavam para `client/src/pages/games/`:
+- `GuessingCard.jsx` (Segredos), `PiramideCard.jsx` (+ `PlayingCard`/`PyramidBoard`/
+  `RED_SUITS`), `VascoCard.jsx` (Impostor). Cada uma importa `CardShell` de `shared.jsx`,
+  `sfx`, e (Piramide/Vasco) `confetti/haptic`. Exports nomeados, como o `cards.jsx`.
+- **`Game.jsx`: 1203 → 600 linhas** (do original 1501). Passou a orquestrador: fases,
+  roda, prep, flash, players strip, game-over — os mini-jogos vivem em módulos.
+- Sem alteração de comportamento (mudança puramente estrutural). Removido o import de
+  `CardShell` já não usado no `Game.jsx`.
+- **Verificação:** `npm run check` ✓ (11 testes, build **511 módulos**). Nenhuma
+  mudança no servidor. Falta ainda modularizar `Board.jsx` e o servidor (backlog).
+
 ## 2026-08-21 — Ronda de robustez pré-playtest: testes, hardening, bots, timer, modularização
 
 Sessão de melhoria de código a pedido do João ("faz tudo o que sugeriste"). 10 itens,
