@@ -5,6 +5,26 @@
 
 ---
 
+## 2026-08-22 — game.js: Intrigas + Segredos extraídos + BOTS do Tabuleiro
+
+Continuação da modularização do servidor + bots para o outro modo.
+
+- `game/intrigas.js` — `setupIntrigas`, `chooseTarget`, `submitRps`, `RPS_BEATS`,
+  `serializeIntrigas`. `game.js` re-exporta `chooseTarget`/`submitRps` p/ o socket.
+- `game/segredos.js` — `pickSecret`, `setupSegredos`, `castGuess`, `revealSegredos`,
+  `serializeSegredos`. `game.js` importa `revealSegredos` (revealResult) e re-exporta
+  `castGuess`. O setup passou de inline (no `spinWheel`) para funções nos módulos.
+- **`game.js`: 650 → 509 linhas** (os 4 mini-jogos da Roda estão agora em módulos).
+- **Bots do Tabuleiro** (`bots.js` + `board.js` exporta `PAWNS`): `driveBoardBots`
+  escolhe peão → lança ordem → na sua vez resolve a casa (mini/gamble/blackjack/
+  beerpong/??) ou avança 1–3. Deixou de ser TODO.
+- Novo teste `test/board-e2e.test.js`: bots correm o tabuleiro até ao fim (vencedor)
+  sem encravar nem expor cartas.
+- **Verificação:** `npm test` **13/13** (Roda + Tabuleiro e2e + invariantes); prova de
+  código idêntico das ações movidas (pickSecret/chooseTarget/submitRps/castGuess/
+  revealSegredos/RPS_BEATS todas iguais); `socket.js` carrega a cadeia; re-exports ✓.
+- **A seguir (backlog):** modularizar `board.js` (886) e `socket.js` (630).
+
 ## 2026-08-22 — Modularização do servidor: helpers + Piramide + Vasco (game.js)
 
 Primeiro passo no servidor (o mais delicado — state machines). Rede reforçada

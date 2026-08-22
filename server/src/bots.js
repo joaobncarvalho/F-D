@@ -9,6 +9,8 @@
 // que um cliente humano chamaria. Modo Tabuleiro fica como TODO (ver fim).
 
 import * as game from './game.js';
+import * as board from './board.js';
+import { PAWNS } from './board.js';
 import { log } from './log.js';
 
 export const ENABLED = process.env.ENABLE_DEV_BOTS === '1';
@@ -46,7 +48,8 @@ const BOT_SECRETS = [
  * anunciar o tipo + entregar mãos/papéis privados aos HUMANOS).
  */
 export async function driveBots(room, hooks = {}) {
-  if (!room?.game) return false; // Tabuleiro: TODO (ver fim do ficheiro)
+  if (room?.mode === 'board' && room.board) return driveBoardBots(room);
+  if (!room?.game) return false;
   const g = room.game;
   const bots = players(room).filter((p) => p.isBot && p.connected && !p.eliminated);
   if (!bots.length) return false;
@@ -215,6 +218,73 @@ export async function driveBots(room, hooks = {}) {
   return false;
 }
 
-// TODO(board): bots para o Modo Tabuleiro (pawn/roll/advance/resolve/blackjack/
-// beerpong/gamble/evento). O Modo Roda é a prioridade de playtest; o Tabuleiro
-// consegue-se testar avançando um peão, por isso fica como melhoria seguinte.
+/**
+ * Conduz os bots no Modo Tabuleiro (uma ação por chamada, ao ritmo do tick):
+ * escolher peão → lançar dado da ordem → na sua vez, resolver a casa pendente
+ * (mini/gamble/blackjack/beerpong/??) ou avançar 1–3 casas.
+ */
+async function driveBoardBots(room) {
+  const b = room.board;
+  const bots = players(room).filter((p) => p.isBot && p.connected);
+  if (!bots.length) return false;
+
+  try {
+    // Escolher peão (fase pawn): cada bot pega num peão livre.
+    if (b.phase === 'pawn') {
+      for (const bot of bots) {
+        if (!b.players[bot.id]?.pawn) {
+          const taken = new Set(Object.values(b.players).map((pl) => pl.pawn).filter(Boolean));
+          const free = PAWNS.find((pw) => !taken.has(pw));
+          if (free) { board.pickPawn(room, bot.id, free); return true; }
+        }
+      }
+      return false;
+    }
+
+    // Lançar o dado da ordem (fase order).
+    if (b.phase === 'order') {
+      for (const bot of bots) {
+        if (b.dice[bot.id] == null) { board.rollOrder(room, bot.id); return true; }
+      }
+      return false;
+    }
+
+    // Corrida (fase playing): só age se for a vez de um bot.
+    if (b.phase === 'playing') {
+      const cur = room.players.get(b.currentPlayerId);
+      if (!cur?.isBot) return false;
+
+      // Há casa pendente? Resolve-a primeiro.
+      if (b.pending) {
+        switch (b.pending.kind) {
+          case 'mini':
+            if (b.pending.variant === 'dare') board.boardResolve(room, cur.id, { action: rand() < 0.5 ? 'drink' : 'do' });
+            else board.boardResolve(room, cur.id, { choice: rand() < 0.5 ? 0 : 1 });
+            return true;
+          case 'gamble':
+            board.boardGamble(room, cur.id, rand() < 0.6); // aposta 60% das vezes
+            return true;
+          case 'blackjack':
+            board.boardBlackjack(room, cur.id, 'stand'); // planta sempre (termina já)
+            return true;
+          case 'beerpong':
+            board.boardBeerpong(room, cur.id, rand()); // força aleatória 0..1
+            return true;
+          case 'evento':
+            board.boardEventoPick(room, cur.id, Math.floor(rand() * 3)); // 1 de 3 cartas
+            return true;
+          default:
+            return false;
+        }
+      }
+
+      // Sem pendência → avança 1 a 3 casas (async: conteúdo da casa).
+      await board.advance(room, cur.id, 1 + Math.floor(rand() * 3));
+      return true;
+    }
+  } catch (err) {
+    log.warn('bot (tabuleiro): jogada ignorada', { phase: b?.phase, message: err?.message });
+    return false;
+  }
+  return false; // fase over
+}

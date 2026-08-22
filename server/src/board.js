@@ -25,7 +25,7 @@ const N_GAMBLE = 4;
 const N_BLACKJACK = 3;
 const N_BEERPONG = 3;
 const MINI_DRINK = 3; // golos se "beber" em vez de fazer o desafio
-const PAWNS = ['🦊', '🐸', '🐵', '🦄', '🐙', '🐝', '🦁', '🐨', '🐼', '🐷', '🐧', '🐢', '🐔', '🦖'];
+export const PAWNS = ['🦊', '🐸', '🐵', '🦄', '🐙', '🐝', '🦁', '🐨', '🐼', '🐷', '🐧', '🐢', '🐔', '🦖'];
 // Casas de mini-jogo: só os jogos RÁPIDOS single-player (os de grupo ficam na Roda).
 const BOARD_MINI_TYPES = ['boca_calada', 'desafio', 'isto_ou_aquilo'];
 
