@@ -1,0 +1,112 @@
+// F&D — núcleo partilhado do Modo Tabuleiro. Helpers usados TANTO pelo board.js
+// (fluxo) COMO pelos motores das casas (blackjack/beerpong/??). Fica aqui para
+// evitar imports circulares (board.js ↔ motores). Sem dependências do board.js.
+
+import { randomUUID } from 'node:crypto';
+import { AppError } from '../errors.js';
+
+/** Garante que há tabuleiro (e, opcionalmente, a fase certa). */
+export function requireBoard(room, phases) {
+  const b = room.board;
+  if (!b) throw new AppError('Não há tabuleiro ativo.');
+  if (phases && !phases.includes(b.phase)) throw new AppError('Não é altura disso.');
+  return b;
+}
+
+export const MINI_DRINK = 3; // golos se "beber" em vez de fazer o desafio
+// Mecânica das cartas jogáveis (o CATÁLOGO — emoji/nome/desc — vem dos bancos/BD).
+// Só estas keys podem ser distribuídas; uma carta na admin com key desconhecida
+// nunca entra no baralho (defensivo).
+export const KNOWN_CARD_KEYS = ['swap', 'back2', 'prison', 'skip', 'shield', 'drink3', 'steal'];
+
+export const nameOf = (room, id) => room.players.get(id)?.name;
+
+/** Escolha ponderada (pesos ≥1) de 1 item. */
+export function weightedPick(items) {
+  const total = items.reduce((s, it) => s + Math.max(1, it.weight || 1), 0);
+  let r = Math.random() * total;
+  for (const it of items) {
+    r -= Math.max(1, it.weight || 1);
+    if (r < 0) return it;
+  }
+  return items[items.length - 1];
+}
+
+/** Amostra ponderada SEM reposição de n itens distintos. */
+export function weightedSample(items, n) {
+  const pool = items.slice();
+  const out = [];
+  while (out.length < n && pool.length) {
+    const pick = weightedPick(pool);
+    out.push(pick);
+    pool.splice(pool.indexOf(pick), 1);
+  }
+  return out;
+}
+
+/** Dá uma carta aleatória do catálogo (só keys com mecânica). Devolve a meta. */
+export function giveRandomCard(b, player) {
+  const pool = b.banks.cards.filter((c) => KNOWN_CARD_KEYS.includes(c.key));
+  if (!pool.length) return null;
+  const c = weightedPick(pool);
+  player.cards.push({ id: randomUUID(), key: c.key });
+  return c;
+}
+
+/** Chegou ao fim (deu a volta)? Marca vitória e termina. */
+export function checkWin(room, playerId) {
+  const b = room.board;
+  const me = b.players[playerId];
+  if (me.pos >= b.size) {
+    me.pos = b.size;
+    me.finished = true;
+    b.winnerId = playerId;
+    b.phase = 'over';
+    return true;
+  }
+  return false;
+}
+
+/** Prisão: consequência aleatória do banco (salta vezes / bebe / recua / perde carta). */
+export function applyPrison(room, playerId, reason = 'prisão') {
+  const b = room.board;
+  const me = b.players[playerId];
+  const nm = nameOf(room, playerId);
+  me.slowStreak = 0;
+  me.prisonCount += 1;
+  const p = weightedPick(b.banks.prison);
+  if (p.skipTurns) me.skipTurns += p.skipTurns;
+  if (p.drink) me.golos += p.drink;
+  if (p.back) me.pos = Math.max(0, me.pos - p.back);
+  if (p.loseCard && me.cards.length) me.cards.shift();
+  b.lastEvent = { text: `🚔 ${nm} foi PRESO (${reason}): ${p.note}` };
+}
+
+/** IDs ativos na corrida (ligados, não terminados), por ordem. */
+export function activeIds(room) {
+  const b = room.board;
+  return b.order.filter((id) => room.players.get(id)?.connected && b.players[id] && !b.players[id].finished);
+}
+
+/** Passa a vez ao próximo ativo, respeitando "salta vez" (prisão). */
+export function advanceBoardTurn(room) {
+  const b = room.board;
+  const order = activeIds(room);
+  if (!order.length) {
+    b.currentPlayerId = null;
+    return;
+  }
+  // idx = -1 se o jogador da vez já não está ativo (saiu/expulso) → começa no primeiro.
+  let idx = order.indexOf(b.currentPlayerId);
+  for (let step = 0; step < order.length; step++) {
+    idx = (idx + 1 + order.length) % order.length;
+    const id = order[idx];
+    if (b.players[id].skipTurns > 0) {
+      b.players[id].skipTurns -= 1;
+      continue;
+    }
+    b.currentPlayerId = id;
+    return;
+  }
+  b.currentPlayerId = order[0]; // todos tinham salta-vez → recomeça no primeiro
+}

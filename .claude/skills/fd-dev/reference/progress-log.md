@@ -5,6 +5,26 @@
 
 ---
 
+## 2026-08-22 — Modularização do board.js (motores das casas)
+
+Mesma abordagem: `board/core.js` partilhado PRIMEIRO (evita imports circulares
+board.js ↔ motores), depois os 3 motores. Protegido pelo `board-e2e.test.js`.
+
+- `board/core.js` — `requireBoard`, `nameOf`, `weightedPick/Sample`, `giveRandomCard`,
+  `checkWin`, `applyPrison`, `activeIds`, `advanceBoardTurn`, `MINI_DRINK`,
+  `KNOWN_CARD_KEYS`. Usado pelo board.js E pelos motores.
+- `board/blackjack.js` (draw/handValue/openBlackjack/positiveReward/resolve/
+  boardBlackjack/standResult; exporta `handValue` p/ o serializePending).
+- `board/beerpong.js` (tabelas + `boardBeerpong`).
+- `board/evento.js` (openEvento/applyEventoEffect/boardEventoPick — casa ??).
+- `board.js` importa `openBlackjack`/`openEvento` (usados no `advance`) e **re-exporta**
+  `boardBlackjack`/`boardBeerpong`/`boardEventoPick` p/ socket.js/bots.js.
+- **`board.js`: 886 → 530 linhas.**
+- **Verificação:** `npm test` 13/13 (o e2e do tabuleiro apanhou um `handValue` em falta
+  no serializePending — corrigido exportando-o); prova de que **0 linhas** se perderam/
+  alteraram (só movidas); a cadeia carrega em runtime; re-exports ✓.
+- **A seguir:** `socket.js`.
+
 ## 2026-08-22 — game.js: Intrigas + Segredos extraídos + BOTS do Tabuleiro
 
 Continuação da modularização do servidor + bots para o outro modo.
