@@ -5,6 +5,24 @@
 
 ---
 
+## 2026-08-22 — Modularização do Board.jsx (overlays/mini-jogos extraídos)
+
+Mesma abordagem gradual + verificada. Overlays do Modo Tabuleiro extraídos para
+`client/src/pages/board/`:
+- `blackjack.jsx` — `PlayingCard`, `bjValue`, `FlipDealerCard`, `BlackjackReveal`
+  (PlayingCard e BlackjackReveal exportados; usados pela mesa de blackjack do Board).
+- `reveals.jsx` — `GambleReveal`, `CardPlayReveal`, `OrderReveal`.
+- `Beerpong.jsx` — `Beerpong` (+`BP_ROWS`).
+- `EventoOverlay.jsx` — casa "??" (3 cartas + flip).
+- Ficam no `Board.jsx` as constantes só dele (`KIND_ICON`/`GAME_EMOJI`/`squareIcon`/
+  `ADVANCE`) e o componente principal.
+- **`Board.jsx`: 1173 → 603 linhas.** Mudança puramente estrutural.
+- **Verificação:** `npm run check` ✓ (11 testes, build **515 módulos**); prova de
+  código idêntico (524=524 linhas, multiset igual ao original em git); sem fugas de
+  scope (nenhum módulo usa identificadores só-do-Board). Servidor intocado.
+- **A seguir (backlog):** modularizar o servidor (`game.js`/`board.js`/`socket.js`),
+  protegido pela suite de testes.
+
 ## 2026-08-22 — Modularização do Game.jsx concluída (cartas restantes extraídas)
 
 Continuação do #2. Extraídas as cartas que faltavam para `client/src/pages/games/`:

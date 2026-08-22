@@ -108,8 +108,11 @@ Estas vão além do FD — candidatas a diferenciar o jogo. Discutir prioridade.
       em `pages/games/`: `shared.jsx` (TYPES/CardShell/BuddyBlock), `cards.jsx`
       (Prompt/Choice/Intrigas), `GuessingCard.jsx`, `PiramideCard.jsx` (+PlayingCard/
       PyramidBoard), `VascoCard.jsx`. Comportamento idêntico (build ✓).
-- [ ] **Modularizar `Board.jsx`** (1173) e `server/game.js` (1125)/`board.js` — mesma
-      abordagem gradual, protegida pela suite de testes.
+- [x] **Modularizar `Board.jsx`** (1173 → **603 linhas**) — overlays/mini-jogos em
+      `pages/board/`: `blackjack.jsx` (PlayingCard/BlackjackReveal), `reveals.jsx`
+      (Gamble/CardPlay/Order), `Beerpong.jsx`, `EventoOverlay.jsx`. Idêntico (build ✓).
+- [ ] **Modularizar o servidor** — `game.js` (1125)/`board.js` (886)/`socket.js` (630)
+      em módulos por mini-jogo, com a suite de testes a proteger cada passo.
 - [ ] **Bots de playtest no Tabuleiro** (`bots.js` só faz a Roda) — pawn/roll/advance/
       resolve/blackjack/beerpong/gamble/evento.
 - [ ] Alargar a suite de testes ao motor do Tabuleiro (`board.js`) e ao `repo.js`.
