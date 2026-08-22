@@ -5,6 +5,28 @@
 
 ---
 
+## 2026-08-22 — Modularização do servidor: helpers + Piramide + Vasco (game.js)
+
+Primeiro passo no servidor (o mais delicado — state machines). Rede reforçada
+PRIMEIRO: o smoke dos bots virou **teste permanente** (`test/bots-e2e.test.js`)
+que joga todas as mecânicas da Roda ponta-a-ponta (spin/aceitar/votar/adivinhar/
+RPS/piramide/vasco) — se algo partir ou encravar, `npm test` falha.
+
+- `game/helpers.js` — `connectedOrder`, `nameOf`, `statsFor`, `drink`, `shuffle`
+  (puros, sem ciclos). `game.js` e os módulos importam daqui.
+- `game/piramide.js` — motor completo (baralho, deal, flip/assign/pass/respond,
+  summary, hand) + `serializePiramide(base, r)`. `game.js` importa `dealPiramide`/
+  `serializePiramide` e **re-exporta** as ações para o `socket.js` (interface intacta).
+- `game/vasco.js` — motor completo (deal, pistas, votação, redenção, resultado) +
+  `serializeVasco`. `game.js` importa `dealVasco`/`tallyVascoVotes`/`buildVascoResult`/
+  `serializeVasco` e re-exporta as ações. Depende de `../repo.js` (quadros).
+- **`game.js`: 1125 → 650 linhas.** `PIRAMIDE_SHARE`/`pickWeightedType` ficam no core.
+- **Verificação:** `npm test` 12/12 (incl. e2e + invariantes de anonimato de ambos);
+  prova de código idêntico vs git (Piramide 210=210, Vasco 135=135 linhas, multiset
+  igual); `socket.js` carrega toda a cadeia de imports/re-exports em runtime ✓;
+  `npm run check` (build 515) ✓. **A interface do `socket.js` não mudou** (re-exports).
+- **A seguir (backlog):** Intrigas/Segredos do `game.js`, depois `board.js`/`socket.js`.
+
 ## 2026-08-22 — Modularização do Board.jsx (overlays/mini-jogos extraídos)
 
 Mesma abordagem gradual + verificada. Overlays do Modo Tabuleiro extraídos para
