@@ -19,25 +19,32 @@ sociais, mini-jogos e bebida. Ver documento de design (`FD.pdf`).
 ```
 fd/
 ├── server/   # Express + Socket.io, RoomManager em memória, motor dos jogos
-│   ├── src/game.js     # modo Roda (rondas + vidas)
-│   ├── src/board.js    # modo Tabuleiro (corrida + golos)
+│   ├── src/game.js       # modo Roda (rondas + vidas)
+│   ├── src/board.js      # modo Tabuleiro (corrida + golos)
+│   ├── src/tournament.js # modo Torneio (bracket eliminatório)
 │   ├── src/repo.js     # camada de dados (Prisma OU fallback em código)
 │   ├── src/admin.{js,html}  # dashboard de conteúdo + showroom
 │   ├── src/content/    # prompts.data.js + board.data.js (fonte única, fallback)
 │   ├── prisma/         # schema.prisma + seed.js
 │   └── db/             # scripts SQL standalone (01_schema, 02_seed, 03_board_items)
 └── client/   # Vite + React + Tailwind
-    └── src/pages/{Home,Lobby,Game,Board,Demo}.jsx
+    └── src/pages/{Home,Lobby,Game,Board,Tournament,Demo}.jsx
 ```
 
-## Dois modos de jogo
+## Três modos de jogo
 
 - **🎡 Roda** — roleta escolhe o tipo; rondas com sistema de **vidas** (recusa → bebe;
   0 vidas → eliminado/espectador). Tipos: Boca Calada, Desafio, Isto ou Aquilo,
-  Intrigas, Segredos, Pirâmide, Jogo do Vasco.
+  Intrigas, Segredos, Pirâmide, Jogo do Vasco, **Categoria Relâmpago**, **Mímica**,
+  **Roleta Russa** e **Duelo 1v1**.
 - **🎲 Tabuleiro** — corrida num tabuleiro de **60 casas**; avança-se bebendo golos,
   ganha quem dá a volta. Casas: mini-jogos rápidos, **??** (sorte), **Gamble**,
-  **Blackjack**, **Beer Pinga**, cartas jogáveis (privadas). Sem vidas.
+  **Blackjack**, **Beer Pinga**, **Leilão** (licitação secreta) e cartas jogáveis
+  (privadas), incluindo **maldições** escondidas numa casa. O ?? também traz
+  **Aliança**, **Roleta de Regras** e **Espelho**. Sem vidas.
+- **🏆 Torneio** — bracket de **eliminação direta**: cada duelo 1v1 é resolvido com um
+  dos mini-jogos rápidos da Roda (mesmo banco de prompts). Quem sobra é coroado
+  rei/rainha da noite.
 
 O modo escolhe-se no lobby (só o host).
 
@@ -90,8 +97,9 @@ Dashboard protegido por `ADMIN_PASSWORD` (em `server/.env`), com três separador
 - **📋 Conteúdo** — CRUD dos prompts da roda (por tipo + intensidade leve/picante/
   hardcore/caos; flags buddy/duração).
 - **🎲 Tabuleiro** — CRUD dos **bancos do tabuleiro**: casa **??** (efeitos tipados),
-  **prisão** (consequências), e **cartas** (catálogo). Editar aqui não exige mexer em
-  código; sem estes dados na BD, o jogo usa o fallback de `board.data.js`.
+  **prisão** (consequências), **cartas** (catálogo) e **regras** (Roleta de Regras).
+  Editar aqui não exige mexer em código; sem estes dados na BD, o jogo usa o fallback
+  de `board.data.js`.
 - **🎮 Demos** — showroom que renderiza os mini-jogos reais com dados fictícios (também
   acessível via `?demo=1`), para confirmar o aspeto sem começar um jogo.
 
@@ -102,5 +110,5 @@ Imagem única no **Railway** (`Dockerfile` multi-stage): o Express serve o
 `https://f-d.up.railway.app`.
 
 Variáveis necessárias no Railway: `DATABASE_URL`, `DIRECT_URL`, `ADMIN_PASSWORD`
-(e opcionalmente `CLIENT_ORIGIN`). O deploy inclui **ambos os modos** (roda +
-tabuleiro).
+(e opcionalmente `CLIENT_ORIGIN`). O deploy inclui **os três modos** (roda,
+tabuleiro e torneio).

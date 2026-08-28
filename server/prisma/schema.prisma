@@ -40,6 +40,7 @@ enum BoardItemCategory {
   evento // casa ?? (efeito tipado)
   prisao // consequência de prisão (efeitos combinados)
   carta  // catálogo de cartas jogáveis
+  regra  // Roleta de Regras (title = regra, value = jogadas que dura)
 }
 
 model Room {
@@ -144,7 +145,8 @@ model GameRound {
 
 // Bancos do Modo Tabuleiro (?? / prisão / cartas) — conteúdo editável na /admin.
 // Uma só tabela discriminada por `category`; as colunas usadas variam por banco:
-//   evento → effect + value ; prisao → skipTurns/drink/back/loseCard ; carta → effect (=key).
+//   evento → effect + value ; prisao → skipTurns/drink/back/loseCard ; carta → effect (=key) ;
+//   regra  → title (texto da regra) + value (jogadas que dura).
 model BoardItem {
   id        String            @id @default(uuid()) @db.Uuid
   category  BoardItemCategory

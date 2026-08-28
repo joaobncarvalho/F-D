@@ -14,8 +14,12 @@
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
 DO $$ BEGIN
-  CREATE TYPE "BoardItemCategory" AS ENUM ('evento', 'prisao', 'carta');
+  CREATE TYPE "BoardItemCategory" AS ENUM ('evento', 'prisao', 'carta', 'regra');
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+-- BD criada antes da Roleta de Regras: acrescenta o valor em falta ao enum.
+-- (fora de transação — o ALTER TYPE ... ADD VALUE exige-o.)
+ALTER TYPE "BoardItemCategory" ADD VALUE IF NOT EXISTS 'regra';
 
 CREATE TABLE IF NOT EXISTS "board_items" (
     "id" UUID NOT NULL,
@@ -47,7 +51,10 @@ INSERT INTO board_items (id, category, emoji, title, description, effect, value)
   (gen_random_uuid(), 'evento', '🍺', 'Golada', 'Bebes 3 golos', 'drink', 3),
   (gen_random_uuid(), 'evento', '🎴', 'Carta nova', 'Ganhas uma carta', 'card', NULL),
   (gen_random_uuid(), 'evento', '🚔', 'Preso!', 'Vais direto para a prisão', 'prison', NULL),
-  (gen_random_uuid(), 'evento', '👯', 'Ronda geral', 'Todos os outros bebem 2', 'others_drink', 2)
+  (gen_random_uuid(), 'evento', '👯', 'Ronda geral', 'Todos os outros bebem 2', 'others_drink', 2),
+  (gen_random_uuid(), 'evento', '🤝', 'Aliança', 'Ficas ligado a alguém: quem beber por casa, o outro bebe metade (3 jogadas)', 'alliance', 3),
+  (gen_random_uuid(), 'evento', '📜', 'Roleta de Regras', 'Uma regra para a mesa toda — quem falhar, bebe', 'rule_roulette', NULL),
+  (gen_random_uuid(), 'evento', '🪞', 'Espelho', 'O próximo ?? de quem joga a seguir também te acerta a ti', 'mirror', NULL)
 ON CONFLICT (category, title) DO UPDATE SET
   emoji = EXCLUDED.emoji, description = EXCLUDED.description,
   effect = EXCLUDED.effect, value = EXCLUDED.value, active = true;
@@ -71,10 +78,28 @@ INSERT INTO board_items (id, category, emoji, title, description, effect) VALUES
   (gen_random_uuid(), 'carta', '⏭️', 'Salta-vez', 'Um jogador perde a próxima vez', 'skip'),
   (gen_random_uuid(), 'carta', '🛡️', 'Escudo', 'Bloqueia a próxima carta contra ti', 'shield'),
   (gen_random_uuid(), 'carta', '🍺', 'Ronda', 'Obrigas alguém a beber 3 golos', 'drink3'),
-  (gen_random_uuid(), 'carta', '🎁', 'Roubo', 'Roubas uma carta a alguém', 'steal')
+  (gen_random_uuid(), 'carta', '🎁', 'Roubo', 'Roubas uma carta a alguém', 'steal'),
+  (gen_random_uuid(), 'carta', '☠️', 'Maldição da Golada', 'Escondes numa casa: quem lá parar bebe 4 golos', 'curse_drink'),
+  (gen_random_uuid(), 'carta', '🕳️', 'Maldição do Buraco', 'Escondes numa casa: quem lá parar recua 3 casas', 'curse_back'),
+  (gen_random_uuid(), 'carta', '👻', 'Maldição da Cela', 'Escondes numa casa: quem lá parar vai preso', 'curse_prison')
 ON CONFLICT (category, title) DO UPDATE SET
   emoji = EXCLUDED.emoji, description = EXCLUDED.description,
   effect = EXCLUDED.effect, active = true;
+
+-- ---------- Roleta de Regras (regra) — title = regra, value = jogadas ----------
+INSERT INTO board_items (id, category, emoji, title, value) VALUES
+  (gen_random_uuid(), 'regra', '📜', 'Ninguém pode dizer nomes próprios', 4),
+  (gen_random_uuid(), 'regra', '📜', 'Proibido dizer "sim" e "não"', 4),
+  (gen_random_uuid(), 'regra', '📜', 'Só se fala na terceira pessoa', 3),
+  (gen_random_uuid(), 'regra', '📜', 'Bebe-se sempre com a mão não dominante', 5),
+  (gen_random_uuid(), 'regra', '📜', 'Proibido apontar com o dedo', 4),
+  (gen_random_uuid(), 'regra', '📜', 'Cada frase acaba com "meu capitão"', 3),
+  (gen_random_uuid(), 'regra', '📜', 'Proibido dizer "beber", "copo" ou "golo"', 4),
+  (gen_random_uuid(), 'regra', '📜', 'Quem rir alto, bebe', 3),
+  (gen_random_uuid(), 'regra', '📜', 'Proibido pousar o copo na mesa', 5),
+  (gen_random_uuid(), 'regra', '📜', 'Fala-se sempre a sussurrar', 3)
+ON CONFLICT (category, title) DO UPDATE SET
+  emoji = EXCLUDED.emoji, value = EXCLUDED.value, active = true;
 
 COMMIT;
 

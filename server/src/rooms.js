@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { AppError } from './errors.js';
 import { serializeGame } from './game.js';
 import { serializeBoard } from './board.js';
+import { serializeTournament } from './tournament.js';
 import { sanitizeText } from './util.js';
 
 export { AppError }; // re-exportado para compatibilidade (socket.js importa daqui)
@@ -159,14 +160,14 @@ export class RoomManager {
     return room;
   }
 
-  /** Modo de jogo escolhido pelo host no lobby ('wheel' | 'board'). */
+  /** Modo de jogo escolhido pelo host no lobby ('wheel' | 'board' | 'tournament'). */
   setMode(code, playerId, mode) {
     const room = this.getRoom(code);
     if (!room) throw new AppError('Sala não encontrada.');
     const player = room.players.get(playerId);
     if (!player || !player.isHost) throw new AppError('Só o host pode escolher o modo.');
     if (room.status !== 'lobby') throw new AppError('O jogo já começou.');
-    room.mode = mode === 'board' ? 'board' : 'wheel';
+    room.mode = ['board', 'tournament'].includes(mode) ? mode : 'wheel';
     return room;
   }
 
@@ -250,6 +251,7 @@ export function serializeRoom(room) {
     // Estado de jogo (null enquanto no lobby). Serialização/anonimização em game.js/board.js.
     game: serializeGame(room),
     board: serializeBoard(room),
+    tournament: serializeTournament(room),
   };
 }
 

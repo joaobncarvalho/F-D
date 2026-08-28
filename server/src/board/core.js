@@ -17,9 +17,43 @@ export const MINI_DRINK = 3; // golos se "beber" em vez de fazer o desafio
 // Mecânica das cartas jogáveis (o CATÁLOGO — emoji/nome/desc — vem dos bancos/BD).
 // Só estas keys podem ser distribuídas; uma carta na admin com key desconhecida
 // nunca entra no baralho (defensivo).
-export const KNOWN_CARD_KEYS = ['swap', 'back2', 'prison', 'skip', 'shield', 'drink3', 'steal'];
+export const CURSE_CARD_KEYS = ['curse_drink', 'curse_back', 'curse_prison'];
+export const KNOWN_CARD_KEYS = ['swap', 'back2', 'prison', 'skip', 'shield', 'drink3', 'steal', ...CURSE_CARD_KEYS];
+export const isCurseCard = (key) => CURSE_CARD_KEYS.includes(key);
 
 export const nameOf = (room, id) => room.players.get(id)?.name;
+
+/**
+ * Golos por EFEITO DE CASA (?? , prisão, mini-jogo, ganância, maldição). Passa
+ * pela Aliança: quem estiver ligado ao bebedor bebe metade (arredondada p/ cima).
+ * Os golos de andar (preço do avanço) e das cartas jogadas NÃO passam por aqui —
+ * a aliança é sobre o azar das casas, não sobre escolhas próprias.
+ */
+export function drinkFromSquare(room, playerId, n) {
+  const b = room.board;
+  const me = b.players[playerId];
+  if (!me || n <= 0) return null;
+  me.golos += n;
+  const allyId = me.allianceWith;
+  const ally = allyId ? b.players[allyId] : null;
+  if (!ally || !me.allianceTurnsLeft) return null;
+  const half = Math.ceil(n / 2);
+  ally.golos += half;
+  return { allyId, allyName: nameOf(room, allyId), golos: half };
+}
+
+/** Corta uma aliança nos dois lados (fim do prazo, saída de jogador…). */
+export function breakAlliance(b, playerId) {
+  const me = b.players[playerId];
+  if (!me) return;
+  const other = me.allianceWith ? b.players[me.allianceWith] : null;
+  if (other && other.allianceWith === playerId) {
+    other.allianceWith = null;
+    other.allianceTurnsLeft = 0;
+  }
+  me.allianceWith = null;
+  me.allianceTurnsLeft = 0;
+}
 
 /** Escolha ponderada (pesos ≥1) de 1 item. */
 export function weightedPick(items) {
@@ -76,7 +110,7 @@ export function applyPrison(room, playerId, reason = 'prisão') {
   me.prisonCount += 1;
   const p = weightedPick(b.banks.prison);
   if (p.skipTurns) me.skipTurns += p.skipTurns;
-  if (p.drink) me.golos += p.drink;
+  if (p.drink) drinkFromSquare(room, playerId, p.drink);
   if (p.back) me.pos = Math.max(0, me.pos - p.back);
   if (p.loseCard && me.cards.length) me.cards.shift();
   b.lastEvent = { text: `🚔 ${nm} foi PRESO (${reason}): ${p.note}` };
@@ -88,9 +122,24 @@ export function activeIds(room) {
   return b.order.filter((id) => room.players.get(id)?.connected && b.players[id] && !b.players[id].finished);
 }
 
+// Uma jogada passou: gasta o prazo da aliança de quem jogou e das regras ativas.
+function tickDurations(room) {
+  const b = room.board;
+  const me = b.currentPlayerId ? b.players[b.currentPlayerId] : null;
+  if (me?.allianceTurnsLeft > 0) {
+    me.allianceTurnsLeft -= 1;
+    if (me.allianceTurnsLeft <= 0) breakAlliance(b, b.currentPlayerId);
+  }
+  if (b.activeRules?.length) {
+    for (const r of b.activeRules) r.remaining -= 1;
+    b.activeRules = b.activeRules.filter((r) => r.remaining > 0);
+  }
+}
+
 /** Passa a vez ao próximo ativo, respeitando "salta vez" (prisão). */
 export function advanceBoardTurn(room) {
   const b = room.board;
+  tickDurations(room);
   const order = activeIds(room);
   if (!order.length) {
     b.currentPlayerId = null;

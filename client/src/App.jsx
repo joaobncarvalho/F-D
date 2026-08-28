@@ -8,6 +8,7 @@ import Game from './pages/Game.jsx';
 import Countdown from './components/Countdown.jsx';
 import IntensityReveal from './components/IntensityReveal.jsx';
 import Board from './pages/Board.jsx';
+import Tournament from './pages/Tournament.jsx';
 import ErrorBoundary from './components/ErrorBoundary.jsx';
 
 const SESSION_KEY = 'fd_session';
@@ -44,6 +45,7 @@ export default function App() {
   const [intrigasReason, setIntrigasReason] = useState(null); // { roundId, reason }
   const [piramideHand, setPiramideHand] = useState(null); // { roundId, cards } — PRIVADO
   const [vascoRole, setVascoRole] = useState(null); // { roundId, isImpostor, word } — PRIVADO
+  const [mimicaWord, setMimicaWord] = useState(null); // { roundId, word, mode… } — PRIVADO
   const [boardHand, setBoardHand] = useState(null); // { cards } — mão de cartas do tabuleiro (PRIVADA)
   const [intensityResult, setIntensityResult] = useState(null); // { intensity, randomized, candidates, counts }
   const [muted, setMuted] = useState(sfx.isMuted());
@@ -79,7 +81,9 @@ export default function App() {
       setYouId(you);
       setError(null);
       saveSession({ code: room.code, playerId: you });
-      setScreen(room.status === 'playing' ? 'game' : 'lobby');
+      // Religar a meio: cada modo tem o seu ecrã (senão o Tabuleiro/Torneio caíam no da Roda).
+      const playingScreen = room.mode === 'board' ? 'board' : room.mode === 'tournament' ? 'tournament' : 'game';
+      setScreen(room.status === 'lobby' ? 'lobby' : playingScreen);
       sfx.join();
     }
     function onRoomState({ room }) {
@@ -93,16 +97,20 @@ export default function App() {
       setIntrigasReason(null);
       setPiramideHand(null);
       setVascoRole(null);
+      setMimicaWord(null);
       setBoardHand(null);
       setIntensityResult(intensityResult || null);
-      // Tabuleiro vai direto ao ecrã do jogo; a roda passa pela roleta + countdown.
-      setScreen(mode === 'board' ? 'board' : 'intensity_reveal');
+      // Tabuleiro/Torneio vão direto ao ecrã do jogo; a roda passa pela roleta + countdown.
+      if (mode === 'board') setScreen('board');
+      else if (mode === 'tournament') setScreen('tournament');
+      else setScreen('intensity_reveal');
     }
     function onBackToLobby() {
       setAuthorRoundId(null);
       setIntrigasReason(null);
       setPiramideHand(null);
       setVascoRole(null);
+      setMimicaWord(null);
       setBoardHand(null);
       setScreen('lobby');
     }
@@ -118,8 +126,11 @@ export default function App() {
     function onVascoRole({ roundId, isImpostor, word }) {
       setVascoRole({ roundId, isImpostor, word });
     }
-    function onBoardHand({ cards }) {
-      setBoardHand({ cards: cards || [] });
+    function onMimicaWord(payload) {
+      setMimicaWord(payload);
+    }
+    function onBoardHand({ cards, traps }) {
+      setBoardHand({ cards: cards || [], traps: traps || [] });
     }
     function onError({ message }) {
       setError(message);
@@ -142,6 +153,7 @@ export default function App() {
     socket.on('intrigas_reason', onIntrigasReason);
     socket.on('piramide_hand', onPiramideHand);
     socket.on('vasco_role', onVascoRole);
+    socket.on('mimica_word', onMimicaWord);
     socket.on('board_hand', onBoardHand);
     socket.on('error_msg', onError);
     socket.on('session_invalid', onSessionInvalid);
@@ -156,6 +168,7 @@ export default function App() {
       socket.off('intrigas_reason', onIntrigasReason);
       socket.off('piramide_hand', onPiramideHand);
       socket.off('vasco_role', onVascoRole);
+      socket.off('mimica_word', onMimicaWord);
       socket.off('board_hand', onBoardHand);
       socket.off('error_msg', onError);
       socket.off('session_invalid', onSessionInvalid);
@@ -226,7 +239,19 @@ export default function App() {
   const boardSkip = useCallback(() => socket.emit('board_skip'), []);
   const boardEnd = useCallback(() => socket.emit('board_end'), []);
   const boardKick = useCallback((targetId) => socket.emit('board_kick', { targetId }), []);
-  const boardPlayCard = useCallback((cardId, targetId) => socket.emit('board_play_card', { cardId, targetId }), []);
+  const boardPlayCard = useCallback(
+    (cardId, targetId, squareIndex) => socket.emit('board_play_card', { cardId, targetId, squareIndex }),
+    []
+  );
+  const boardBid = useCallback((amount) => socket.emit('board_bid', { amount }), []);
+  const boardRuleFail = useCallback((ruleId, targetId) => socket.emit('board_rule_fail', { ruleId, targetId }), []);
+  const tournamentNext = useCallback(() => socket.emit('tournament_next'), []);
+  const tournamentAction = useCallback((action) => socket.emit('tournament_action', { action }), []);
+  const tournamentChoose = useCallback((index) => socket.emit('tournament_choose', { index }), []);
+  const tournamentVote = useCallback((duelistId) => socket.emit('tournament_vote', { duelistId }), []);
+  const tournamentContinue = useCallback(() => socket.emit('tournament_continue'), []);
+  const tournamentSkip = useCallback(() => socket.emit('tournament_skip'), []);
+  const tournamentEnd = useCallback(() => socket.emit('tournament_end'), []);
   const addQuestion = useCallback(
     (targetPlayerId, text) => socket.emit('add_question', { targetPlayerId, text }),
     []
@@ -258,6 +283,13 @@ export default function App() {
   const vascoClueDone = useCallback(() => socket.emit('vasco_clue_done'), []);
   const vascoVote = useCallback((suspectId) => socket.emit('vasco_vote', { suspectId }), []);
   const vascoRedeem = useCallback((word) => socket.emit('vasco_redeem', { word }), []);
+  const relampagoStart = useCallback(() => socket.emit('relampago_start'), []);
+  const relampagoResolve = useCallback((survived) => socket.emit('relampago_resolve', { survived }), []);
+  const mimicaStart = useCallback(() => socket.emit('mimica_start'), []);
+  const mimicaResolve = useCallback((guessed) => socket.emit('mimica_resolve', { guessed }), []);
+  const roletaAnswer = useCallback(() => socket.emit('roleta_answer'), []);
+  const roletaPass = useCallback(() => socket.emit('roleta_pass'), []);
+  const dueloResult = useCallback((winnerId) => socket.emit('duelo_result', { winnerId }), []);
   const skipTurn = useCallback(() => socket.emit('skip_turn'), []);
   const endGame = useCallback(() => socket.emit('end_game'), []);
   const resetGame = useCallback(() => socket.emit('reset_game'), []);
@@ -273,6 +305,7 @@ export default function App() {
     setIntrigasReason(null);
     setPiramideHand(null);
     setVascoRole(null);
+    setMimicaWord(null);
     setBoardHand(null);
     setScreen('home');
   }, []);
@@ -323,6 +356,7 @@ export default function App() {
             room={room}
             youId={youId}
             myHand={boardHand?.cards}
+            myTraps={boardHand?.traps}
             onPickPawn={boardPickPawn}
             onRoll={boardRoll}
             onAdvance={boardAdvance}
@@ -332,9 +366,27 @@ export default function App() {
             onBlackjack={boardBlackjack}
             onBeerpong={boardBeerpong}
             onPlayCard={boardPlayCard}
+            onBid={boardBid}
+            onRuleFail={boardRuleFail}
             onSkip={boardSkip}
             onEnd={boardEnd}
             onKick={boardKick}
+            onReset={resetGame}
+            onLeave={leaveRoom}
+          />
+        )}
+        {screen === 'tournament' && (
+          <Tournament
+            key="tournament"
+            room={room}
+            youId={youId}
+            onNext={tournamentNext}
+            onAction={tournamentAction}
+            onChoose={tournamentChoose}
+            onVote={tournamentVote}
+            onContinue={tournamentContinue}
+            onSkip={tournamentSkip}
+            onEnd={tournamentEnd}
             onReset={resetGame}
             onLeave={leaveRoom}
           />
@@ -356,6 +408,7 @@ export default function App() {
             intrigasReason={intrigasReason}
             piramideHand={piramideHand}
             vascoRole={vascoRole}
+            mimicaWord={mimicaWord}
             onAddQuestion={addQuestion}
             onAddSecret={addSecret}
             onBeginPlay={beginPlay}
@@ -378,6 +431,13 @@ export default function App() {
             onVascoClueDone={vascoClueDone}
             onVascoVote={vascoVote}
             onVascoRedeem={vascoRedeem}
+            onRelampagoStart={relampagoStart}
+            onRelampagoResolve={relampagoResolve}
+            onMimicaStart={mimicaStart}
+            onMimicaResolve={mimicaResolve}
+            onRoletaAnswer={roletaAnswer}
+            onRoletaPass={roletaPass}
+            onDueloResult={dueloResult}
             onSkip={skipTurn}
             onEnd={endGame}
             onReset={resetGame}

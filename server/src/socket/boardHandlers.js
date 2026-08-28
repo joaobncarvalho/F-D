@@ -113,10 +113,32 @@ export function registerBoardHandlers(socket, { io, requireRoom, broadcastState,
     }
   });
 
-  socket.on('board_play_card', ({ cardId, targetId } = {}, ack) => {
+  socket.on('board_bid', ({ amount } = {}, ack) => {
     try {
       const room = requireRoom(socket);
-      board.playCard(room, socket.data.playerId, cardId, targetId);
+      board.boardBid(room, socket.data.playerId, amount);
+      broadcastState(io, room.code);
+      if (typeof ack === 'function') ack({ ok: true });
+    } catch (err) {
+      handleError(socket, ack, err);
+    }
+  });
+
+  socket.on('board_rule_fail', ({ ruleId, targetId } = {}, ack) => {
+    try {
+      const room = requireRoom(socket);
+      board.boardRuleFail(room, socket.data.playerId, ruleId, targetId);
+      broadcastState(io, room.code);
+      if (typeof ack === 'function') ack({ ok: true });
+    } catch (err) {
+      handleError(socket, ack, err);
+    }
+  });
+
+  socket.on('board_play_card', ({ cardId, targetId, squareIndex } = {}, ack) => {
+    try {
+      const room = requireRoom(socket);
+      board.playCard(room, socket.data.playerId, cardId, targetId, squareIndex);
       broadcastState(io, room.code);
       if (typeof ack === 'function') ack({ ok: true });
     } catch (err) {

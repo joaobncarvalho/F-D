@@ -7,12 +7,24 @@ import { PromptCard, ChoiceCard, IntrigasCard } from './games/cards.jsx';
 import { GuessingCard } from './games/GuessingCard.jsx';
 import { PiramideCard } from './games/PiramideCard.jsx';
 import { VascoCard } from './games/VascoCard.jsx';
+import { RelampagoCard, MimicaCard, RoletaCard, DueloCard } from './games/quickCards.jsx';
 import { socket } from '../socket.js';
 import { sfx } from '../sfx.js';
 import { confetti, haptic } from '../confetti.js';
 
 // TYPES + CardShell/BuddyBlock/cartas reutilizáveis vivem agora em ./games/*.
-const SPIN_PHASES = ['prompt', 'intrigas', 'guessing', 'piramide', 'vasco', 'choice'];
+const SPIN_PHASES = [
+  'prompt',
+  'intrigas',
+  'guessing',
+  'piramide',
+  'vasco',
+  'choice',
+  'relampago',
+  'mimica',
+  'roleta',
+  'duelo',
+];
 
 // Sugestões para os indecisos na preparação (banco curado — offline, sem custo).
 // Trocável por geração com a API da Anthropic quando houver ANTHROPIC_API_KEY.
@@ -293,6 +305,50 @@ export default function Game(props) {
             onVote={props.onVascoVote}
             onRedeem={props.onVascoRedeem}
             onReveal={props.onReveal}
+            onContinue={props.onContinue}
+          />
+        )}
+        {revealed && g.phase === 'relampago' && (
+          <RelampagoCard
+            key={round.id}
+            round={round}
+            youId={youId}
+            canControl={isHost || isSpinner}
+            onStart={props.onRelampagoStart}
+            onResolve={props.onRelampagoResolve}
+            onContinue={props.onContinue}
+          />
+        )}
+        {revealed && g.phase === 'mimica' && (
+          <MimicaCard
+            key={round.id}
+            round={round}
+            youId={youId}
+            word={props.mimicaWord?.roundId === round.id ? props.mimicaWord : null}
+            canControl={isHost || isSpinner}
+            onStart={props.onMimicaStart}
+            onResolve={props.onMimicaResolve}
+            onContinue={props.onContinue}
+          />
+        )}
+        {revealed && g.phase === 'roleta' && (
+          <RoletaCard
+            key={round.id}
+            round={round}
+            youId={youId}
+            canControl={isHost || isSpinner}
+            onAnswer={props.onRoletaAnswer}
+            onPass={props.onRoletaPass}
+            onContinue={props.onContinue}
+          />
+        )}
+        {revealed && g.phase === 'duelo' && (
+          <DueloCard
+            key={round.id}
+            round={round}
+            youId={youId}
+            canControl={isHost || isSpinner}
+            onResult={props.onDueloResult}
             onContinue={props.onContinue}
           />
         )}
