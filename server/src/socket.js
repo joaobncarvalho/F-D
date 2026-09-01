@@ -34,10 +34,17 @@ const ALLOWED_WHILE_PAUSED = new Set([
  *   chat_message{ ... }             -> nova mensagem de chat
  *   error_msg   { message }         -> erro legível para o utilizador
  */
+/**
+ * Repõe as salas de um reinício anterior. Corre ANTES de o servidor começar a
+ * ouvir (index.js) — um telemóvel a religar não pode chegar antes das salas.
+ */
+export async function restoreRooms() {
+  const n = await snapshot.restore(rooms);
+  snapshot.startAutosave(rooms); // só depois: senão gravava por cima com a memória vazia
+  return n;
+}
+
 export function registerSocketHandlers(io) {
-  // Recupera salas de um reinício anterior e passa a gravar o estado (snapshot.js).
-  snapshot.restore(rooms);
-  snapshot.startAutosave(rooms);
   startAutoResolveSweeper(io);
 
   io.on('connection', (socket) => {

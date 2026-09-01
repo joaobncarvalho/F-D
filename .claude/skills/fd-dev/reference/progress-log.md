@@ -5,6 +5,65 @@
 
 ---
 
+## 2026-09-01 (b) — Snapshot na Postgres + SQL da BD regenerado
+
+Os dois pontos que tinham ficado em aberto na sessão anterior.
+
+### 1. Snapshot deixa de morrer com a máquina
+O retrato das salas só existia em ficheiro — cobria reinícios do processo e do
+container, mas não um deploy que trocasse de máquina (o disco fica para trás).
+
+- `prisma/schema.prisma`: modelo **`RoomSnapshot`** (`code` PK, `data` Json,
+  `saved_at`). Estado efémero, não histórico: uma linha por sala, substituída a
+  cada gravação e apagada quando a sala acaba ou passadas 6h.
+- `snapshot.js` passa a ter **dois destinos**, de propósito: ficheiro a cada 5s
+  (instantâneo, salva o dev e o `--watch`) e BD a cada 15s (mais cara, mas é a
+  única que sobrevive entre máquinas). No arranque a BD manda e o ficheiro entra
+  para as salas que ela não tinha. Gravação profunda também no SIGTERM — que é
+  exatamente o sinal de um redeploy.
+- Falhar a BD (ex.: ainda sem `db push`) **não perde nada**: o ficheiro continua
+  a fazer o trabalho e o jogo nem dá por isso.
+- `repo.prismaClient()` exposto para o snapshot reutilizar a MESMA pool.
+
+**Dois defeitos apanhados pelo smoke de arranque** (e corrigidos):
+- o autosave arrancava *antes* da recuperação — se o timer disparasse primeiro,
+  gravava por cima com a memória ainda vazia. Passou para depois do restore;
+- um `EADDRINUSE` era engolido pelo safety net do `uncaughtException` e ficava um
+  processo vivo sem servir ninguém. Agora morre com exit 1 e log próprio.
+
+### 2. Os SQL da pasta db/ deixam de derivar
+`01_schema.sql` e `02_seed.sql` tinham ficado para trás: enum de intensidade só
+com leve/picante, prompts sem `buddy`/`duration`, seed nos 4 tipos originais.
+
+- **`db/generate.mjs`**: gera-os das fontes de verdade — estrutura de
+  `prisma/schema.prisma` (via `prisma migrate diff`, **offline**, sem tocar em
+  nenhuma BD) e conteúdo de `content/prompts.data.js` (o mesmo banco do seed).
+- O `01_schema.sql` passa a ser **"cria OU atualiza"**: a seguir aos CREATE
+  idempotentes emite `ADD COLUMN IF NOT EXISTS` para cada coluna e
+  `ADD VALUE IF NOT EXISTS` para cada valor de enum — põe em dia uma BD antiga
+  sem apagar nada e sem precisar do Prisma.
+- `02_seed.sql`: **18 tipos, 360 prompts**, com `buddy`/`duration`/`tag`. Ids
+  derivados do texto (determinísticos) + `ON CONFLICT` → idempotente.
+- Scripts novos: `npm run db:sql` (regenera), `npm run db:push`,
+  **`npm run db:sync`** (push + seed, o caminho de uma linha só).
+- `db/README.md` reescrito: caminho com `.env` e caminho pelo SQL editor.
+
+### Verificação
+- `npm test`: **37 → 44**. Novos: `snapshot.test.js` (ficheiro; BD com um Prisma
+  falso que serializa como uma coluna Json a sério; quem ganha quando os dois têm
+  dados; e uma BD sem a tabela não pode partir o arranque) e `db-sql.test.js`
+  (o `02_seed.sql` no disco tem de ser igual ao que o gerador produz — se mexeres
+  no conteúdo e não correres `npm run db:sql`, falha aqui).
+- Smoke real: sala criada e a jogar → servidor morto → servidor novo noutra porta
+  → **sala recuperada**, pela ordem certa (restore → autosave → listen).
+- `prisma validate` ✓ · `npm run check` (44 testes + build) ✓.
+
+### Continua por fazer (precisa de credenciais)
+O `db push`/seed contra a Supabase **não foi corrido**: esta máquina não tem
+`server/.env` (é gitignored e ficou na outra). Fica a um comando:
+`cd server && npm run db:sync` — ou colar `db/01_schema.sql` + `02_seed.sql` no
+SQL editor da Supabase, que não precisa de credenciais locais nenhumas.
+
 ## 2026-09-01 — Pacote pré-playtest: 7 jogos novos + fundações de festa
 
 Sessão grande, a 10 dias do playtest. Três frentes: tapar os buracos que se

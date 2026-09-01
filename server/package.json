@@ -12,6 +12,9 @@
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:seed": "prisma db seed",
+    "db:push": "prisma db push",
+    "db:sync": "prisma db push && prisma db seed",
+    "db:sql": "node db/generate.mjs",
     "db:studio": "prisma studio",
     "db:reset": "prisma migrate reset"
   },

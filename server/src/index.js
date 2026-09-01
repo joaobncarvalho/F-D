@@ -6,7 +6,7 @@ import path from 'node:path';
 import express from 'express';
 import cors from 'cors';
 import { Server } from 'socket.io';
-import { registerSocketHandlers } from './socket.js';
+import { registerSocketHandlers, restoreRooms } from './socket.js';
 import { createAdminRouter } from './admin.js';
 import { log } from './log.js';
 
@@ -56,6 +56,17 @@ if (existsSync(clientDist)) {
   app.get('*', (_req, res) => res.sendFile(path.join(clientDist, 'index.html')));
   log.info('A servir frontend', { dir: clientDist });
 }
+
+// Só se abre a porta depois de as salas do reinício anterior estarem de volta.
+await restoreRooms().catch((err) => log.warn('snapshot: recuperação falhou', { message: err?.message }));
+
+// Falhar a abrir a porta não é um erro recuperável: sem isto, o safety net do
+// uncaughtException engolia o EADDRINUSE e ficava um processo vivo a não servir
+// ninguém (e o deploy dava-se por bom).
+httpServer.on('error', (err) => {
+  log.error('não foi possível abrir a porta', { port: PORT, message: err?.message });
+  process.exit(1);
+});
 
 httpServer.listen(PORT, () => {
   log.info('F&D server a ouvir', { url: `http://localhost:${PORT}`, cors: rawOrigin });

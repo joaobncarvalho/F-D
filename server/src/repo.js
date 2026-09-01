@@ -25,6 +25,15 @@ async function client() {
   return prismaPromise;
 }
 
+/**
+ * Cliente Prisma partilhado (ou null se não houver BD). Exposto para módulos que
+ * precisam da MESMA ligação — nomeadamente o snapshot.js, que não deve abrir uma
+ * segunda pool só para gravar o estado das salas.
+ */
+export async function prismaClient() {
+  return client();
+}
+
 /** Prisma obrigatório (para a admin). Lança se não houver BD. */
 async function requirePrisma() {
   const prisma = await client();

@@ -170,6 +170,25 @@ model BoardItem {
   @@map("board_items")
 }
 
+// Retrato do estado QUENTE de uma sala (server/src/snapshot.js).
+//
+// O estado de jogo vive em memória, de propósito — isto é só a rede de segurança
+// para o jogo sobreviver a um reinício do servidor a meio da noite. Guardado na
+// BD (e não só em ficheiro) porque o disco do container não sobrevive a um
+// deploy que troque de máquina.
+//
+// É estado efémero, não histórico: uma linha por sala, substituída a cada
+// gravação e apagada quando a sala acaba. `data` é o payload completo da sala
+// (jogadores + modo a decorrer), sem nada que não estivesse já em memória.
+model RoomSnapshot {
+  code    String   @id // código curto da sala (4 chars)
+  data    Json // sala serializada (ver snapshot.js: toPlain)
+  savedAt DateTime @default(now()) @updatedAt @map("saved_at")
+
+  @@index([savedAt]) // limpeza dos retratos velhos
+  @@map("room_snapshots")
+}
+
 model LifeEvent {
   id        String        @id @default(uuid()) @db.Uuid
   roomId    String        @map("room_id") @db.Uuid

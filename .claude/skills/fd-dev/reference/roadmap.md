@@ -117,7 +117,15 @@ Legenda: ✅ feito · 🚧 em curso · ⬜ por fazer · 🔗 ponto de integraç�
       · modo TV (`/?tv=CODIGO`) · legibilidade de bar · música com ducking
       · cartão de resultados partilhável · ecrã de regras · voltar a jogar
 - [ ] Playtest real com amigos → correção de bugs (o único P0 restante)
-- [ ] 🔗 `prisma db push` + `db seed` na Supabase (coluna `tag` + 128 prompts novos)
+- [x] **Snapshot das salas na Postgres** (2026-09-01b) — modelo `RoomSnapshot`;
+      ficheiro a cada 5s + BD a cada 15s e no SIGTERM. Sobrevive a um deploy que
+      troque de máquina, que era o buraco que restava.
+- [x] **SQL da pasta `db/` regenerado** (2026-09-01b) — `db/generate.mjs` gera
+      `01_schema.sql` (cria OU atualiza) e `02_seed.sql` (18 tipos, 360 prompts)
+      das fontes de verdade. `npm run db:sql` · `npm run db:sync`.
+- [ ] 🔗 **Correr na Supabase**: `cd server && npm run db:sync` (ou colar
+      `db/01_schema.sql` + `db/02_seed.sql` no SQL editor). **Falta só isto** —
+      precisa do `server/.env`, que não está nesta máquina.
 - [x] Deploy no ar (Railway, imagem única) — inclui **ambos os modos**. Falta só o
       `db push`+seed da tabela `board_items` na Supabase p/ ativar a edição na admin.
 - [x] **Bancos do tabuleiro em dados/BD** (melhoria): ?? / prisão / cartas passam a
