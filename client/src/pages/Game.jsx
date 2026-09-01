@@ -418,6 +418,7 @@ export default function Game(props) {
             youId={youId}
             canControl={isHost || isSpinner}
             onResult={props.onDueloResult}
+            onCall={props.onDueloCall}
             onContinue={props.onContinue}
           />
         )}

@@ -142,8 +142,28 @@ const SCENARIOS = [
     render: () => <RoletaCard round={{ id: 'r3', gameTypeKey: 'roleta_russa', currentPlayerId: 'me', currentPlayerName: 'Tu', question: 'Qual foi o encontro mais desastroso da tua vida?', passes: 1, tab: 1, nextCost: 2, maxPasses: 3, substate: 'asking', result: null }} youId="me" canControl onAnswer={noop} onPass={noop} onContinue={noop} />,
   },
   {
+    id: 'w-moeda', kind: 'wheel', group: 'Roda', label: '🪙 Cara ou Coroa',
+    // A moeda relança-se sempre que se abre a demo — dá para ver a animação sem
+    // ter de montar um duelo a sério.
+    render: () => {
+      const face = Math.random() < 0.5 ? 'cara' : 'coroa';
+      return (
+        <DueloCard
+          round={{
+            id: 'r5-' + face + Math.random(), gameTypeKey: 'duelo',
+            currentPlayerId: 'me', currentPlayerName: 'Tu', opponentId: 'p2', opponentName: 'Bea',
+            duel: { key: 'cara_coroa', emoji: '🪙', label: 'Cara ou Coroa', desc: 'A moeda é lançada aqui na app.' },
+            substate: 'result', coin: { call: 'cara', face },
+            result: { winnerId: face === 'cara' ? 'me' : 'p2', winnerName: face === 'cara' ? 'Tu' : 'Bea', loserName: face === 'cara' ? 'Bea' : 'Tu', golos: 3 },
+          }}
+          youId="me" canControl onResult={noop} onCall={noop} onContinue={noop}
+        />
+      );
+    },
+  },
+  {
     id: 'w-duelo', kind: 'wheel', group: 'Roda', label: '⚔️ Duelo 1v1',
-    render: () => <DueloCard round={{ id: 'r4', gameTypeKey: 'duelo', currentPlayerId: 'me', currentPlayerName: 'Tu', opponentId: 'p2', opponentName: 'Bea', duel: { key: 'par_impar', emoji: '✌️', label: 'Par ou Ímpar', desc: 'Contagem até três e cada um mostra os dedos de uma mão.' }, substate: 'duelling', result: null }} youId="me" canControl onResult={noop} onContinue={noop} />,
+    render: () => <DueloCard round={{ id: 'r4', gameTypeKey: 'duelo', currentPlayerId: 'me', currentPlayerName: 'Tu', opponentId: 'p2', opponentName: 'Bea', duel: { key: 'par_impar', emoji: '✌️', label: 'Par ou Ímpar', desc: 'Contagem até três e cada um mostra os dedos de uma mão.' }, substate: 'duelling', result: null }} youId="me" canControl onResult={noop} onCall={noop} onContinue={noop} />,
   },
 ];
 

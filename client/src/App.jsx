@@ -306,6 +306,8 @@ export default function App() {
   const tournamentAction = useCallback((action) => socket.emit('tournament_action', { action }), []);
   const tournamentChoose = useCallback((index) => socket.emit('tournament_choose', { index }), []);
   const tournamentVote = useCallback((duelistId) => socket.emit('tournament_vote', { duelistId }), []);
+  const tournamentBet = useCallback((duelistId) => socket.emit('tournament_bet', { duelistId }), []);
+  const tournamentCall = useCallback((call) => socket.emit('tournament_call', { call }), []);
   const tournamentContinue = useCallback(() => socket.emit('tournament_continue'), []);
   const tournamentSkip = useCallback(() => socket.emit('tournament_skip'), []);
   const tournamentEnd = useCallback(() => socket.emit('tournament_end'), []);
@@ -347,6 +349,7 @@ export default function App() {
   const roletaAnswer = useCallback(() => socket.emit('roleta_answer'), []);
   const roletaPass = useCallback(() => socket.emit('roleta_pass'), []);
   const dueloResult = useCallback((winnerId) => socket.emit('duelo_result', { winnerId }), []);
+  const dueloCall = useCallback((call) => socket.emit('duelo_call', { call }), []);
   const skipTurn = useCallback(() => socket.emit('skip_turn'), []);
   const endGame = useCallback(() => socket.emit('end_game'), []);
   const resetGame = useCallback(() => socket.emit('reset_game'), []);
@@ -502,6 +505,8 @@ export default function App() {
             onChoose={tournamentChoose}
             onVote={tournamentVote}
             onTap={tournamentTap}
+            onBet={tournamentBet}
+            onCall={tournamentCall}
             onContinue={tournamentContinue}
             onSkip={tournamentSkip}
             onEnd={tournamentEnd}
@@ -566,6 +571,7 @@ export default function App() {
             onRoletaAnswer={roletaAnswer}
             onRoletaPass={roletaPass}
             onDueloResult={dueloResult}
+            onDueloCall={dueloCall}
             onSkip={skipTurn}
             onEnd={endGame}
             onReset={resetGame}

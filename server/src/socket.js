@@ -569,6 +569,17 @@ export function registerSocketHandlers(io) {
       }
     });
 
+    socket.on('duelo_call', ({ call } = {}, ack) => {
+      try {
+        const room = requireRoom(socket);
+        game.dueloCall(room, socket.data.playerId, call);
+        broadcastState(io, room.code);
+        if (typeof ack === 'function') ack({ ok: true });
+      } catch (err) {
+        handleError(socket, ack, err);
+      }
+    });
+
     socket.on('duelo_result', ({ winnerId } = {}, ack) => {
       try {
         const room = requireRoom(socket);

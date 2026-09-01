@@ -40,7 +40,7 @@ export { castGuess } from './game/segredos.js';
 export { relampagoStart, relampagoResolve } from './game/relampago.js';
 export { mimicaWord, mimicaStart, mimicaResolve } from './game/mimica.js';
 export { roletaAnswer, roletaPass } from './game/roleta.js';
-export { dueloResult } from './game/duelo.js';
+export { dueloResult, dueloCall } from './game/duelo.js';
 export { grupoAnswer, grupoForceReveal, revealGrupo, grupoVoters } from './game/grupo.js';
 export { cascataStart, cascataStop } from './game/cascata.js';
 export { desenhoStart, desenhoGuess, desenhoGiveUp, desenhoWord, finishDesenho } from './game/desenho.js';

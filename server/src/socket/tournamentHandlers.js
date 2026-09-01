@@ -4,6 +4,30 @@
 import * as tournament from '../tournament.js';
 
 export function registerTournamentHandlers(socket, { io, requireRoom, broadcastState, handleError }) {
+  // Aposta de um espetador (inclui quem já foi eliminado — é o que os mantém no jogo).
+  socket.on('tournament_bet', ({ duelistId } = {}, ack) => {
+    try {
+      const room = requireRoom(socket);
+      tournament.tournamentBet(room, socket.data.playerId, duelistId);
+      broadcastState(io, room.code);
+      if (typeof ack === 'function') ack({ ok: true });
+    } catch (err) {
+      handleError(socket, ack, err);
+    }
+  });
+
+  // Cara ou Coroa: a moeda é lançada no servidor e animada no cliente.
+  socket.on('tournament_call', ({ call } = {}, ack) => {
+    try {
+      const room = requireRoom(socket);
+      tournament.tournamentCall(room, socket.data.playerId, call);
+      broadcastState(io, room.code);
+      if (typeof ack === 'function') ack({ ok: true });
+    } catch (err) {
+      handleError(socket, ack, err);
+    }
+  });
+
   // Duelo de Reação: cada duelista carrega assim que o ecrã acender.
   socket.on('tournament_tap', (_payload, ack) => {
     try {

@@ -7,25 +7,59 @@
 // Três bancos, todos editáveis na /admin (tabela board_items, discriminada por
 // `category`). Aqui vivem os valores por omissão (usados sem BD / se a BD falhar).
 //
-//   • evento (casa ??): { emoji, title, desc, effect, value }
-//       effect ∈ advance | back | drink | card | prison | others_drink
-//       value  = magnitude (casas/golos); ignorado em card/prison.
+//   • evento (casa ??): { emoji, title, desc, effect, value, weight }
+//       effect ∈ advance | back | drink | all_drink | others_drink | leader_drink |
+//                drink_per_card | last_advance | card | steal_card | trade_cards |
+//                shield | swap_leader | skip | prison | alliance | rule_roulette | mirror
+//       value  = magnitude (casas/golos); ignorado nos efeitos sem grandeza.
+//       weight = probabilidade relativa dentro do banco (1 = normal).
 //   • prisao: { note, skipTurns, drink, back, loseCard }  (efeitos combinados)
 //   • carta (catálogo jogável): { key, emoji, name, desc }
 //       A MECÂNICA de cada carta vive em board.js (keyed por `key`); aqui está só
 //       o catálogo (quais existem + aspeto). Desativar uma carta tira-a do baralho.
 //   • regra (Roleta de Regras): { text, turns }  (na BD: title=texto, value=jogadas)
 
+// A casa ?? mostra TRÊS cartas de cada vez. Com um banco de 9 via-se um terço do
+// baralho a cada visita e ao fim de meia hora já se sabia tudo de cor — daí este
+// banco maior e com pesos.
+//
+// `weight` é a probabilidade relativa dentro do banco (1 = normal). Os efeitos
+// dramáticos levam peso baixo para continuarem a ser acontecimentos; os pequenos
+// levam peso alto porque são o pano de fundo.
 export const BOARD_EVENTS = [
-  { emoji: '🚀', title: 'Sorte!', desc: 'Avanças 2 casas', effect: 'advance', value: 2 },
-  { emoji: '💨', title: 'Azar', desc: 'Recuas 2 casas', effect: 'back', value: 2 },
-  { emoji: '🍺', title: 'Golada', desc: 'Bebes 3 golos', effect: 'drink', value: 3 },
-  { emoji: '🎴', title: 'Carta nova', desc: 'Ganhas uma carta', effect: 'card', value: null },
-  { emoji: '🚔', title: 'Preso!', desc: 'Vais direto para a prisão', effect: 'prison', value: null },
-  { emoji: '👯', title: 'Ronda geral', desc: 'Todos os outros bebem 2', effect: 'others_drink', value: 2 },
-  { emoji: '🤝', title: 'Aliança', desc: 'Ficas ligado a alguém: quem beber por casa, o outro bebe metade (3 jogadas)', effect: 'alliance', value: 3 },
-  { emoji: '📜', title: 'Roleta de Regras', desc: 'Uma regra para a mesa toda — quem falhar, bebe', effect: 'rule_roulette', value: null },
-  { emoji: '🪞', title: 'Espelho', desc: 'O próximo ?? de quem joga a seguir também te acerta a ti', effect: 'mirror', value: null },
+  // ---- Movimento (o pão-nosso da corrida) ----
+  { emoji: '🚀', title: 'Sorte!', desc: 'Avanças 2 casas', effect: 'advance', value: 2, weight: 3 },
+  { emoji: '🏃', title: 'Atalho', desc: 'Avanças 1 casa', effect: 'advance', value: 1, weight: 3 },
+  { emoji: '🌟', title: 'Noite inspirada', desc: 'Avanças 4 casas', effect: 'advance', value: 4, weight: 1 },
+  { emoji: '💨', title: 'Azar', desc: 'Recuas 2 casas', effect: 'back', value: 2, weight: 3 },
+  { emoji: '🍌', title: 'Casca de banana', desc: 'Recuas 1 casa', effect: 'back', value: 1, weight: 3 },
+  { emoji: '🕳️', title: 'Buraco', desc: 'Recuas 4 casas', effect: 'back', value: 4, weight: 1 },
+  { emoji: '🐢', title: 'Último a rir', desc: 'Se vais em último, avanças 3 — senão bebes 2', effect: 'last_advance', value: 3, weight: 2 },
+
+  // ---- Bebida (a moeda do jogo) ----
+  { emoji: '🍺', title: 'Golada', desc: 'Bebes 3 golos', effect: 'drink', value: 3, weight: 3 },
+  { emoji: '🥤', title: 'Golinho', desc: 'Bebes 1 golo', effect: 'drink', value: 1, weight: 3 },
+  { emoji: '🥴', title: 'Fundo do copo', desc: 'Bebes 5 golos', effect: 'drink', value: 5, weight: 1 },
+  { emoji: '👯', title: 'Ronda geral', desc: 'Todos os outros bebem 2', effect: 'others_drink', value: 2, weight: 2 },
+  { emoji: '🍻', title: 'Saúde!', desc: 'TODA a mesa bebe 2 — tu incluído', effect: 'all_drink', value: 2, weight: 2 },
+  { emoji: '👑', title: 'Impostos', desc: 'Quem vai à frente bebe 3', effect: 'leader_drink', value: 3, weight: 2 },
+  { emoji: '🎴', title: 'Conta a mão', desc: 'Bebes 1 golo por cada carta que tens', effect: 'drink_per_card', value: 1, weight: 2 },
+
+  // ---- Cartas e inventário ----
+  { emoji: '🎁', title: 'Carta nova', desc: 'Ganhas uma carta', effect: 'card', value: null, weight: 3 },
+  { emoji: '🪝', title: 'Carteirista', desc: 'Roubas uma carta a alguém ao acaso', effect: 'steal_card', value: null, weight: 2 },
+  { emoji: '🔄', title: 'Feira da ladra', desc: 'Trocas a tua mão com a de outro jogador', effect: 'trade_cards', value: null, weight: 1 },
+  { emoji: '🛡️', title: 'Imunidade', desc: 'Ficas com escudo: bloqueia a próxima carta contra ti', effect: 'shield', value: null, weight: 2 },
+
+  // ---- Posição e vez ----
+  { emoji: '🔀', title: 'Golpe de estado', desc: 'Trocas de casa com quem vai à frente', effect: 'swap_leader', value: null, weight: 1 },
+  { emoji: '😴', title: 'Adormeceste', desc: 'Perdes a próxima vez', effect: 'skip', value: 1, weight: 2 },
+  { emoji: '🚔', title: 'Preso!', desc: 'Vais direto para a prisão', effect: 'prison', value: null, weight: 1 },
+
+  // ---- Efeitos com duração (os que mudam a mesa) ----
+  { emoji: '🤝', title: 'Aliança', desc: 'Ficas ligado a alguém: quem beber por casa, o outro bebe metade (3 jogadas)', effect: 'alliance', value: 3, weight: 2 },
+  { emoji: '📜', title: 'Roleta de Regras', desc: 'Uma regra para a mesa toda — quem falhar, bebe', effect: 'rule_roulette', value: null, weight: 3 },
+  { emoji: '🪞', title: 'Espelho', desc: 'O próximo ?? de quem joga a seguir também te acerta a ti', effect: 'mirror', value: null, weight: 2 },
 ];
 
 export const BOARD_PRISON = [
@@ -71,7 +105,7 @@ export const BOARD_RULES = [
 export function boardItemsForSeed() {
   const rows = [];
   for (const e of BOARD_EVENTS)
-    rows.push({ category: 'evento', emoji: e.emoji, title: e.title, desc: e.desc, effect: e.effect, value: e.value ?? null, skipTurns: 0, drink: 0, back: 0, loseCard: false });
+    rows.push({ category: 'evento', emoji: e.emoji, title: e.title, desc: e.desc, effect: e.effect, value: e.value ?? null, skipTurns: 0, drink: 0, back: 0, loseCard: false, weight: e.weight ?? 1 });
   for (const p of BOARD_PRISON)
     rows.push({ category: 'prisao', emoji: '🚔', title: p.note, desc: '', effect: null, value: null, skipTurns: p.skipTurns, drink: p.drink, back: p.back, loseCard: p.loseCard });
   for (const c of BOARD_CARDS)

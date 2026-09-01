@@ -24,7 +24,9 @@ import { createReaction, tapReaction, finishReaction, reactionRanking, serialize
 
 // A Reação é o duelo mais puro que há: dois dedos, um GO, um vencedor. Não usa
 // conteúdo nenhum, por isso nunca repete e não depende do banco de prompts.
-const DUEL_TYPES = ['boca_calada', 'desafio', 'isto_ou_aquilo', 'reacao'];
+const DUEL_TYPES = ['boca_calada', 'desafio', 'isto_ou_aquilo', 'reacao', 'cara_coroa'];
+const APOSTA_GOLOS = 2; // quem aposta no perdedor bebe
+const FINAL_BEST_OF = 3; // a final é à melhor de 3 — tem de custar a ganhar
 const REFUSE_GOLOS = 3; // quem recusa (e cai) bebe
 const TIEBREAK_GOLOS = 2; // ambos fizeram o mesmo → os dois bebem antes do sorteio
 
@@ -47,12 +49,17 @@ function buildRound(ids) {
   const pool = [...ids];
   // Número ímpar → o último fica com bye (passa automaticamente).
   const bye = pool.length % 2 === 1 ? pool.pop() : null;
+  // Sobram dois → é a final, e a final joga-se à melhor de 3.
+  const bestOf = ids.length === 2 ? FINAL_BEST_OF : 1;
   for (let i = 0; i < pool.length; i += 2) {
-    matches.push({ id: randomUUID(), aId: pool[i], bId: pool[i + 1], winnerId: null, bye: false });
+    matches.push({ id: randomUUID(), aId: pool[i], bId: pool[i + 1], winnerId: null, bye: false, bestOf, wins: {} });
   }
-  if (bye) matches.push({ id: randomUUID(), aId: bye, bId: null, winnerId: bye, bye: true });
+  if (bye) matches.push({ id: randomUUID(), aId: bye, bId: null, winnerId: bye, bye: true, bestOf: 1, wins: {} });
   return matches;
 }
+
+/** Vitórias precisas para fechar um encontro (1 nos normais, 2 na final). */
+const precisaDe = (match) => Math.ceil((match?.bestOf || 1) / 2);
 
 export function initTournament(room, { intensity = 'leve' } = {}) {
   resetBags(room); // saco de prompts limpo (anti-repetição)
@@ -137,14 +144,19 @@ async function openDuel(room, t, match) {
     aName: nameOf(room, match.aId),
     bId: match.bId,
     bName: nameOf(room, match.bId),
-    substate: key === 'isto_ou_aquilo' ? 'choosing' : key === 'reacao' ? 'racing' : 'daring', // daring|choosing|racing → judging → result
+    substate: key === 'isto_ou_aquilo' ? 'choosing' : key === 'reacao' ? 'racing' : 'daring', // daring|choosing|racing|calling → judging → result
     actions: {}, // playerId -> 'accept'|'refuse' (daring) ou 0|1 (choosing)
     votes: {}, // espetador -> duelista (só no isto_ou_aquilo)
+    bets: {}, // espetador -> duelista em quem apostou (todos os duelos)
     result: null,
   };
   if (key === 'isto_ou_aquilo') {
     const parts = String(prompt?.text || '||').split('||');
     duel.options = [(parts[0] || '—').trim(), (parts[1] || '—').trim()];
+  } else if (key === 'cara_coroa') {
+    duel.substate = 'calling'; // a moeda é lançada na app (ver tournamentCall)
+    duel.coin = null;
+    duel.text = 'Cara ou coroa: quem foi sorteado escolhe a face. Se sair a outra, está fora.';
   } else if (key === 'reacao') {
     duel.reaction = createReaction([match.aId, match.bId]);
     duel.text = 'Assim que o ecrã acender: CARREGA! Quem carregar antes, perde.';
@@ -163,26 +175,100 @@ function spectators(room, t) {
   return [...room.players.values()].filter((p) => p.connected && p.id !== d.aId && p.id !== d.bId);
 }
 
-/** Fecha o duelo: aplica o vencedor ao quadro e elimina o perdedor. */
+/**
+ * Aposta de um espetador em quem vai ganhar o duelo. Existe para o torneio deixar
+ * de ser "metade da mesa a ver": quem já foi eliminado continua a jogar (e a
+ * beber) em todos os duelos até ao fim.
+ */
+export function tournamentBet(room, playerId, duelistId) {
+  const t = requireTournament(room, ['duel']);
+  const d = t.duel;
+  if (d.substate === 'result') throw new AppError('Este duelo já acabou.');
+  if ([d.aId, d.bId].includes(playerId)) throw new AppError('Os duelistas não apostam.');
+  if (!room.players.get(playerId)) throw new AppError('Jogador inválido.');
+  if (![d.aId, d.bId].includes(duelistId)) throw new AppError('Aposta num dos duelistas.');
+  if (d.bets[playerId]) throw new AppError('Já apostaste.');
+  d.bets[playerId] = duelistId;
+  return t;
+}
+
+/** Quem apostou no perdedor bebe; quem acertou fica com mais um acerto no placar. */
+function resolveBets(room, t, winnerId) {
+  const d = t.duel;
+  const certos = [];
+  const errados = [];
+  for (const [betterId, escolha] of Object.entries(d.bets)) {
+    if (escolha === winnerId) {
+      statsFor(t, betterId).betsWon = (statsFor(t, betterId).betsWon || 0) + 1;
+      certos.push({ id: betterId, name: nameOf(room, betterId) });
+    } else {
+      drink(t, betterId, APOSTA_GOLOS);
+      errados.push({ id: betterId, name: nameOf(room, betterId) });
+    }
+  }
+  return { certos, errados, golos: APOSTA_GOLOS };
+}
+
+/**
+ * Fecha um duelo. Nas rondas normais elimina logo o perdedor; na FINAL (à melhor
+ * de 3) só conta mais uma vitória — a série continua até alguém chegar a 2.
+ */
 function finishDuel(room, t, winnerId, how) {
   const d = t.duel;
   const loserId = winnerId === d.aId ? d.bId : d.aId;
   const match = currentRound(t).find((m) => m.id === d.matchId);
-  if (match) match.winnerId = winnerId;
-  statsFor(t, winnerId).wins += 1;
-  t.eliminated.push({ id: loserId, name: nameOf(room, loserId), roundIdx: t.roundIdx });
+  const apostas = resolveBets(room, t, winnerId);
+
   d.result = {
     winnerId,
     winnerName: nameOf(room, winnerId),
     loserId,
     loserName: nameOf(room, loserId),
-    how, // 'recusou' | 'sorteio' | 'votacao'
+    how, // 'recusou' | 'sorteio' | 'votacao' | 'reflexos' | 'moeda'
     actions: d.actions,
+    bets: d.bets,
+    apostas,
   };
   d.substate = 'result';
+
+  if (match) {
+    match.wins ||= {};
+    match.wins[winnerId] = (match.wins[winnerId] || 0) + 1;
+    const precisa = precisaDe(match);
+    d.result.series = { need: precisa, wins: { ...match.wins }, bestOf: match.bestOf || 1 };
+    if ((match.wins[winnerId] || 0) < precisa) {
+      // Série a meio: ninguém sai ainda, joga-se outra ronda deste encontro.
+      d.result.seriesOngoing = true;
+      t.lastResult = { ...d.result, gameTypeKey: d.gameTypeKey };
+      pushFeed(room, '🥊', `${d.result.winnerName} ganha ${match.wins[winnerId]}-${match.wins[loserId] || 0} — a final continua!`);
+      return d;
+    }
+    match.winnerId = winnerId;
+  }
+
+  statsFor(t, winnerId).wins += 1;
+  t.eliminated.push({ id: loserId, name: nameOf(room, loserId), roundIdx: t.roundIdx });
   t.lastResult = { ...d.result, gameTypeKey: d.gameTypeKey };
   pushFeed(room, '⚔️', `${d.result.winnerName} eliminou ${d.result.loserName} (${how})`);
+  if (apostas.errados.length) {
+    pushFeed(room, '🎲', `Apostaram mal: ${apostas.errados.map((x) => x.name).join(', ')} bebem ${APOSTA_GOLOS}`);
+  }
   return d;
+}
+
+/** Cara ou Coroa do torneio: o duelista sorteado escolhe a face; a app lança. */
+export function tournamentCall(room, playerId, call) {
+  const t = requireTournament(room, ['duel']);
+  const d = t.duel;
+  if (d.substate !== 'calling') throw new AppError('Não é altura de escolher.');
+  if (playerId !== d.aId) throw new AppError('Escolhe quem foi sorteado para pedir.');
+  if (!['cara', 'coroa'].includes(call)) throw new AppError('Escolhe cara ou coroa.');
+  const face = Math.random() < 0.5 ? 'cara' : 'coroa';
+  const winnerId = face === call ? d.aId : d.bId;
+  d.coin = { call, face, callerId: d.aId };
+  drink(t, winnerId === d.aId ? d.bId : d.aId, REFUSE_GOLOS);
+  finishDuel(room, t, winnerId, 'moeda');
+  return t;
 }
 
 /** Boca Calada / Desafio: cada duelista aceita ou recusa. */
@@ -288,6 +374,11 @@ export function tournamentContinue(room, playerId) {
   const p = room.players.get(playerId);
   if (!p || (!p.isHost && ![d.aId, d.bId].includes(playerId)))
     throw new AppError('Só o host ou os duelistas podem continuar.');
+  // Final a meio da série → reabre o MESMO encontro, com um duelo novo.
+  if (d.result?.seriesOngoing) {
+    const match = currentRound(t).find((m) => m.id === d.matchId);
+    if (match) return openDuel(room, t, match).then(() => t);
+  }
   t.duel = null;
   t.phase = 'bracket';
   return t;
@@ -311,7 +402,9 @@ export function tournamentSkip(room, hostId) {
 export async function tournamentAutoResolve(room) {
   const t = room.tournament;
   if (!t) return null;
-  if (t.phase === 'duel' && t.duel?.substate === 'racing') {
+  if (t.phase === 'duel' && t.duel?.substate === 'calling') {
+    tournamentCall(room, t.duel.aId, Math.random() < 0.5 ? 'cara' : 'coroa');
+  } else if (t.phase === 'duel' && t.duel?.substate === 'racing') {
     resolveTournamentReaction(room, t); // a corrida decide-se pelos toques que houve
   } else if (t.phase === 'duel' && t.duel && t.duel.substate !== 'result') {
     finishDuel(room, t, Math.random() < 0.5 ? t.duel.aId : t.duel.bId, 'sorteio');
@@ -369,6 +462,10 @@ function serializeDuel(room, t) {
     actions: revealed ? d.actions : null,
     voters: Object.keys(d.votes),
     reaction, // só no duelo de Reação: instante do GO + quem já carregou
+    coin: d.coin || null, // só no Cara ou Coroa: face que saiu (o cliente anima)
+    // As apostas são SEGREDO até ao resultado — senão apostava-se todos no mesmo.
+    betters: Object.keys(d.bets),
+    bets: revealed ? d.bets : null,
     result: d.result,
   };
 }
@@ -388,6 +485,8 @@ export function serializeTournament(room) {
         b: label(m.bId),
         winnerId: m.winnerId,
         bye: m.bye,
+        bestOf: m.bestOf || 1,
+        wins: m.wins || {},
       }))
     ),
     eliminated: t.eliminated,

@@ -35,6 +35,20 @@ export function openEvento(room, playerId) {
   b.pending = { kind: 'evento', playerId, cards: chosen };
 }
 
+/** Quem vai à frente na corrida (excluindo o próprio). Null se estiver sozinho. */
+function leaderId(room, exceptId) {
+  const b = room.board;
+  const outros = activeIds(room).filter((id) => id !== exceptId);
+  if (!outros.length) return null;
+  return outros.reduce((best, id) => (b.players[id].pos > b.players[best].pos ? id : best), outros[0]);
+}
+
+/** Um jogador ativo ao acaso, tirando o próprio. */
+function randomOther(room, exceptId) {
+  const outros = activeIds(room).filter((id) => id !== exceptId);
+  return outros.length ? outros[Math.floor(Math.random() * outros.length)] : null;
+}
+
 /** Jogador ativo a seguir a `playerId` na ordem (o "da direita" à mesa). */
 function nextInOrder(room, playerId) {
   const order = activeIds(room);
@@ -104,6 +118,69 @@ function applyEventoEffect(room, playerId, ev) {
     case 'prison':
       applyPrison(room, playerId, 'sorte tramada'); // escreve o lastEvent detalhado
       return b.lastEvent.text;
+
+    // ----- Efeitos acrescentados depois do 1.º playtest (o banco era pequeno
+    // de mais: com 3 cartas por casa, via-se o baralho todo em meia hora) -----
+
+    case 'all_drink': {
+      for (const id of Object.keys(b.players)) drinkFromSquare(room, id, ev.value || 0);
+      return `🍻 SAÚDE! Toda a mesa bebe ${ev.value} golos — ${nm} incluído.`;
+    }
+    case 'leader_drink': {
+      const lider = leaderId(room, null);
+      if (!lider) return `👑 Não há ninguém à frente — safaram-se.`;
+      drinkFromSquare(room, lider, ev.value || 0);
+      return `👑 IMPOSTOS: ${nameOf(room, lider)} vai à frente e bebe ${ev.value} golos!`;
+    }
+    case 'drink_per_card': {
+      const n = me.cards.length * (ev.value || 1);
+      if (!n) return `🎴 ${nm} não tinha cartas nenhumas — safou-se.`;
+      drinkFromSquare(room, playerId, n);
+      return `🎴 ${nm} tem ${me.cards.length} carta(s) — bebe ${n} golos!`;
+    }
+    case 'last_advance': {
+      const ultimo = activeIds(room).every((id) => id === playerId || b.players[id].pos >= me.pos);
+      if (!ultimo) {
+        drinkFromSquare(room, playerId, 2);
+        return `🐢 ${nm} não vai em último — bebe 2 golos.`;
+      }
+      me.pos = Math.min(b.size, me.pos + (ev.value || 0));
+      checkWin(room, playerId);
+      return `🐢 ${nm} ia em último e avança ${ev.value} casas — quem ri por último…`;
+    }
+    case 'steal_card': {
+      const alvos = activeIds(room).filter((id) => id !== playerId && b.players[id].cards.length);
+      if (!alvos.length) return `🪝 ${nm} tentou roubar, mas ninguém tinha cartas.`;
+      const vitima = alvos[Math.floor(Math.random() * alvos.length)];
+      const carta = b.players[vitima].cards.splice(Math.floor(Math.random() * b.players[vitima].cards.length), 1)[0];
+      me.cards.push(carta);
+      const meta = b.banks.cards.find((c) => c.key === carta.key);
+      return `🪝 ${nm} roubou ${meta?.name || 'uma carta'} a ${nameOf(room, vitima)}!`;
+    }
+    case 'trade_cards': {
+      const outro = randomOther(room, playerId);
+      if (!outro) return `🔄 ${nm} não tinha com quem trocar.`;
+      const minhas = me.cards;
+      me.cards = b.players[outro].cards;
+      b.players[outro].cards = minhas;
+      return `🔄 FEIRA DA LADRA: ${nm} (${me.cards.length}) trocou a mão com ${nameOf(room, outro)} (${minhas.length})!`;
+    }
+    case 'shield':
+      me.shield = true;
+      return `🛡️ ${nm} fica com escudo — a próxima carta contra ele não pega.`;
+    case 'swap_leader': {
+      const lider = leaderId(room, playerId);
+      if (!lider || b.players[lider].pos === me.pos) return `🔀 ${nm} já ia à frente — nada mudou.`;
+      const minha = me.pos;
+      me.pos = b.players[lider].pos;
+      b.players[lider].pos = minha;
+      checkWin(room, playerId);
+      return `🔀 GOLPE DE ESTADO: ${nm} trocou de casa com ${nameOf(room, lider)}!`;
+    }
+    case 'skip': {
+      me.skipTurns += ev.value || 1;
+      return `😴 ${nm} adormeceu — perde ${ev.value || 1} vez.`;
+    }
     default:
       return `${nm} não teve nada.`;
   }
@@ -120,7 +197,10 @@ export function boardEventoPick(room, playerId, index) {
   let text = applyEventoEffect(room, playerId, chosen); // muta o estado
   // Espelho: quem marcou este jogador apanha o MESMO efeito (uma vez só). Não
   // reencadeia (o efeito espelhado nunca dispara outro espelho).
-  const MIRRORABLE = ['advance', 'back', 'drink', 'card', 'prison', 'others_drink'];
+  const MIRRORABLE = [
+    'advance', 'back', 'drink', 'card', 'prison', 'others_drink',
+    'skip', 'drink_per_card', 'shield', 'last_advance',
+  ];
   for (const [oid, pl] of Object.entries(b.players)) {
     if (pl.mirrorOf !== playerId || oid === playerId) continue;
     pl.mirrorOf = null;

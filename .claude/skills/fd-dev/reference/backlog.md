@@ -85,6 +85,14 @@ pós-MVP / v2 · **💡** = ideia nova a validar.
 - [x] **Modo "duelo"** — Reação como duelo do Torneio e casa do Tabuleiro.
 - [x] **Recuperação de sala após crash do servidor** — `snapshot.js`.
 
+## 📋 Vindo do 1.º playtest (2026-09-01) — feito
+
+- [x] Beer Pinga: bug do 2.º jogador seguido + medidor lento (era rápido de mais
+      e dependente da taxa de refrescamento do ecrã)
+- [x] Cara ou Coroa com moeda animada, lançada pela app
+- [x] Torneio "fazível" com 6 pessoas: apostas + final à melhor de 3
+- [x] Casa ?? com banco 3× maior e probabilidades afinadas
+
 ## 💡 Ideias novas (a validar)
 
 Estas vão além do FD — candidatas a diferenciar o jogo. Discutir prioridade.

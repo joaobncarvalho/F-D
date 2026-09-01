@@ -258,6 +258,9 @@ export async function advance(room, playerId, squares) {
   }
   if (sq.kind === 'beerpong') {
     room.board.pending = { kind: 'beerpong', playerId }; // resolve-se com o lançamento (força)
+    // Limpa a revelação do tiro anterior: se dois jogadores caem aqui de seguida,
+    // o segundo via a mesa do primeiro e o ecrã não o deixava apontar.
+    b.lastEvent = { text: `🏓 ${nameOf(room, playerId)} está a apontar…` };
     return { board: b, over: false };
   }
   if (sq.kind === 'evento') {

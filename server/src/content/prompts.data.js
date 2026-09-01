@@ -519,7 +519,7 @@ export const DUELO_GAMES = [
     key: 'cara_coroa',
     emoji: '🪙',
     label: 'Cara ou Coroa',
-    desc: 'Uma moeda ao ar (ou o telemóvel de alguém a decidir). Um pede cara, o outro coroa.',
+    desc: 'A moeda é lançada aqui na app. Quem lançou o duelo escolhe a face; se sair a outra, perde.',
   },
   {
     key: 'braco_ferro',

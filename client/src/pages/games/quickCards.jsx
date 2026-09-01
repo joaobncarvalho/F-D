@@ -2,7 +2,9 @@
 // conteúdo, o cronómetro e o botão de veredicto): Categoria Relâmpago, Mímica,
 // Roleta Russa e Duelo 1v1. Mesmo padrão dos cards.jsx.
 
+import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
+import Coin from '../../components/Coin.jsx';
 import { sfx } from '../../sfx.js';
 import Timer from '../../components/Timer.jsx';
 import { CardShell } from './shared.jsx';
@@ -206,12 +208,20 @@ export function RoletaCard({ round, youId, canControl, onAnswer, onPass, onConti
   );
 }
 
-export function DueloCard({ round, youId, canControl, onResult, onContinue }) {
+export function DueloCard({ round, youId, canControl, onResult, onCall, onContinue }) {
   const duelists = [
     { id: round.currentPlayerId, name: round.currentPlayerName },
     { id: round.opponentId, name: round.opponentName },
   ];
   const canMark = canControl || duelists.some((d) => d.id === youId);
+  // O cara-ou-coroa joga-se dentro da app: a moeda tem de assentar antes de se
+  // ver quem ganhou, senão o resultado aparecia com a moeda ainda no ar.
+  const isMoeda = round.duel?.key === 'cara_coroa';
+  const [moedaAssentou, setMoedaAssentou] = useState(false);
+  useEffect(() => {
+    setMoedaAssentou(false);
+  }, [round.id, round.coin?.face]);
+  const escondeResultado = isMoeda && round.coin && !moedaAssentou;
 
   return (
     <CardShell typeKey="duelo">
@@ -232,7 +242,37 @@ export function DueloCard({ round, youId, canControl, onResult, onContinue }) {
       </p>
       <p className="text-sm text-white/60 leading-snug">{round.duel?.desc}</p>
 
-      {round.substate === 'duelling' ? (
+      {/* Cara ou Coroa: escolher a face → a moeda voa → o resultado. */}
+      {isMoeda && round.substate === 'calling' && (
+        youId === round.currentPlayerId ? (
+          <div className="flex flex-col gap-2 mt-1">
+            <p className="text-sm text-white/60">Escolhe a tua face — se sair a outra, perdes:</p>
+            <div className="flex gap-3">
+              <button onClick={() => { sfx.click(); onCall('cara'); }} className="fd-btn fd-btn-amber flex-1 py-4 text-lg">
+                👑 Cara
+              </button>
+              <button onClick={() => { sfx.click(); onCall('coroa'); }} className="fd-btn fd-btn-primary flex-1 py-4 text-lg">
+                🍺 Coroa
+              </button>
+            </div>
+          </div>
+        ) : (
+          <p className="text-sm text-white/50">
+            {round.currentPlayerName} está a escolher cara ou coroa…
+          </p>
+        )
+      )}
+
+      {isMoeda && round.coin && (
+        <>
+          <Coin face={round.coin.face} flipKey={round.id} onDone={() => setMoedaAssentou(true)} />
+          <p className="text-xs text-white/40">
+            {round.currentPlayerName} pediu {round.coin.call === 'cara' ? '👑 cara' : '🍺 coroa'}
+          </p>
+        </>
+      )}
+
+      {escondeResultado ? null : round.substate === 'duelling' ? (
         canMark ? (
           <div className="flex flex-col gap-2 mt-1">
             <p className="text-xs text-white/40">Quem ganhou?</p>

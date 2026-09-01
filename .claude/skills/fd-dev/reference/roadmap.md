@@ -118,7 +118,15 @@ Legenda: ✅ feito · 🚧 em curso · ⬜ por fazer · 🔗 ponto de integraç�
       · feed de eventos · pausa do host (com cronómetros congelados) · auto-resolve
       · modo TV (`/?tv=CODIGO`) · legibilidade de bar · música com ducking
       · cartão de resultados partilhável · ecrã de regras · voltar a jogar
-- [ ] Playtest real com amigos → correção de bugs (o único P0 restante)
+- [x] **1.º playtest feito** → correções e melhorias (2026-09-01d):
+      · 🐛 Beer Pinga: dois jogadores seguidos na casa — o 2.º não atirava (corrigido
+        no servidor E no cliente, com teste de regressão)
+      · 🐌 Beer Pinga: medidor por relógio e 4× mais lento (andava ao dobro a 120 Hz)
+      · 🪙 Cara ou Coroa lançado NA APP, com moeda 3D — também no Torneio e no showroom
+      · 🏆 Torneio: apostas dos espetadores (ninguém fica parado) + final à melhor
+        de 3 + 5.º tipo de duelo
+      · 🎲 Casa ??: 9 → 24 efeitos com pesos (18 tipos), fim da repetição
+- [ ] 2.º playtest (11 set) → validar estas mudanças com o grupo
 - [x] **Snapshot das salas na Postgres** (2026-09-01b) — modelo `RoomSnapshot`;
       ficheiro a cada 5s + BD a cada 15s e no SIGTERM. Sobrevive a um deploy que
       troque de máquina, que era o buraco que restava.

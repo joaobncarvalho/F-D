@@ -158,6 +158,11 @@ export async function driveBots(room, hooks = {}) {
     if (g.phase === 'duelo') {
       const r = g.round;
       const cur = room.players.get(r.currentPlayerId);
+      if (r.substate === 'calling') {
+        // Cara ou coroa é lançado pela app — o bot só tem de pedir uma face.
+        if (cur?.isBot) { game.dueloCall(room, cur.id, rand() < 0.5 ? 'cara' : 'coroa'); return true; }
+        return false;
+      }
       if (r.substate === 'duelling') {
         const marker = [r.currentPlayerId, r.opponentId].find((id) => room.players.get(id)?.isBot);
         if (marker) {
@@ -395,6 +400,20 @@ async function driveTournamentBots(room) {
       }
       return false;
     }
+    // Cara ou Coroa: o duelista sorteado pede uma face e a app lança a moeda.
+    if (d.substate === 'calling') {
+      const quem = room.players.get(d.aId);
+      if (quem?.isBot) { tournament.tournamentCall(room, d.aId, rand() < 0.5 ? 'cara' : 'coroa'); return true; }
+      return false;
+    }
+    // Apostas dos espetadores: quem não está a duelar aposta (também os eliminados).
+    for (const bot of bots) {
+      if ([d.aId, d.bId].includes(bot.id)) continue;
+      if (d.bets[bot.id] || d.substate === 'result') continue;
+      tournament.tournamentBet(room, bot.id, rand() < 0.5 ? d.aId : d.bId);
+      return true;
+    }
+
     // Duelo de Reação: espera pelo GO (numa sala só de bots, adianta-o).
     if (d.substate === 'racing') {
       const semHumanos = players(room).every((p) => p.isBot || !p.connected);
@@ -420,7 +439,8 @@ async function driveTournamentBots(room) {
     }
     if (d.substate === 'result') {
       const closer = [d.aId, d.bId].find((id) => room.players.get(id)?.isBot);
-      if (closer) { tournament.tournamentContinue(room, closer); return true; }
+      // Pode reabrir a final (série à melhor de 3) → devolve promessa nesse caso.
+      if (closer) { await tournament.tournamentContinue(room, closer); return true; }
       return false;
     }
   } catch (err) {

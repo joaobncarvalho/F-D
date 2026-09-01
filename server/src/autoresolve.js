@@ -172,6 +172,10 @@ async function resolveWheel(room) {
       return continueOrAbandon(room);
 
     case 'duelo':
+      if (r?.substate === 'calling') {
+        game.dueloCall(room, r.currentPlayerId, Math.random() < 0.5 ? 'cara' : 'coroa');
+        return true;
+      }
       if (r?.substate === 'duelling') {
         const lados = [r.currentPlayerId, r.opponentId];
         game.dueloResult(room, r.currentPlayerId, lados[Math.random() < 0.5 ? 0 : 1]);

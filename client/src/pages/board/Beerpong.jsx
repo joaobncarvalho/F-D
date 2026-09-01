@@ -12,9 +12,13 @@ const BP_ROWS = [
   { count: 1, y: 23, size: 24, spacing: 0 }, // trás
 ];
 
+// Tempo que o medidor demora a fazer uma passagem completa (0 → 1). Era ~0,55 s
+// e ninguém conseguia apontar; a 2,4 s dá para mirar sem a mesa adormecer.
+const SWEEP_MS = 2400;
+
 export function Beerpong({ pending, reveal, isMyTurn, currentLabel, onShoot }) {
   const [power, setPower] = useState(0.5);
-  const dirRef = useRef(1);
+  const powerRef = useRef(0.5); // valor no instante do disparo (o estado pode ir atrasado)
   const rafRef = useRef(0);
   const [locked, setLocked] = useState(false);
   const [landed, setLanded] = useState(false);
@@ -22,16 +26,27 @@ export function Beerpong({ pending, reveal, isMyTurn, currentLabel, onShoot }) {
 
   const aiming = !!pending && isMyTurn && !reveal && !locked;
 
-  // Medidor a oscilar (só quem está a apontar).
+  // Casa nova (outro jogador, ou o mesmo outra vez) → destrancar. Sem isto, quem
+  // caísse aqui a seguir a outro ficava com o ecrã trancado do tiro anterior.
+  useEffect(() => {
+    if (!pending) return;
+    setLocked(false);
+    setLanded(false);
+    setPower(0.5);
+    powerRef.current = 0.5;
+  }, [pending?.playerId]);
+
+  // Medidor a oscilar (só quem está a apontar). Baseado no RELÓGIO e não no
+  // número de frames — senão a 120 Hz oscila ao dobro da velocidade.
   useEffect(() => {
     if (!aiming) return;
-    const loop = () => {
-      setPower((p) => {
-        let np = p + dirRef.current * 0.03;
-        if (np >= 1) { np = 1; dirRef.current = -1; }
-        else if (np <= 0) { np = 0; dirRef.current = 1; }
-        return np;
-      });
+    const t0 = performance.now();
+    const loop = (t) => {
+      // Onda triangular: sobe de 0 a 1 e volta, em 2×SWEEP_MS.
+      const fase = ((t - t0) % (SWEEP_MS * 2)) / SWEEP_MS;
+      const p = fase <= 1 ? fase : 2 - fase;
+      powerRef.current = p;
+      setPower(p);
       rafRef.current = requestAnimationFrame(loop);
     };
     rafRef.current = requestAnimationFrame(loop);
@@ -61,7 +76,7 @@ export function Beerpong({ pending, reveal, isMyTurn, currentLabel, onShoot }) {
     cancelAnimationFrame(rafRef.current);
     setLocked(true);
     sfx.spin();
-    onShoot(power);
+    onShoot(powerRef.current); // o valor exato do instante do toque
   };
 
   const targetRow = reveal ? reveal.row : null;

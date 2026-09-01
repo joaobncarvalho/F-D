@@ -7,11 +7,19 @@ import { sfx } from '../sfx.js';
 import { confetti, haptic } from '../confetti.js';
 import { TYPES } from './games/shared.jsx';
 import { BotaoReacao } from './games/ReacaoCard.jsx';
+import Coin from '../components/Coin.jsx';
 import Feed, { ShareResult } from '../components/Feed.jsx';
 
 const typeMeta = (key) => TYPES.find((t) => t.key === key) || { emoji: '🎮', label: 'Duelo', color: '#ff3d8b' };
 
-export default function Tournament({ room, youId, onNext, onAction, onChoose, onVote, onTap, onContinue, onSkip, onEnd, onReset, onLeave }) {
+/** Marcador da série (final à melhor de 3) para o encontro em curso. */
+function matchSerie(t, d) {
+  const match = (t.rounds?.[t.roundIdx] || []).find((m) => m.id === d.matchId);
+  if (!match || (match.bestOf || 1) <= 1) return null;
+  return { bestOf: match.bestOf, need: Math.ceil(match.bestOf / 2), wins: match.wins || {} };
+}
+
+export default function Tournament({ room, youId, onNext, onAction, onChoose, onVote, onTap, onBet, onCall, onContinue, onSkip, onEnd, onReset, onLeave }) {
   const t = room?.tournament;
   const you = room?.players.find((p) => p.id === youId);
   const isHost = you?.isHost;
@@ -122,22 +130,63 @@ export default function Tournament({ room, youId, onNext, onAction, onChoose, on
     const d = t.duel;
     const meta = typeMeta(d.gameTypeKey);
     const isDuelist = d.aId === youId || d.bId === youId;
+    // Série da final: mostra-se o marcador para a mesa perceber o que está em jogo.
+    const serie = d.result?.series?.bestOf > 1 ? d.result.series : matchSerie(t, d);
+    const minhaAposta = d.bets?.[youId] || (d.betters?.includes(youId) ? 'feita' : null);
+    const jaApostei = d.betters?.includes(youId);
     const iPlayed = d.substate === 'daring' ? d.played.includes(youId) : d.played.includes(youId);
     const canContinue = isHost || isDuelist;
 
     return (
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex-1 flex flex-col gap-3">
-        <Header sub={`Ronda ${t.roundIdx + 1} · eliminação direta`}>⚔️ Duelo</Header>
+        <Header sub={serie ? `FINAL · à melhor de ${serie.bestOf}` : `Ronda ${t.roundIdx + 1} · eliminação direta`}>
+          {serie ? '🏅 Final' : '⚔️ Duelo'}
+        </Header>
 
         <Feed feed={room.feed} />
 
         <div className="fd-card p-3 flex items-center justify-around text-center">
-          <span className={`font-extrabold ${d.result?.winnerId === d.aId ? 'text-emerald-300' : ''}`}>{d.aName}</span>
+          <span className={`font-extrabold ${d.result?.winnerId === d.aId ? 'text-emerald-300' : ''}`}>
+            {d.aName}
+            {serie && <span className="block text-2xl text-amber-300">{serie.wins?.[d.aId] || 0}</span>}
+          </span>
           <motion.span animate={{ scale: [1, 1.15, 1] }} transition={{ duration: 1.4, repeat: Infinity }} className="text-2xl">
             ⚔️
           </motion.span>
-          <span className={`font-extrabold ${d.result?.winnerId === d.bId ? 'text-emerald-300' : ''}`}>{d.bName}</span>
+          <span className={`font-extrabold ${d.result?.winnerId === d.bId ? 'text-emerald-300' : ''}`}>
+            {d.bName}
+            {serie && <span className="block text-2xl text-amber-300">{serie.wins?.[d.bId] || 0}</span>}
+          </span>
         </div>
+
+        {/* Apostas: é isto que mantém no jogo quem já foi eliminado. */}
+        {!isDuelist && (
+          <div className="fd-card p-3 flex flex-col gap-2">
+            <p className="text-sm text-white/60">
+              🎲 <b>Aposta</b> — quem errar bebe 2. <span className="text-white/40">Ninguém vê em quem apostaste.</span>
+            </p>
+            {jaApostei || d.substate === 'result' ? (
+              <p className="text-sm text-emerald-300 font-semibold">
+                {d.substate === 'result' && d.bets
+                  ? d.bets[youId]
+                    ? d.bets[youId] === d.result?.winnerId
+                      ? '✅ Acertaste na aposta!'
+                      : `❌ Falhaste — bebe ${d.result?.apostas?.golos ?? 2}.`
+                    : 'Não apostaste desta vez.'
+                  : 'Aposta trancada ✓'}
+              </p>
+            ) : (
+              <div className="flex gap-2">
+                {[{ id: d.aId, name: d.aName }, { id: d.bId, name: d.bName }].map((x) => (
+                  <button key={x.id} onClick={() => { sfx.click(); onBet(x.id); }} className="fd-chip flex-1">
+                    {x.name}
+                  </button>
+                ))}
+              </div>
+            )}
+            <p className="text-xs text-white/30">{d.betters?.length || 0} aposta(s) feitas</p>
+          </div>
+        )}
 
         <motion.div
           initial={{ opacity: 0, y: 14, scale: 0.97 }}
@@ -170,6 +219,33 @@ export default function Tournament({ room, youId, onNext, onAction, onChoose, on
                   {iPlayed ? 'Jogaste! À espera do adversário…' : `Duelo em curso… ${d.played.length}/2 jogaram`}
                 </p>
               )}
+            </>
+          )}
+
+          {d.substate === 'calling' && (
+            <>
+              <p className="text-lg leading-snug">{d.text}</p>
+              {youId === d.aId ? (
+                <div className="flex gap-3 mt-1">
+                  <button onClick={() => { sfx.click(); onCall('cara'); }} className="fd-btn fd-btn-amber flex-1 py-4 text-lg">
+                    👑 Cara
+                  </button>
+                  <button onClick={() => { sfx.click(); onCall('coroa'); }} className="fd-btn fd-btn-primary flex-1 py-4 text-lg">
+                    🍺 Coroa
+                  </button>
+                </div>
+              ) : (
+                <p className="text-sm text-white/40">{d.aName} está a escolher a face…</p>
+              )}
+            </>
+          )}
+
+          {d.coin && (
+            <>
+              <Coin face={d.coin.face} flipKey={d.matchId + d.coin.face} />
+              <p className="text-xs text-white/40">
+                {d.aName} pediu {d.coin.call === 'cara' ? '👑 cara' : '🍺 coroa'}
+              </p>
             </>
           )}
 
@@ -242,6 +318,18 @@ export default function Tournament({ room, youId, onNext, onAction, onChoose, on
             </>
           )}
 
+          {d.substate === 'result' && d.result?.seriesOngoing && (
+            <p className="text-sm font-bold text-amber-300">
+              🥊 {d.result.winnerName} ganha esta — a final vai a{' '}
+              {d.result.series.wins[d.aId] || 0}-{d.result.series.wins[d.bId] || 0}. Ainda não acabou!
+            </p>
+          )}
+          {d.substate === 'result' && !!d.result?.apostas?.errados?.length && (
+            <p className="text-sm text-rose-300">
+              🎲 Apostaram mal: {d.result.apostas.errados.map((x) => x.name).join(' · ')} — bebem{' '}
+              {d.result.apostas.golos}.
+            </p>
+          )}
           {d.substate === 'result' && (
             <>
               <p className="text-xl font-extrabold text-emerald-300">🏆 {d.result.winnerName} avança!</p>

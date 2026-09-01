@@ -5,6 +5,66 @@
 
 ---
 
+## 2026-09-01 (d) — Correções e melhorias do 1.º playtest
+
+Quatro pontos vindos do teste com o grupo.
+
+### 🐛 Beer Pinga: o 2.º jogador seguido não conseguia atirar
+Bug real, com duas causas — as duas corrigidas:
+- **servidor:** cair na casa não limpava o `lastEvent`, por isso o cliente ainda
+  via a revelação do TIRO ANTERIOR; o ecrã só deixa apontar quando não há
+  revelação a mostrar, logo ficava trancado;
+- **cliente:** o `locked` (posto ao disparar) nunca voltava a false quando
+  chegava uma casa nova.
+Novo `test/board-beerpong.test.js` fixa o caso ("dois seguidos na mesma casa").
+
+### 🐌 Beer Pinga: medidor mais lento (e correto)
+O medidor andava **por frame** (`+0.03`), o que dava ~0,55 s por passagem — e o
+DOBRO da velocidade num telemóvel a 120 Hz. Passou a ser por **relógio**
+(`performance.now`), com 2,4 s por passagem. O disparo usa o valor exato do
+toque (`powerRef`), não o estado do React, que podia estar um frame atrás.
+
+### 🪙 Cara ou Coroa passa a ser lançado na app
+Era só texto ("atirem uma moeda e digam quem ganhou"). Agora:
+- `components/Coin.jsx` — moeda 3D a rodar, com salto e aterragem na face certa
+  (voltas inteiras + meia volta se calhar coroa). O RESULTADO vem do servidor;
+  a animação é só apresentação, e o vencedor só aparece depois de assentar.
+- `game/duelo.js`: substate `calling` → quem lançou o duelo pede a face, o
+  servidor lança, quem falha perde. Sem discussão à mesa.
+- Entrou também como **tipo de duelo do Torneio** e está no showroom (`?demo`).
+
+### 🏆 Torneio: com 6 pessoas era fraco
+O problema não era o bracket, era o tempo morto: com 6, três saem na 1.ª ronda e
+ficam a olhar. Três mudanças:
+- **Apostas em TODOS os duelos** — quem não está a duelar (incluindo eliminados)
+  aposta no vencedor; quem erra bebe 2. Secretas até ao resultado, senão apostava
+  toda a gente no mesmo. É isto que mantém a mesa inteira dentro do jogo.
+- **Final à melhor de 3** (`bestOf` no encontro): a primeira vitória já não
+  elimina; o "continuar" reabre o MESMO encontro com um duelo novo até alguém
+  chegar a 2. O marcador aparece no cabeçalho.
+- **5.º tipo de duelo** (cara ou coroa) → menos repetição no quadro.
+Novo `test/tournament-apostas.test.js` (4 casos: apostas secretas/pagas, o
+eliminado continua a apostar, série da final, moeda).
+
+### 🎲 Casa ?? deixou de ser repetitiva
+Eram **9 efeitos** e a casa mostra **3 de cada vez** — via-se um terço do baralho
+por visita. Agora **24 efeitos com pesos** (`weight`: os dramáticos raros, os
+pequenos comuns) e **18 tipos de efeito**, 9 deles novos:
+`all_drink` · `leader_drink` (impostos a quem vai à frente) · `drink_per_card` ·
+`last_advance` (prémio a quem vai em último) · `steal_card` · `trade_cards`
+(trocar a mão) · `shield` · `swap_leader` (golpe de estado) · `skip`.
+Também se corrigiu um defeito silencioso: o fallback em memória **esmagava os
+pesos para 1**, por isso os pesos não faziam nada sem BD. Novo
+`test/board-evento.test.js` (7 casos, um por efeito novo + banco coerente).
+
+### Verificação
+- `npm test`: **44 → 58**. Suite corrida **4×** (os duelos são aleatórios) — os
+  testes que assumiam o vencedor passaram a normalizar o tipo de duelo primeiro.
+- `npm run check` (58 + build) ✓ · smoke pela rede contra a Supabase: duelo de
+  cara-ou-coroa, aposta aceite e **invisível** antes do fim, moeda lançada no
+  servidor, vencedor certo.
+- BD sincronizada: **24 eventos ?? com 18 efeitos distintos**, 49 board_items.
+
 ## 2026-09-01 (c) — Supabase em dia: schema aplicado e conteúdo semeado
 
 Com as credenciais à mão, ficou fechado o último ponto em aberto.

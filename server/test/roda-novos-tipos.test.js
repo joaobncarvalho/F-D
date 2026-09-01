@@ -97,12 +97,51 @@ test('Duelo 1v1: sorteia adversário e quem perde bebe', async () => {
   assert.ok(round.opponentId && round.opponentId !== ana.id, 'há adversário sorteado');
   assert.ok(round.duel?.key, 'há mini-duelo sorteado');
 
-  // O adversário também pode registar o resultado.
-  game.dueloResult(room, round.opponentId, ana.id);
+  if (round.duel.key === 'cara_coroa') {
+    // Este joga-se DENTRO da app: só quem lançou o duelo escolhe a face.
+    assert.equal(round.substate, 'calling');
+    assert.throws(() => game.dueloResult(room, ana.id, ana.id), /cara ou coroa/i);
+    game.dueloCall(room, ana.id, 'cara');
+  } else {
+    // Os restantes jogam-se à mesa — o adversário também pode registar o resultado.
+    game.dueloResult(room, round.opponentId, ana.id);
+  }
+
   const r = serializeRoom(room).game.round;
-  assert.equal(r.result.winnerId, ana.id);
-  assert.ok(room.game.stats[round.opponentId].drinks > 0, 'o perdedor bebeu');
+  assert.ok(r.result.winnerId, 'há vencedor');
+  assert.ok(room.game.stats[r.result.loserId].drinks > 0, 'o perdedor bebeu');
 
   game.continueRound(room, ana.id);
   assert.equal(room.game.phase, 'wheel');
+});
+
+test('Cara ou Coroa: a moeda é lançada pela app e decide sozinha', async () => {
+  const { room, players } = start();
+  const [ana] = players;
+
+  // Sorteia até calhar o cara-ou-coroa (os mini-duelos são 3).
+  let round = null;
+  for (let i = 0; i < 300 && !round; i++) {
+    const r = await spinUntil(room, 'duelo');
+    if (r.duel.key === 'cara_coroa') round = r;
+    else {
+      game.dueloResult(room, ana.id, ana.id);
+      game.continueRound(room, ana.id);
+      room.game.currentPlayerId = ana.id; // a vez volta à Ana para o próximo spin
+    }
+  }
+  assert.ok(round, 'nunca saiu o cara ou coroa');
+
+  const antes = serializeRoom(room).game.round;
+  assert.equal(antes.coin, null, 'a moeda ainda não foi lançada');
+  assert.throws(() => game.dueloCall(room, round.opponentId, 'cara'), /quem lançou/i);
+  assert.throws(() => game.dueloCall(room, ana.id, 'lado'), /cara ou coroa/i);
+
+  game.dueloCall(room, ana.id, 'cara');
+  const r = serializeRoom(room).game.round;
+  assert.ok(['cara', 'coroa'].includes(r.coin.face), 'o servidor é que lança');
+  assert.equal(r.coin.call, 'cara');
+  // Acertar ganha, falhar dá a vitória ao adversário — sem discussão à mesa.
+  const esperado = r.coin.face === 'cara' ? ana.id : round.opponentId;
+  assert.equal(r.result.winnerId, esperado);
 });

@@ -112,10 +112,10 @@ export async function getRandomVascoBoard() {
 // disponível; senão cai para o conteúdo em código (board.data.js). O board.js
 // "fotografa" isto no initBoard (b.banks) — daí ser async só aqui.
 const FALLBACK_BANKS = {
-  events: BOARD_EVENTS.map((e) => ({ ...e, weight: 1 })),
-  prison: BOARD_PRISON.map((p) => ({ ...p, weight: 1 })),
-  cards: BOARD_CARDS.map((c) => ({ ...c, weight: 1 })),
-  rules: BOARD_RULES.map((r) => ({ ...r, weight: 1 })),
+  events: BOARD_EVENTS.map((e) => ({ ...e, weight: e.weight ?? 1 })),
+  prison: BOARD_PRISON.map((p) => ({ ...p, weight: p.weight ?? 1 })),
+  cards: BOARD_CARDS.map((c) => ({ ...c, weight: c.weight ?? 1 })),
+  rules: BOARD_RULES.map((r) => ({ ...r, weight: r.weight ?? 1 })),
 };
 
 export async function getBoardBanks() {
