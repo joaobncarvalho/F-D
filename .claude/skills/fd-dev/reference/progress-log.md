@@ -5,6 +5,71 @@
 
 ---
 
+## 2026-09-01 — Pacote pré-playtest: 7 jogos novos + fundações de festa
+
+Sessão grande, a 10 dias do playtest. Três frentes: tapar os buracos que se
+notariam logo na primeira noite, dar à Roda os jogos de MESA INTEIRA que lhe
+faltavam, e tratar do que faz um jogo de festa parecer um jogo de festa.
+
+### Buracos tapados (eram os mais visíveis)
+- **Prompts repetiam-se.** `content/bag.js`: saco por sala e por tipo — um desafio
+  não repete enquanto houver conteúdo novo; quando esgota, repõe-se. Usado pela
+  Roda, pelo Tabuleiro e pelo Torneio.
+- **Ecrã apagava-se a meio.** `device.js: keepScreenAwake` (wake lock, com novo
+  pedido no `visibilitychange` — o browser larga-o em segundo plano).
+- **Não era instalável.** `public/manifest.webmanifest` + `sw.js` (rede primeiro,
+  cache só como último recurso) + ícones PNG gerados sem dependências.
+- **Reinício do servidor apagava as salas.** `snapshot.js`: gravação atómica a cada
+  5s + no SIGTERM, recuperação no arranque. Verificado a sério: matei o servidor a
+  meio de uma ronda de Desenho e o jogador religou na mesma ronda.
+
+### Jogos novos (o catálogo era quase todo "o jogador da vez")
+- **Roda:** Eu Nunca · Mais Provável · Termómetro · Quem Disse (`game/grupo.js`,
+  mesma forma: todos respondem em segredo, revela-se de uma vez) · Cascata
+  (`game/cascata.js`) · Desenha e Adivinha (`game/desenho.js`) · Reação.
+- **Torneio:** duelo de Reação (4.º tipo; sem conteúdo, por isso nunca repete).
+- **Tabuleiro:** casa ⚡ Reação (duelo contra adversário sorteado).
+- Motor da reação (`game/reacao.js`) é PURO e partilhado pelos três modos: o GO
+  tem atraso aleatório e é decidido pelo servidor — sem isso não havia corrida justa.
+- Conteúdo: **11 → 18 tipos, 232 → 360 prompts**.
+
+### Fundações
+- **Curva de intensidade** (`game/intensity.js`): a votação passa a ser o TETO da
+  noite; começa leve e sobe (~12 rondas ou 25 min). Ligável pelo host.
+- **Packs temáticos** (aniversário/despedida/reencontro): `tag` no prompt, aditivo
+  (um prompt sem tag serve sempre), CRUD na /admin, coluna no schema.
+- **Identidade transversal** (emoji + cor) escolhida no lobby e usada na Roda, no
+  chat, no pódio e como peão do Tabuleiro (que passa a saltar a fase de escolha).
+- **Feed de eventos** (`feed.js`) no `room_state`, com painel nos três modos.
+- **Pausa do host**: middleware de socket recusa ações com a sala em pausa, e o
+  `clock.js` congela os cronómetros do cliente (senão a pausa era decorativa).
+- **Auto-resolve** (`autoresolve.js`): assinatura de progresso por sala; se nada
+  mexer, resolve-se a ronda pela via que o jogo já usava (quem não age, bebe) e
+  segue. Desliga-se com `AUTO_RESOLVE_MS=0`.
+- **Modo TV** (`watch_room` + `pages/Display.jsx`, `/?tv=CODIGO`): entra em
+  só-leitura, não ocupa lugar, recebe o mesmo payload já anonimizado.
+- **Legibilidade de bar**: texto grande + alto contraste (⚙️), guardados no telemóvel.
+- **Música ambiente** com ducking (baixa quando toca um efeito).
+- **Cartão de resultados PNG** partilhável nos três ecrãs de fim.
+- **Ecrã de regras** durante o jogo (por modo e por mini-jogo).
+- **Voltar a jogar**: nome/emoji/cor e salas recentes em `localStorage`.
+
+### Verificação
+- `npm test`: **24 → 37**. Novos: `grupo-novos.test.js` (invariantes dos 7 tipos —
+  respostas e autor nunca no broadcast) e `socket-e2e.test.js` (**pela rede, com
+  socket.io-client**: identidade, pausa a recusar pacotes, modo TV, votação de
+  grupo e a palavra do Desenho por canal privado).
+- `bots-e2e` alargado: os bots exercitam as **14 mecânicas** da Roda, ≥30 rondas.
+- `npm run check` (37 testes + build) ✓ · servidor real: /health, manifest, sw e
+  `?tv=` a 200 · snapshot verificado com reinício a meio de uma ronda.
+
+### A seguir
+- **Falta correr `prisma db push` + seed** para a coluna `tag` e os 128 prompts
+  novos chegarem à Supabase. Sem isso o jogo corre na mesma (cai para o conteúdo
+  em código), mas os packs não são editáveis na /admin.
+- O snapshot vive no disco do container: cobre reinícios, não um deploy que troque
+  de máquina. Passo seguinte seria guardá-lo na Postgres.
+
 ## 2026-08-22 — socket.js: handlers do Tabuleiro num módulo
 
 - `socket/boardHandlers.js` — `registerBoardHandlers(socket, ctx)` recebe os helpers

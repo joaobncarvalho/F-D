@@ -6,6 +6,8 @@ import { PlayingCard, BlackjackReveal } from './board/blackjack.jsx';
 import { GambleReveal, CardPlayReveal, OrderReveal } from './board/reveals.jsx';
 import { Beerpong } from './board/Beerpong.jsx';
 import { EventoOverlay } from './board/EventoOverlay.jsx';
+import { BotaoReacao } from './games/ReacaoCard.jsx';
+import Feed, { ShareResult } from '../components/Feed.jsx';
 
 const KIND_ICON = { partida: '🏁', evento: '❓', gamble: '🎲', blackjack: '🃏', beerpong: '🏓', leilao: '🔨' };
 const CURSE_PREFIX = 'curse_';
@@ -26,7 +28,7 @@ const ADVANCE = [
   { n: 3, golos: 6 },
 ];
 
-export default function Board({ room, youId, myHand, myTraps, onPickPawn, onRoll, onAdvance, onResolve, onGamble, onEventoPick, onBlackjack, onBeerpong, onPlayCard, onBid, onRuleFail, onSkip, onEnd, onKick, onReset, onLeave }) {
+export default function Board({ room, youId, myHand, myTraps, onPickPawn, onRoll, onAdvance, onResolve, onGamble, onEventoPick, onBlackjack, onBeerpong, onPlayCard, onBid, onRuleFail, onReacaoTap, onSkip, onEnd, onKick, onReset, onLeave }) {
   const b = room.board;
   const you = room.players.find((p) => p.id === youId);
   const isHost = you?.isHost;
@@ -291,6 +293,19 @@ export default function Board({ room, youId, myHand, myTraps, onPickPawn, onRoll
           </ul>
         </div>
         <div className="flex flex-col gap-2 mt-auto">
+          <ShareResult
+            data={() => ({
+              title: 'F&D — a corrida',
+              subtitle: `${b.size} casas · ${board.length} jogadores`,
+              awards: awards.map((a) => ({ emoji: a.emoji, label: a.title, name: a.who.name })),
+              rows: board.map((r) => ({
+                emoji: r.pawn,
+                name: r.name,
+                detail: `casa ${r.pos} · 🍺 ${r.golos}`,
+                highlight: r.id === b.winner?.id,
+              })),
+            })}
+          />
           {isHost && (
             <button onClick={() => { sfx.click(); onReset(); }} className="fd-btn fd-btn-primary">
               🔄 Jogar outra vez
@@ -317,8 +332,9 @@ export default function Board({ room, youId, myHand, myTraps, onPickPawn, onRoll
   const bjPending = pending?.kind === 'blackjack' ? pending : null;
   const beerpongPending = pending?.kind === 'beerpong' ? pending : null;
   const auctionPending = pending?.kind === 'auction' ? pending : null;
+  const reacaoPending = pending?.kind === 'reacao' ? pending : null;
   const miniGamblePending =
-    pending && !['evento', 'blackjack', 'beerpong', 'auction'].includes(pending.kind) ? pending : null;
+    pending && !['evento', 'blackjack', 'beerpong', 'auction', 'reacao'].includes(pending.kind) ? pending : null;
   const targets = room.players.filter((p) => p.connected && p.id !== youId);
   const selMeta = selCard ? meta[selCard.key] : null;
   const selIsCurse = selCard ? isCurse(selCard.key) : false;
@@ -335,6 +351,8 @@ export default function Board({ room, youId, myHand, myTraps, onPickPawn, onRoll
         {isMyTurn ? '🎯 É a tua vez!' : b.currentPlayerId ? `Vez de ${currentPawn} ${currentPlayer?.name || ''}`.trim() : '⏳ À espera de jogadores…'}
       </Header>
 
+      <Feed feed={room.feed} />
+
       {/* Casa ?? — overlay de 3 cartas viradas + flip */}
       <EventoOverlay
         pending={eventoPending}
@@ -343,6 +361,28 @@ export default function Board({ room, youId, myHand, myTraps, onPickPawn, onRoll
         currentName={currentPlayer?.name}
         onPick={onEventoPick}
       />
+
+      {/* Casa ⚡ — duelo de reação entre quem lá caiu e um adversário sorteado */}
+      {reacaoPending && (
+        <div className="fd-card p-4 flex flex-col gap-3 text-center">
+          <p className="text-sm font-bold uppercase tracking-wide text-yellow-300">⚡ Duelo de Reação</p>
+          <p className="text-lg font-extrabold">
+            {room.players.find((p) => p.id === reacaoPending.playerId)?.name}{' '}
+            <span className="text-white/40">vs</span>{' '}
+            {room.players.find((p) => p.id === reacaoPending.opponentId)?.name}
+          </p>
+          {[reacaoPending.playerId, reacaoPending.opponentId].includes(youId) ? (
+            <BotaoReacao
+              goAt={reacaoPending.goAt}
+              jaCarreguei={reacaoPending.tapped?.includes(youId)}
+              falso={reacaoPending.falseStarts?.includes(youId)}
+              onTap={onReacaoTap}
+            />
+          ) : (
+            <p className="text-sm text-white/50">A ver quem tem melhores reflexos… 🍿</p>
+          )}
+        </div>
+      )}
 
       {/* Carta a ser usada — banner flutuante para todos (não bloqueia toques) */}
       {ev?.card && !pending && <CardPlayReveal key={'card' + ev.text} card={ev.card} />}

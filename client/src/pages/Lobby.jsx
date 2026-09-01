@@ -1,7 +1,21 @@
 import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import QRCode from '../components/QRCode.jsx';
+import { Avatar } from './games/shared.jsx';
 import { sfx } from '../sfx.js';
+import { loadProfile, saveProfile } from '../device.js';
+
+// Espelho das listas do servidor (content/identity.js). Aqui só para desenhar as
+// opções — quem valida é sempre o servidor.
+const EMOJIS = ['🦊', '🐸', '🐵', '🦄', '🐙', '🐝', '🦁', '🐨', '🐼', '🐷', '🐧', '🐢', '🐔', '🦖', '🦩', '🦉'];
+const COLORS = ['#ff3d8b', '#9b5cff', '#ffb020', '#1fd3b6', '#5b8cff', '#4ade80', '#f472b6', '#38bdf8'];
+
+const PACKS = [
+  { key: null, label: '🌐 Tudo' },
+  { key: 'aniversario', label: '🎂 Aniversário' },
+  { key: 'despedida', label: '💍 Despedida' },
+  { key: 'reencontro', label: '🫂 Reencontro' },
+];
 
 const INTENSITY_OPTS = [
   { key: 'leve', label: '🍃 Leve' },
@@ -15,16 +29,32 @@ const DEV_MODE =
   (typeof import.meta !== 'undefined' && import.meta.env?.DEV) ||
   (typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('dev'));
 
-export default function Lobby({ room, youId, messages, error, onSendMessage, onStart, onVoteIntensity, onSetMode, onAddBots, onLeave }) {
+export default function Lobby({
+  room, youId, messages, error, onSendMessage, onStart, onVoteIntensity,
+  onSetMode, onSetIdentity, onSetPack, onSetCurve, onAddBots, onLeave,
+}) {
   const [draft, setDraft] = useState('');
   const [showQR, setShowQR] = useState(false);
   const [copied, setCopied] = useState(false);
   const [lives, setLives] = useState(3);
+  const [showIdent, setShowIdent] = useState(false);
   const chatEndRef = useRef(null);
+  const identSent = useRef(false);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  // "Voltar a jogar com o mesmo grupo": se este telemóvel já escolheu emoji/cor
+  // noutra noite, reaplica-os automaticamente (uma vez, e sem estorvar se o
+  // emoji já estiver ocupado — nesse caso o servidor recusa e fica o de origem).
+  useEffect(() => {
+    if (identSent.current || !room || !youId || !onSetIdentity) return;
+    const perfil = loadProfile();
+    if (!perfil?.emoji) return;
+    identSent.current = true;
+    onSetIdentity({ emoji: perfil.emoji, color: perfil.color });
+  }, [room, youId, onSetIdentity]);
 
   if (!room) return null;
 
@@ -111,7 +141,8 @@ export default function Lobby({ room, youId, messages, error, onSendMessage, onS
                   p.connected ? '' : 'opacity-50'
                 }`}
               >
-                <span className="font-semibold">
+                <span className="font-semibold flex items-center gap-2">
+                  <Avatar player={p} size={28} ring />
                   {p.isHost && '👑 '}
                   {p.isBot && '🤖 '}
                   {p.name}
@@ -124,6 +155,69 @@ export default function Lobby({ room, youId, messages, error, onSendMessage, onS
           </AnimatePresence>
         </ul>
       </section>
+
+      {/* Identidade: o mesmo emoji e a mesma cor seguem-te nos três modos —
+          numa mesa de 8, reconhece-se um 🦊 laranja muito mais depressa que um nome. */}
+      <div className="fd-card p-3 flex flex-col gap-2">
+        <button
+          onClick={() => {
+            sfx.click();
+            setShowIdent((v) => !v);
+          }}
+          className="flex items-center justify-between"
+        >
+          <span className="text-sm text-white/60">🎭 A tua marca</span>
+          <span className="flex items-center gap-2">
+            <Avatar player={you} size={30} ring />
+            <span className="text-xs text-white/40">{showIdent ? 'fechar' : 'mudar'}</span>
+          </span>
+        </button>
+        <AnimatePresence>
+          {showIdent && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              className="overflow-hidden flex flex-col gap-2"
+            >
+              <div className="grid grid-cols-8 gap-1.5 pt-1">
+                {EMOJIS.map((e) => {
+                  const ocupado = room.players.some((p) => p.emoji === e && p.id !== youId);
+                  return (
+                    <button
+                      key={e}
+                      disabled={ocupado}
+                      onClick={() => {
+                        sfx.click();
+                        onSetIdentity({ emoji: e });
+                        saveProfile({ ...(loadProfile() || {}), emoji: e, color: you?.color });
+                      }}
+                      className={`text-xl h-9 rounded-lg ${you?.emoji === e ? 'bg-white/20 ring-2 ring-pink-400' : 'bg-white/5'} ${ocupado ? 'opacity-20' : ''}`}
+                    >
+                      {e}
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="flex gap-2 flex-wrap">
+                {COLORS.map((c) => (
+                  <button
+                    key={c}
+                    onClick={() => {
+                      sfx.click();
+                      onSetIdentity({ color: c });
+                      saveProfile({ ...(loadProfile() || {}), emoji: you?.emoji, color: c });
+                    }}
+                    className={`w-8 h-8 rounded-full border-2 ${you?.color === c ? 'border-white' : 'border-transparent'}`}
+                    style={{ background: c }}
+                    aria-label={`cor ${c}`}
+                  />
+                ))}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
 
       <section className="flex-1 flex flex-col min-h-36">
         <h2 className="text-sm font-semibold text-white/60 mb-2">Chat</h2>
@@ -230,6 +324,52 @@ export default function Lobby({ room, youId, messages, error, onSendMessage, onS
             <button onClick={() => { sfx.click(); onAddBots(1); }} className="fd-chip">+1 bot</button>
             <button onClick={() => { sfx.click(); onAddBots(3); }} className="fd-chip">+3 bots</button>
           </div>
+        </div>
+      )}
+
+      {isHost && (
+        <div className="fd-card p-3 flex flex-col gap-2">
+          <span className="text-sm text-white/60">🎁 Pack temático</span>
+          <div className="grid grid-cols-2 gap-2">
+            {PACKS.map((p) => (
+              <button
+                key={p.key || 'all'}
+                onClick={() => {
+                  sfx.click();
+                  onSetPack(p.key);
+                }}
+                className={`fd-chip ${(room.pack || null) === p.key ? 'fd-chip-on' : ''}`}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
+          <p className="text-xs text-white/40">
+            Os packs são aditivos: junta-se conteúdo da ocasião ao banco normal.
+          </p>
+
+          <button
+            onClick={() => {
+              sfx.click();
+              onSetCurve(!(room.curve !== false));
+            }}
+            className={`fd-chip flex items-center justify-between mt-1 ${room.curve !== false ? 'fd-chip-on' : ''}`}
+          >
+            <span>📈 Curva de intensidade</span>
+            <span className="text-xs opacity-80">{room.curve !== false ? 'ligada' : 'desligada'}</span>
+          </button>
+          <p className="text-xs text-white/40">
+            Com a curva, a intensidade votada é o <b>teto</b>: começa leve e sobe ao longo da noite.
+          </p>
+
+          <a
+            href={`${window.location.origin}/?tv=${room.code}`}
+            target="_blank"
+            rel="noreferrer"
+            className="fd-chip text-center mt-1"
+          >
+            📺 Abrir modo TV (portátil ligado à televisão)
+          </a>
         </div>
       )}
 

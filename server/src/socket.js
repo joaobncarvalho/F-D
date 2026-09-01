@@ -17,7 +17,7 @@ const botTicks = new Map(); // code -> intervalId (tick dos bots de playtest)
 // Tudo o resto é recusado pelo servidor — a pausa tem de ser real, não decorativa.
 const ALLOWED_WHILE_PAUSED = new Set([
   'pause_game', 'rejoin_room', 'send_message', 'end_game', 'reset_game',
-  'create_room', 'join_room', 'set_identity',
+  'create_room', 'join_room', 'set_identity', 'watch_room',
 ]);
 
 /**
@@ -79,6 +79,27 @@ export function registerSocketHandlers(io) {
           you: player.id,
         });
         broadcastState(io, room.code);
+      } catch (err) {
+        handleError(socket, ack, err);
+      }
+    });
+
+    /**
+     * Modo TV / espectador: um portátil ligado à televisão entra na sala em modo
+     * SÓ-LEITURA. Não cria jogador nem ocupa lugar; recebe o mesmo `room_state`
+     * que já é anonimizado para todos (segredos, mãos e papéis nunca lá vão).
+     */
+    socket.on('watch_room', ({ code } = {}, ack) => {
+      try {
+        const room = rooms.getRoom(code);
+        if (!room) throw new AppError('Sala não encontrada.');
+        socket.data.code = room.code;
+        socket.data.playerId = null; // espectador: não é jogador
+        socket.data.spectator = true;
+        socket.join(room.code);
+        const payload = { room: serializeRoom(room), you: null };
+        if (typeof ack === 'function') ack({ ok: true, ...payload });
+        socket.emit('room_state', payload);
       } catch (err) {
         handleError(socket, ack, err);
       }
@@ -717,7 +738,7 @@ export function registerSocketHandlers(io) {
 
     socket.on('disconnect', () => {
       const { code, playerId } = socket.data;
-      if (!code || !playerId) return;
+      if (!code || !playerId || socket.data.spectator) return;
       try {
         rooms.handleDisconnect(code, playerId);
         // Tabuleiro: se quem saiu estava a jogar, não deixar o turno preso.

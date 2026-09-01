@@ -151,3 +151,70 @@ h1, h2, h3 {
 /* Scrollbars discretas */
 *::-webkit-scrollbar { width: 6px; height: 6px; }
 *::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.15); border-radius: 3px; }
+
+/* --- Legibilidade de bar (device.js: applyA11y) ---------------------------
+   Luz baixa, ecrã com dedadas, gente já bem disposta. Dois interruptores:
+   texto maior e alto contraste. Ficam guardados no telemóvel de cada um. */
+html.fd-big {
+  font-size: 21px;
+}
+@media (max-width: 480px) {
+  html.fd-big {
+    font-size: 20.5px;
+  }
+}
+
+html.fd-contrast body::before,
+html.fd-contrast body::after {
+  opacity: 0.18; /* os halos animados são bonitos, mas comem contraste */
+}
+html.fd-contrast body {
+  background: #000;
+  color: #fff;
+}
+html.fd-contrast .fd-card {
+  background: rgba(255, 255, 255, 0.14);
+  border-color: rgba(255, 255, 255, 0.55);
+  backdrop-filter: none;
+}
+html.fd-contrast .fd-chip {
+  background: rgba(255, 255, 255, 0.16);
+  border-color: rgba(255, 255, 255, 0.45);
+}
+html.fd-contrast .fd-input {
+  background: rgba(255, 255, 255, 0.16);
+  border-color: rgba(255, 255, 255, 0.5);
+}
+html.fd-contrast .fd-neon {
+  text-shadow: none;
+}
+html.fd-contrast .text-white\/40,
+html.fd-contrast .text-white\/50,
+html.fd-contrast .text-white\/60 {
+  color: rgba(255, 255, 255, 0.88) !important;
+}
+
+/* Menos animação para quem a pediu no sistema (e menos enjoo ao 5.º copo). */
+@media (prefers-reduced-motion: reduce) {
+  body::before,
+  body::after {
+    animation: none;
+  }
+}
+
+/* --- Modo TV / espectador (pages/Display.jsx) -----------------------------
+   O telemóvel é o comando; a TV mostra o estado. Tudo em vw para escalar. */
+.fd-tv {
+  max-width: none;
+  padding: 2vh 3vw;
+}
+.fd-tv .fd-tv-title {
+  font-size: clamp(2rem, 5vw, 5rem);
+  line-height: 1.05;
+}
+.fd-tv .fd-tv-big {
+  font-size: clamp(1.4rem, 3vw, 3rem);
+}
+.fd-tv .fd-tv-mid {
+  font-size: clamp(1rem, 1.7vw, 1.8rem);
+}

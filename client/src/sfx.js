@@ -9,6 +9,19 @@ try {
   muted = false;
 }
 
+// A música ambiente sai por um barramento próprio para lhe podermos baixar o
+// volume ("ducking") sempre que toca um efeito — senão os dois lutam e não se
+// percebe nem um nem outro.
+let musicGain = null;
+let musicNodes = [];
+let musicOn = false;
+let musicTimer = null;
+try {
+  musicOn = localStorage.getItem('fd_music') === '1';
+} catch {
+  musicOn = false;
+}
+
 function ac() {
   if (!ctx) {
     const AC = window.AudioContext || window.webkitAudioContext;
@@ -18,10 +31,24 @@ function ac() {
   return ctx;
 }
 
+const MUSIC_VOL = 0.075;
+const DUCK_VOL = 0.02;
+
+/** Baixa a música por instantes para o efeito se ouvir por cima. */
+function duck(ms = 420) {
+  if (!musicGain || !ctx) return;
+  const t = ctx.currentTime;
+  musicGain.gain.cancelScheduledValues(t);
+  musicGain.gain.setValueAtTime(musicGain.gain.value, t);
+  musicGain.gain.linearRampToValueAtTime(DUCK_VOL, t + 0.05);
+  musicGain.gain.linearRampToValueAtTime(MUSIC_VOL, t + ms / 1000);
+}
+
 /** Toca um tom simples. */
 function tone(freq, dur = 0.12, type = 'sine', gain = 0.14, when = 0) {
   const a = ac();
   if (!a || muted) return;
+  duck();
   const t0 = a.currentTime + when;
   const osc = a.createOscillator();
   const g = a.createGain();
@@ -38,6 +65,7 @@ function tone(freq, dur = 0.12, type = 'sine', gain = 0.14, when = 0) {
 function slide(from, to, dur = 0.25, type = 'sawtooth', gain = 0.12) {
   const a = ac();
   if (!a || muted) return;
+  duck();
   const t0 = a.currentTime;
   const osc = a.createOscillator();
   const g = a.createGain();
@@ -90,4 +118,71 @@ export const sfx = {
   tick: (urgent = false) => tone(urgent ? 880 : 620, 0.05, 'square', urgent ? 0.12 : 0.07),
   // Buzina de tempo esgotado.
   timeout: () => slide(500, 120, 0.4, 'sawtooth', 0.16),
+
+  // ----- Música ambiente -----
+  // Um loop simples e sintetizado (baixo + acorde a respirar): o silêncio entre
+  // rondas matava o ritmo da mesa. Fica muito abaixo dos efeitos e nunca por cima.
+  isMusicOn: () => musicOn,
+  toggleMusic() {
+    musicOn = !musicOn;
+    try {
+      localStorage.setItem('fd_music', musicOn ? '1' : '0');
+    } catch {
+      /* ignore */
+    }
+    if (musicOn) sfx.startMusic();
+    else sfx.stopMusic();
+    return musicOn;
+  },
+  startMusic() {
+    const a = ac();
+    if (!a || !musicOn || musicTimer) return;
+    musicGain = a.createGain();
+    musicGain.gain.setValueAtTime(MUSIC_VOL, a.currentTime);
+    musicGain.connect(a.destination);
+
+    // Progressão de 4 acordes em lá menor — festa sem ser irritante.
+    const PROG = [
+      [110, 164.81, 220], // Am
+      [98, 146.83, 196], // G
+      [87.31, 130.81, 174.61], // F
+      [82.41, 123.47, 164.81], // E
+    ];
+    let step = 0;
+    const bar = () => {
+      if (!musicOn || muted) return;
+      const now = a.currentTime;
+      const chord = PROG[step % PROG.length];
+      step += 1;
+      musicNodes = musicNodes.filter((n) => {
+        try { n.stop(); } catch { /* já parou */ }
+        return false;
+      });
+      chord.forEach((freq, i) => {
+        const osc = a.createOscillator();
+        const g = a.createGain();
+        osc.type = i === 0 ? 'triangle' : 'sine';
+        osc.frequency.setValueAtTime(freq, now);
+        g.gain.setValueAtTime(0.0001, now);
+        g.gain.linearRampToValueAtTime(i === 0 ? 0.5 : 0.22, now + 0.4);
+        g.gain.linearRampToValueAtTime(0.0001, now + 2.4);
+        osc.connect(g).connect(musicGain);
+        osc.start(now);
+        osc.stop(now + 2.5);
+        musicNodes.push(osc);
+      });
+    };
+    bar();
+    musicTimer = setInterval(bar, 2400);
+  },
+  stopMusic() {
+    clearInterval(musicTimer);
+    musicTimer = null;
+    for (const n of musicNodes) {
+      try { n.stop(); } catch { /* já parou */ }
+    }
+    musicNodes = [];
+    try { musicGain?.disconnect(); } catch { /* ignore */ }
+    musicGain = null;
+  },
 };

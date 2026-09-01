@@ -115,18 +115,29 @@ export async function initBoard(room, { intensity = 'leve' } = {}) {
   const squares = await generateSquares();
   const banks = await repo.getBoardBanks(); // { events, prison, cards } — snapshot p/ os handlers síncronos
   const players = {};
+  // O peão arranca com o emoji que o jogador escolheu no lobby: é a MESMA marca
+  // nos três modos, e poupa um passo a quem já se identificou. Só cai para "por
+  // escolher" se o emoji não servir de peão ou já estiver ocupado.
+  const usados = new Set();
   for (const p of room.players.values()) {
+    const herdado = PAWNS.includes(p.emoji) && !usados.has(p.emoji) ? p.emoji : null;
+    if (herdado) usados.add(herdado);
     players[p.id] = {
-      pawn: null, pos: 0, golos: 0, slowStreak: 0, fastStreak: 0, skipTurns: 0,
+      pawn: herdado, pos: 0, golos: 0, slowStreak: 0, fastStreak: 0, skipTurns: 0,
       finished: false, cards: [], shield: false,
       allianceWith: null, allianceTurnsLeft: 0, // Casa Aliança (bebe metade pelo parceiro)
       mirrorOf: null, // Casa Espelho: o próximo ?? deste jogador também me acerta
       prisonCount: 0, cardsPlayed: 0, // estatísticas do fim
     };
   }
+  // Se toda a gente já trouxe peão do lobby, não há nada para escolher —
+  // salta-se direto para o lançamento da ordem.
+  const ligados = [...room.players.values()].filter((p) => p.connected);
+  const todosComPeao = ligados.length > 0 && ligados.every((p) => players[p.id].pawn);
+
   room.mode = 'board';
   room.board = {
-    phase: 'pawn', // pawn | order | playing | over
+    phase: todosComPeao ? 'order' : 'pawn', // pawn | order | playing | over
     intensity: ['picante', 'hardcore', 'caos'].includes(intensity) ? intensity : 'leve',
     size: BOARD_SIZE,
     squares,

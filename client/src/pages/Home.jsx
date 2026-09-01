@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { sfx } from '../sfx.js';
+import { loadProfile, saveProfile } from '../device.js';
 
 // Traduz o erro do servidor num painel amigável (emoji + dica de o que fazer).
 function friendlyError(msg) {
@@ -18,21 +19,26 @@ export default function Home({ error, onCreate, onJoin }) {
   const [mode, setMode] = useState(null); // null | 'create' | 'join'
   const [name, setName] = useState('');
   const [code, setCode] = useState('');
+  // Perfil local (device.js): nome, emoji/cor e últimas salas deste telemóvel.
+  // Não é login nem conta — é só não obrigar a escrever tudo outra vez.
+  const [profile] = useState(loadProfile);
 
   useEffect(() => {
+    if (profile?.name) setName(profile.name);
     const params = new URLSearchParams(window.location.search);
     const j = params.get('join');
     if (j) {
       setMode('join');
       setCode(j.toUpperCase().slice(0, 4));
     }
-  }, []);
+  }, [profile]);
 
   function submit(e) {
     e.preventDefault();
     const trimmed = name.trim();
     if (!trimmed) return;
     sfx.click();
+    saveProfile({ ...(loadProfile() || {}), name: trimmed });
     if (mode === 'create') onCreate(trimmed);
     else onJoin(code.trim().toUpperCase(), trimmed);
   }
@@ -81,6 +87,27 @@ export default function Home({ error, onCreate, onJoin }) {
           >
             🚪 Juntar a Jogo
           </button>
+
+          {/* Voltar a jogar com o mesmo grupo: um toque em vez de código + nome. */}
+          {!!profile?.recentRooms?.length && profile?.name && (
+            <div className="flex flex-col gap-2 mt-1">
+              <p className="text-xs text-white/30 text-center">Voltar a uma sala recente</p>
+              <div className="flex gap-2 justify-center flex-wrap">
+                {profile.recentRooms.map((c) => (
+                  <button
+                    key={c}
+                    onClick={() => {
+                      sfx.click();
+                      onJoin(c, profile.name);
+                    }}
+                    className="fd-chip tracking-[0.2em] font-bold"
+                  >
+                    {profile.emoji || '🚪'} {c}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </motion.div>
       )}
 

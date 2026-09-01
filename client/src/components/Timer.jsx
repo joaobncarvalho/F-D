@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { sfx } from '../sfx.js';
+import { elapsedSince } from '../clock.js';
 
 /**
  * Timer visual reutilizável (anel SVG) com contagem decrescente, tiques nos
@@ -13,6 +14,9 @@ import { sfx } from '../sfx.js';
  *   runKey   — muda para REINICIAR (ex.: id da ronda). Sempre que muda, recomeça.
  *   onExpire — callback opcional ao chegar a 0 (disparado uma só vez)
  *   size     — diâmetro em px (default 88)
+ *
+ * O tempo decorrido vem do relógio partilhado (clock.js), que PARA enquanto o
+ * host tiver o jogo em pausa — um intervalo não pode custar a ronda a ninguém.
  */
 export default function Timer({ seconds = 20, runKey, onExpire, size = 88 }) {
   const [left, setLeft] = useState(seconds);
@@ -25,7 +29,7 @@ export default function Timer({ seconds = 20, runKey, onExpire, size = 88 }) {
     lastTickRef.current = null;
     const start = Date.now();
     const id = setInterval(() => {
-      const remaining = Math.max(0, seconds - (Date.now() - start) / 1000);
+      const remaining = Math.max(0, seconds - elapsedSince(start) / 1000);
       setLeft(remaining);
       const whole = Math.ceil(remaining);
       if (remaining > 0 && remaining <= 5 && lastTickRef.current !== whole) {

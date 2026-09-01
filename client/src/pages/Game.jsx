@@ -8,6 +8,12 @@ import { GuessingCard } from './games/GuessingCard.jsx';
 import { PiramideCard } from './games/PiramideCard.jsx';
 import { VascoCard } from './games/VascoCard.jsx';
 import { RelampagoCard, MimicaCard, RoletaCard, DueloCard } from './games/quickCards.jsx';
+import { GrupoCard } from './games/grupoCards.jsx';
+import { CascataCard } from './games/CascataCard.jsx';
+import { DesenhoCard } from './games/DesenhoCard.jsx';
+import { ReacaoCard } from './games/ReacaoCard.jsx';
+import Feed, { ShareResult } from '../components/Feed.jsx';
+import { Avatar } from './games/shared.jsx';
 import { socket } from '../socket.js';
 import { sfx } from '../sfx.js';
 import { confetti, haptic } from '../confetti.js';
@@ -24,6 +30,10 @@ const SPIN_PHASES = [
   'mimica',
   'roleta',
   'duelo',
+  'grupo', // eu_nunca · mais_provavel · termometro · quem_disse
+  'cascata',
+  'desenho',
+  'reacao',
 ];
 
 // Sugestões para os indecisos na preparação (banco curado — offline, sem custo).
@@ -167,12 +177,21 @@ export default function Game(props) {
 
       <div className="flex items-center justify-between text-xs text-white/40">
         <span>Ronda {g.roundCount || 0}</span>
+        <button onClick={props.onShowRules} className="text-white/40 underline decoration-dotted">
+          📖 regras
+        </button>
         <span className="uppercase tracking-wide">
           {{ leve: '🍃 Leve', picante: '🌶️ Picante +18', hardcore: '🔥 Hardcore', caos: '💥 Caos' }[
             g.intensity
           ] || '🍃 Leve'}
+          {/* A curva sobe a intensidade ao longo da noite: mostra-se o teto votado. */}
+          {g.curve && g.intensityCeiling !== g.intensity && (
+            <span className="text-white/25"> → {{ picante: '🌶️', hardcore: '🔥', caos: '💥' }[g.intensityCeiling]}</span>
+          )}
         </span>
       </div>
+
+      <Feed feed={room.feed} />
 
       {g.activeRules?.length > 0 && (
         <div className="fd-card p-2.5 flex flex-col gap-1">
@@ -339,6 +358,56 @@ export default function Game(props) {
             canControl={isHost || isSpinner}
             onAnswer={props.onRoletaAnswer}
             onPass={props.onRoletaPass}
+            onContinue={props.onContinue}
+          />
+        )}
+        {revealed && g.phase === 'grupo' && (
+          <GrupoCard
+            key={round.id}
+            round={round}
+            room={room}
+            youId={youId}
+            isAuthor={authorRoundId === round.id}
+            canControl={isHost || isSpinner}
+            onAnswer={props.onGrupoAnswer}
+            onReveal={props.onGrupoReveal}
+            onContinue={props.onContinue}
+          />
+        )}
+        {revealed && g.phase === 'cascata' && (
+          <CascataCard
+            key={round.id}
+            round={round}
+            room={room}
+            youId={youId}
+            canControl={isHost || isSpinner}
+            onStart={props.onCascataStart}
+            onStop={props.onCascataStop}
+            onContinue={props.onContinue}
+          />
+        )}
+        {revealed && g.phase === 'desenho' && (
+          <DesenhoCard
+            key={round.id}
+            round={round}
+            room={room}
+            youId={youId}
+            word={props.desenhoWord?.roundId === round.id ? props.desenhoWord : null}
+            canControl={isHost || isSpinner}
+            onStart={props.onDesenhoStart}
+            onGuess={props.onDesenhoGuess}
+            onGiveUp={props.onDesenhoGiveUp}
+            onContinue={props.onContinue}
+          />
+        )}
+        {revealed && g.phase === 'reacao' && (
+          <ReacaoCard
+            key={round.id}
+            round={round}
+            room={room}
+            youId={youId}
+            canControl={isHost || isSpinner}
+            onTap={props.onReacaoTap}
             onContinue={props.onContinue}
           />
         )}
@@ -542,10 +611,11 @@ function PlayersStrip({ room, youId, currentId }) {
             p.connected && !p.eliminated ? '' : 'opacity-45'
           } ${currentId === p.id ? 'ring-2 ring-pink-500' : ''}`}
         >
-          <p className="text-xs font-semibold whitespace-nowrap">
-            {p.isHost && '👑 '}
+          <p className="text-xs font-semibold whitespace-nowrap flex items-center gap-1 justify-center">
+            <Avatar player={p} size={20} ring={currentId === p.id} />
+            {p.isHost && '👑'}
             {p.name}
-            {p.id === youId && <span className="text-white/40"> (tu)</span>}
+            {p.id === youId && <span className="text-white/40">(tu)</span>}
           </p>
           <motion.p key={p.lives} initial={{ scale: 1.4 }} animate={{ scale: 1 }} className="text-sm">
             {p.lives > 0 ? '❤️'.repeat(p.lives) : '💀'}
@@ -583,6 +653,33 @@ function FlashOverlay({ effect }) {
   );
 }
 
+/** Dados do cartão de resultados da Roda (o botão vive em components/Feed.jsx). */
+function ShareButton({ room, stats }) {
+  if (!stats?.rows?.length) return null;
+  const jogador = (id) => room.players.find((p) => p.id === id);
+  return (
+    <ShareResult
+      data={() => ({
+        title: 'F&D — a nossa noite',
+        subtitle: `${stats.roundCount || 0} rondas · ${room.players.length} jogadores`,
+        awards: [
+          stats.survivor && { emoji: '🏆', label: 'Último de pé', name: stats.survivor.name },
+          stats.mostDrinks && { emoji: '🍺', label: 'Bebeu mais', name: stats.mostDrinks.name },
+          stats.mostRefusals && { emoji: '🙅', label: 'Recusou mais', name: stats.mostRefusals.name },
+        ].filter(Boolean),
+        rows: [...stats.rows]
+          .sort((a, b) => b.drinks - a.drinks)
+          .map((r) => ({
+            emoji: jogador(r.id)?.emoji || '🙂',
+            name: r.name,
+            detail: `🍺 ${r.drinks} · 🥃 ${r.shots}`,
+            highlight: r.id === stats.survivor?.id,
+          })),
+      })}
+    />
+  );
+}
+
 function GameOver({ room, isHost, onReset, onLeave }) {
   const stats = room.game.finalStats;
   useEffect(() => {
@@ -597,6 +694,8 @@ function GameOver({ room, isHost, onReset, onLeave }) {
     >
       <h1 className="fd-title fd-neon text-3xl font-extrabold text-center mt-2">Fim de jogo! 🏁</h1>
       <p className="text-center text-white/50 text-sm">{stats?.roundCount || 0} rondas jogadas</p>
+
+      <ShareButton room={room} stats={stats} />
 
       {stats?.survivor && (
         <div className="fd-card p-3 text-center" style={{ background: 'rgba(31,211,182,0.12)' }}>

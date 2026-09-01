@@ -10,8 +10,16 @@ import IntensityReveal from './components/IntensityReveal.jsx';
 import Board from './pages/Board.jsx';
 import Tournament from './pages/Tournament.jsx';
 import ErrorBoundary from './components/ErrorBoundary.jsx';
+import Display from './pages/Display.jsx';
+import Settings from './components/Settings.jsx';
+import Rules from './components/Rules.jsx';
+import { keepScreenAwake, loadA11y, applyA11y, registerServiceWorker, rememberRoom } from './device.js';
+import { setPaused } from './clock.js';
 
 const SESSION_KEY = 'fd_session';
+
+// Modo TV: `/?tv=CODIGO` abre a sala em só-leitura num ecrã grande.
+const TV_CODE = new URLSearchParams(window.location.search).get('tv');
 
 // Sessão: o sessionStorage é por-separador (2 separadores em dev = 2 jogadores)
 // e sobrevive a recarregar. Mas se o browser MATAR o separador (comum no
@@ -48,7 +56,12 @@ export default function App() {
   const [mimicaWord, setMimicaWord] = useState(null); // { roundId, word, mode… } — PRIVADO
   const [boardHand, setBoardHand] = useState(null); // { cards } — mão de cartas do tabuleiro (PRIVADA)
   const [intensityResult, setIntensityResult] = useState(null); // { intensity, randomized, candidates, counts }
+  const [desenhoWord, setDesenhoWord] = useState(null); // { roundId, word } — PRIVADO
   const [muted, setMuted] = useState(sfx.isMuted());
+  const [music, setMusic] = useState(sfx.isMusicOn());
+  const [a11y, setA11y] = useState(loadA11y);
+  const [showSettings, setShowSettings] = useState(false);
+  const [showRules, setShowRules] = useState(false);
 
   const sessionRef = useRef(loadSession());
 
@@ -68,12 +81,34 @@ export default function App() {
     }
   }
 
-  // Desbloqueia o áudio no primeiro toque (política de autoplay dos browsers).
+  // Desbloqueia o áudio no primeiro toque (política de autoplay dos browsers) e
+  // arranca a música ambiente se estiver ligada — só pode ser aqui, num gesto.
   useEffect(() => {
-    const unlock = () => sfx.unlock();
+    const unlock = () => {
+      sfx.unlock();
+      if (sfx.isMusicOn()) sfx.startMusic();
+    };
     window.addEventListener('pointerdown', unlock, { once: true });
     return () => window.removeEventListener('pointerdown', unlock);
   }, []);
+
+  // Ecrã sempre aceso + PWA + preferências de legibilidade.
+  useEffect(() => {
+    const release = keepScreenAwake();
+    registerServiceWorker();
+    applyA11y(loadA11y());
+    return release;
+  }, []);
+
+  useEffect(() => {
+    applyA11y(a11y);
+  }, [a11y]);
+
+  // Pausa do host: além de o servidor recusar ações, os cronómetros congelam —
+  // senão quem volta da casa de banho perdia a ronda à mesma.
+  useEffect(() => {
+    setPaused(!!room?.paused);
+  }, [room?.paused]);
 
   useEffect(() => {
     function onRoomJoined({ room, you }) {
@@ -81,6 +116,7 @@ export default function App() {
       setYouId(you);
       setError(null);
       saveSession({ code: room.code, playerId: you });
+      rememberRoom(room.code); // "voltar a jogar" no ecrã inicial
       // Religar a meio: cada modo tem o seu ecrã (senão o Tabuleiro/Torneio caíam no da Roda).
       const playingScreen = room.mode === 'board' ? 'board' : room.mode === 'tournament' ? 'tournament' : 'game';
       setScreen(room.status === 'lobby' ? 'lobby' : playingScreen);
@@ -98,6 +134,7 @@ export default function App() {
       setPiramideHand(null);
       setVascoRole(null);
       setMimicaWord(null);
+      setDesenhoWord(null);
       setBoardHand(null);
       setIntensityResult(intensityResult || null);
       // Tabuleiro/Torneio vão direto ao ecrã do jogo; a roda passa pela roleta + countdown.
@@ -111,6 +148,7 @@ export default function App() {
       setPiramideHand(null);
       setVascoRole(null);
       setMimicaWord(null);
+      setDesenhoWord(null);
       setBoardHand(null);
       setScreen('lobby');
     }
@@ -128,6 +166,9 @@ export default function App() {
     }
     function onMimicaWord(payload) {
       setMimicaWord(payload);
+    }
+    function onDesenhoWord(payload) {
+      setDesenhoWord(payload);
     }
     function onBoardHand({ cards, traps }) {
       setBoardHand({ cards: cards || [], traps: traps || [] });
@@ -154,6 +195,7 @@ export default function App() {
     socket.on('piramide_hand', onPiramideHand);
     socket.on('vasco_role', onVascoRole);
     socket.on('mimica_word', onMimicaWord);
+    socket.on('desenho_word', onDesenhoWord);
     socket.on('board_hand', onBoardHand);
     socket.on('error_msg', onError);
     socket.on('session_invalid', onSessionInvalid);
@@ -169,6 +211,7 @@ export default function App() {
       socket.off('piramide_hand', onPiramideHand);
       socket.off('vasco_role', onVascoRole);
       socket.off('mimica_word', onMimicaWord);
+      socket.off('desenho_word', onDesenhoWord);
       socket.off('board_hand', onBoardHand);
       socket.off('error_msg', onError);
       socket.off('session_invalid', onSessionInvalid);
@@ -228,6 +271,20 @@ export default function App() {
   const voteIntensity = useCallback((intensity) => socket.emit('vote_intensity', { intensity }), []);
   const setMode = useCallback((mode) => socket.emit('set_mode', { mode }), []);
   const addBots = useCallback((count) => socket.emit('dev_add_bots', { count }), []); // playtest (dev)
+  const setIdentity = useCallback((ident) => socket.emit('set_identity', ident), []);
+  const setPack = useCallback((pack) => socket.emit('set_pack', { pack }), []);
+  const setCurve = useCallback((on) => socket.emit('set_curve', { on }), []);
+  const pauseGame = useCallback((paused) => socket.emit('pause_game', { paused }), []);
+  const grupoAnswer = useCallback((value) => socket.emit('grupo_answer', { value }), []);
+  const grupoReveal = useCallback(() => socket.emit('grupo_reveal'), []);
+  const cascataStart = useCallback(() => socket.emit('cascata_start'), []);
+  const cascataStop = useCallback(() => socket.emit('cascata_stop'), []);
+  const desenhoStart = useCallback(() => socket.emit('desenho_start'), []);
+  const desenhoGuess = useCallback((text) => socket.emit('desenho_guess', { text }), []);
+  const desenhoGiveUp = useCallback(() => socket.emit('desenho_giveup'), []);
+  const reacaoTap = useCallback(() => socket.emit('reacao_tap'), []);
+  const boardReacaoTap = useCallback(() => socket.emit('board_reacao_tap'), []);
+  const tournamentTap = useCallback(() => socket.emit('tournament_tap'), []);
   const boardPickPawn = useCallback((pawn) => socket.emit('board_pick_pawn', { pawn }), []);
   const boardRoll = useCallback(() => socket.emit('board_roll'), []);
   const boardAdvance = useCallback((squares) => socket.emit('board_advance', { squares }), []);
@@ -306,6 +363,7 @@ export default function App() {
     setPiramideHand(null);
     setVascoRole(null);
     setMimicaWord(null);
+    setDesenhoWord(null);
     setBoardHand(null);
     setScreen('home');
   }, []);
@@ -313,16 +371,71 @@ export default function App() {
   function toggleMute() {
     setMuted(sfx.toggleMute());
   }
+  function toggleMusic() {
+    setMusic(sfx.toggleMusic());
+  }
+  function toggleA11y(key) {
+    setA11y((prev) => ({ ...prev, [key]: !prev[key] }));
+  }
+
+  // Modo TV: ecrã grande, só-leitura, sem barra de comandos nem sessão.
+  if (TV_CODE) return <Display code={TV_CODE.toUpperCase()} />;
+
+  const you = room?.players?.find((p) => p.id === youId);
+  const isHost = !!you?.isHost;
 
   return (
     <div className="min-h-full mx-auto max-w-md px-5 py-6 flex flex-col relative">
-      <button
-        onClick={toggleMute}
-        className="fixed top-3 right-3 z-40 fd-card w-10 h-10 grid place-items-center text-lg"
-        title={muted ? 'Ligar som' : 'Silenciar'}
-      >
-        {muted ? '🔇' : '🔊'}
-      </button>
+      <div className="fixed top-3 right-3 z-40 flex gap-2">
+        {isHost && screen !== 'home' && screen !== 'lobby' && (
+          <button
+            onClick={() => {
+              sfx.click();
+              pauseGame(!room?.paused);
+            }}
+            className="fd-card w-10 h-10 grid place-items-center text-lg"
+            title={room?.paused ? 'Retomar' : 'Pausa'}
+          >
+            {room?.paused ? '▶️' : '⏸️'}
+          </button>
+        )}
+        <button
+          onClick={() => {
+            sfx.click();
+            setShowSettings(true);
+          }}
+          className="fd-card w-10 h-10 grid place-items-center text-lg"
+          title="Definições"
+        >
+          ⚙️
+        </button>
+      </div>
+
+      <AnimatePresence>
+        {showSettings && (
+          <Settings
+            key="settings"
+            muted={muted}
+            music={music}
+            a11y={a11y}
+            onToggleMute={toggleMute}
+            onToggleMusic={toggleMusic}
+            onToggleA11y={toggleA11y}
+            onRules={() => {
+              setShowSettings(false);
+              setShowRules(true);
+            }}
+            onClose={() => setShowSettings(false)}
+          />
+        )}
+        {showRules && <Rules key="rules" mode={room?.mode || 'wheel'} onClose={() => setShowRules(false)} />}
+      </AnimatePresence>
+
+      {room?.paused && screen !== 'home' && (
+        <div className="mb-3 rounded-lg bg-amber-500/20 text-amber-200 text-center text-sm py-2 font-bold">
+          ⏸️ Jogo em pausa {isHost ? '— toca em ▶️ para retomar' : '— o host já volta'}
+        </div>
+      )}
 
       {conn === 'reconnecting' && screen !== 'home' && (
         <div className="mb-3 rounded-lg bg-amber-500/15 text-amber-300 text-center text-sm py-2">
@@ -346,6 +459,9 @@ export default function App() {
             onStart={startGame}
             onVoteIntensity={voteIntensity}
             onSetMode={setMode}
+            onSetIdentity={setIdentity}
+            onSetPack={setPack}
+            onSetCurve={setCurve}
             onAddBots={addBots}
             onLeave={leaveRoom}
           />
@@ -368,6 +484,7 @@ export default function App() {
             onPlayCard={boardPlayCard}
             onBid={boardBid}
             onRuleFail={boardRuleFail}
+            onReacaoTap={boardReacaoTap}
             onSkip={boardSkip}
             onEnd={boardEnd}
             onKick={boardKick}
@@ -384,6 +501,7 @@ export default function App() {
             onAction={tournamentAction}
             onChoose={tournamentChoose}
             onVote={tournamentVote}
+            onTap={tournamentTap}
             onContinue={tournamentContinue}
             onSkip={tournamentSkip}
             onEnd={tournamentEnd}
@@ -409,6 +527,16 @@ export default function App() {
             piramideHand={piramideHand}
             vascoRole={vascoRole}
             mimicaWord={mimicaWord}
+            desenhoWord={desenhoWord}
+            onGrupoAnswer={grupoAnswer}
+            onGrupoReveal={grupoReveal}
+            onCascataStart={cascataStart}
+            onCascataStop={cascataStop}
+            onDesenhoStart={desenhoStart}
+            onDesenhoGuess={desenhoGuess}
+            onDesenhoGiveUp={desenhoGiveUp}
+            onReacaoTap={reacaoTap}
+            onShowRules={() => setShowRules(true)}
             onAddQuestion={addQuestion}
             onAddSecret={addSecret}
             onBeginPlay={beginPlay}

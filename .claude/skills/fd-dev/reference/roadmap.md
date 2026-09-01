@@ -107,7 +107,17 @@ Legenda: ✅ feito · 🚧 em curso · ⬜ por fazer · 🔗 ponto de integraç�
 - [x] Controlos do host: saltar jogador, remover quem saiu, terminar jogo (roda já
       tinha `skip_turn`/`end_game`; **tabuleiro** agora tem `board_skip`/`board_end`/
       `board_kick` + auto-skip de quem se desliga — anti-deadlock)
-- [ ] Playtest real com amigos → correção de bugs (o único P0 restante do tabuleiro)
+- [x] **Pacote pré-playtest (2026-09-01)** — ver progress-log:
+      · anti-repetição de prompts (saco por sala) · wake lock · PWA (manifest+SW+ícones)
+      · snapshot/recuperação das salas depois de reinício
+      · 7 tipos novos (Eu Nunca · Mais Provável · Termómetro · Quem Disse · Cascata ·
+        Desenha · Reação) — Roda, e a Reação também no Torneio e no Tabuleiro
+      · curva de intensidade · packs temáticos · identidade transversal (emoji+cor)
+      · feed de eventos · pausa do host (com cronómetros congelados) · auto-resolve
+      · modo TV (`/?tv=CODIGO`) · legibilidade de bar · música com ducking
+      · cartão de resultados partilhável · ecrã de regras · voltar a jogar
+- [ ] Playtest real com amigos → correção de bugs (o único P0 restante)
+- [ ] 🔗 `prisma db push` + `db seed` na Supabase (coluna `tag` + 128 prompts novos)
 - [x] Deploy no ar (Railway, imagem única) — inclui **ambos os modos**. Falta só o
       `db push`+seed da tabela `board_items` na Supabase p/ ativar a edição na admin.
 - [x] **Bancos do tabuleiro em dados/BD** (melhoria): ?? / prisão / cartas passam a

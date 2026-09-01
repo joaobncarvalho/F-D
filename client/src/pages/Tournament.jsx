@@ -6,10 +6,12 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { sfx } from '../sfx.js';
 import { confetti, haptic } from '../confetti.js';
 import { TYPES } from './games/shared.jsx';
+import { BotaoReacao } from './games/ReacaoCard.jsx';
+import Feed, { ShareResult } from '../components/Feed.jsx';
 
 const typeMeta = (key) => TYPES.find((t) => t.key === key) || { emoji: '🎮', label: 'Duelo', color: '#ff3d8b' };
 
-export default function Tournament({ room, youId, onNext, onAction, onChoose, onVote, onContinue, onSkip, onEnd, onReset, onLeave }) {
+export default function Tournament({ room, youId, onNext, onAction, onChoose, onVote, onTap, onContinue, onSkip, onEnd, onReset, onLeave }) {
   const t = room?.tournament;
   const you = room?.players.find((p) => p.id === youId);
   const isHost = you?.isHost;
@@ -91,6 +93,19 @@ export default function Tournament({ room, youId, onNext, onAction, onChoose, on
         <Bracket t={t} youId={youId} />
 
         <div className="flex flex-col gap-2 mt-auto">
+          <ShareResult
+            data={() => ({
+              title: 'F&D — o torneio',
+              subtitle: `${t.roundIdx + 1} rondas de eliminação direta`,
+              awards: [t.champion && { emoji: '👑', label: 'Rei/Rainha da noite', name: t.champion.name }].filter(Boolean),
+              rows: ranking.map((r) => ({
+                emoji: room.players.find((p) => p.id === r.id)?.emoji || '🙂',
+                name: r.name,
+                detail: `🏆 ${r.wins} · 🍺 ${r.drinks}`,
+                highlight: r.id === t.champion?.id,
+              })),
+            })}
+          />
           {isHost && (
             <button onClick={() => { sfx.click(); onReset(); }} className="fd-btn fd-btn-primary">
               🔄 Jogar outra vez
@@ -113,6 +128,8 @@ export default function Tournament({ room, youId, onNext, onAction, onChoose, on
     return (
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex-1 flex flex-col gap-3">
         <Header sub={`Ronda ${t.roundIdx + 1} · eliminação direta`}>⚔️ Duelo</Header>
+
+        <Feed feed={room.feed} />
 
         <div className="fd-card p-3 flex items-center justify-around text-center">
           <span className={`font-extrabold ${d.result?.winnerId === d.aId ? 'text-emerald-300' : ''}`}>{d.aName}</span>
@@ -151,6 +168,24 @@ export default function Tournament({ room, youId, onNext, onAction, onChoose, on
               ) : (
                 <p className="text-sm text-white/40">
                   {iPlayed ? 'Jogaste! À espera do adversário…' : `Duelo em curso… ${d.played.length}/2 jogaram`}
+                </p>
+              )}
+            </>
+          )}
+
+          {d.substate === 'racing' && d.reaction && (
+            <>
+              <p className="text-lg leading-snug">{d.text}</p>
+              {isDuelist ? (
+                <BotaoReacao
+                  goAt={d.reaction.goAt}
+                  jaCarreguei={d.reaction.tapped?.includes(youId)}
+                  falso={d.reaction.falseStarts?.includes(youId)}
+                  onTap={onTap}
+                />
+              ) : (
+                <p className="text-sm text-white/40">
+                  🍿 Dois dedos, um sinal. {d.reaction.tapped.length + d.reaction.falseStarts.length}/2 já carregaram.
                 </p>
               )}
             </>

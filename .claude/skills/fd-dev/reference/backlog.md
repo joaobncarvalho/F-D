@@ -65,9 +65,25 @@ pós-MVP / v2 · **💡** = ideia nova a validar.
 - [x] **Testes automatizados dos invariantes** (`server/test/*`, `npm test`) — anonimato,
       rotação, eliminação, cartas privadas. Correr antes de cada commit.
 - [x] **Log estruturado** (`log.js`) + safety net de processo (não deita o servidor abaixo).
-- [ ] Recuperação de sala após crash do servidor (snapshot opcional na BD)
+- [x] **Recuperação de sala após reinício** — `snapshot.js` (ficheiro; passar à BD
+      é o passo seguinte, para sobreviver a trocas de máquina no deploy)
 
 ---
+
+## ✅ Feitas em 2026-09-01 (eram ideias, passaram a jogo)
+
+- [x] **Modo espectador / ecrã partilhado** — `/?tv=CODIGO` (`pages/Display.jsx`),
+      entra por `watch_room` sem ocupar lugar.
+- [x] **Intensidade adaptativa** — curva: a votação é o teto, começa leve e sobe.
+- [x] **Pack de conteúdo por ocasião** — `tag` no prompt + CRUD na /admin.
+- [x] **Perfis leves persistentes** — nome/emoji/cor e salas recentes em localStorage.
+- [x] **Acessibilidade** — texto grande + alto contraste (⚙️).
+- [x] **Partilha do resultado final** — cartão PNG (canvas) nos três modos.
+- [x] **Jogos de mesa inteira** — Eu Nunca · Mais Provável · Termómetro · Quem Disse
+      · Cascata · Desenha · Reação (era o buraco do catálogo: quase tudo girava à
+      volta do jogador da vez).
+- [x] **Modo "duelo"** — Reação como duelo do Torneio e casa do Tabuleiro.
+- [x] **Recuperação de sala após crash do servidor** — `snapshot.js`.
 
 ## 💡 Ideias novas (a validar)
 

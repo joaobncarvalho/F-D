@@ -17,7 +17,40 @@ export const TYPES = [
   { key: 'mimica', label: 'Mímica', color: '#f472b6', emoji: '🎭' },
   { key: 'roleta_russa', label: 'Roleta Russa', color: '#ef4444', emoji: '🎯' },
   { key: 'duelo', label: 'Duelo 1v1', color: '#38bdf8', emoji: '⚔️' },
+  // Jogos de MESA INTEIRA — toda a gente joga ao mesmo tempo.
+  { key: 'eu_nunca', label: 'Eu Nunca', color: '#a78bfa', emoji: '🙈' },
+  { key: 'mais_provavel', label: 'Mais Provável', color: '#fb923c', emoji: '👉' },
+  { key: 'termometro', label: 'Termómetro', color: '#f87171', emoji: '🌡️' },
+  { key: 'quem_disse', label: 'Quem Disse', color: '#22d3ee', emoji: '💬' },
+  { key: 'cascata', label: 'Cascata', color: '#60a5fa', emoji: '🌊' },
+  { key: 'desenho', label: 'Desenha', color: '#34d399', emoji: '🎨' },
+  { key: 'reacao', label: 'Reação', color: '#fde047', emoji: '⚡' },
 ];
+
+/** Cor/emoji/label de um tipo — com um fallback seguro para tipos desconhecidos. */
+export function typeMeta(key) {
+  return TYPES.find((t) => t.key === key) || { key, label: key, color: '#9b5cff', emoji: '🎲' };
+}
+
+/** Avatar do jogador (emoji + cor escolhidos no lobby). Transversal aos 3 modos. */
+export function Avatar({ player, size = 30, ring = false }) {
+  if (!player) return null;
+  return (
+    <span
+      className="inline-grid place-items-center rounded-full flex-shrink-0"
+      style={{
+        width: size,
+        height: size,
+        fontSize: size * 0.58,
+        background: `${player.color || '#9b5cff'}33`,
+        border: `2px solid ${ring ? player.color || '#9b5cff' : 'transparent'}`,
+      }}
+      title={player.name}
+    >
+      {player.emoji || '🙂'}
+    </span>
+  );
+}
 
 export function CardShell({ children, typeKey }) {
   const t = TYPES.find((x) => x.key === typeKey);
