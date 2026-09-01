@@ -158,6 +158,7 @@ export default function Lobby({ room, youId, messages, error, onSendMessage, onS
           {[
             { key: 'wheel', label: '🎡 Roda' },
             { key: 'board', label: '🎲 Tabuleiro' },
+            { key: 'tournament', label: '🏆 Torneio' },
           ].map((m) => (
             <button
               key={m.key}
@@ -177,6 +178,11 @@ export default function Lobby({ room, youId, messages, error, onSendMessage, onS
         {room.mode === 'board' && (
           <p className="text-xs text-emerald-300/80">
             🎲 Tabuleiro: corrida de bebida (dás a volta = ganhas). Sem vidas. <b>beta</b>
+          </p>
+        )}
+        {room.mode === 'tournament' && (
+          <p className="text-xs text-amber-300/80">
+            🏆 Torneio: duelos 1v1 de eliminação direta com os jogos rápidos. Quem sobra é o rei/rainha da noite.
           </p>
         )}
         {!isHost && <p className="text-xs text-white/40">Só o host escolhe o modo.</p>}

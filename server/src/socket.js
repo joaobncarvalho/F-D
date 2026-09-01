@@ -4,7 +4,9 @@ import * as board from './board.js';
 import { sanitizeText, throttled } from './util.js';
 import { log } from './log.js';
 import * as bots from './bots.js';
+import * as tournament from './tournament.js';
 import { registerBoardHandlers } from './socket/boardHandlers.js';
+import { registerTournamentHandlers } from './socket/tournamentHandlers.js';
 
 const rooms = new RoomManager();
 const botTicks = new Map(); // code -> intervalId (tick dos bots de playtest)
@@ -76,6 +78,11 @@ export function registerSocketHandlers(io) {
           const role = game.vascoRole(room, player.id);
           if (role) socket.emit('vasco_role', { roundId: room.game.round.id, ...role });
         }
+        // Mímica a decorrer: devolve a palavra privada a quem está a mimar.
+        if (room.game?.round?.gameTypeKey === 'mimica') {
+          const w = game.mimicaWord(room, player.id);
+          if (w) socket.emit('mimica_word', { roundId: room.game.round.id, ...w });
+        }
         broadcastState(io, room.code);
       } catch (err) {
         // Falha de reconexão é terminal: a sessão guardada já não é válida.
@@ -131,6 +138,8 @@ export function registerSocketHandlers(io) {
         const intensityResult = game.tallyIntensity(room);
         if (room.mode === 'board') {
           await board.initBoard(room, { intensity: intensityResult.intensity }); // modo Tabuleiro
+        } else if (room.mode === 'tournament') {
+          tournament.initTournament(room, { intensity: intensityResult.intensity }); // modo Torneio
         } else {
           game.initGame(room, { lives, intensity: intensityResult.intensity }); // modo Roda
         }
@@ -144,6 +153,8 @@ export function registerSocketHandlers(io) {
 
     // Handlers do Modo Tabuleiro (em ./socket/boardHandlers.js).
     registerBoardHandlers(socket, { io, requireRoom, broadcastState, handleError });
+    // Handlers do Modo Torneio (em ./socket/tournamentHandlers.js).
+    registerTournamentHandlers(socket, { io, requireRoom, broadcastState, handleError });
 
     socket.on('add_question', ({ targetPlayerId, text } = {}, ack) => {
       try {
@@ -384,6 +395,84 @@ export function registerSocketHandlers(io) {
       }
     });
 
+    // ----- Categoria Relâmpago / Mímica / Roleta Russa / Duelo 1v1 -----
+    socket.on('relampago_start', (_payload, ack) => {
+      try {
+        const room = requireRoom(socket);
+        game.relampagoStart(room, socket.data.playerId);
+        broadcastState(io, room.code);
+        if (typeof ack === 'function') ack({ ok: true });
+      } catch (err) {
+        handleError(socket, ack, err);
+      }
+    });
+
+    socket.on('relampago_resolve', ({ survived } = {}, ack) => {
+      try {
+        const room = requireRoom(socket);
+        game.relampagoResolve(room, socket.data.playerId, survived);
+        broadcastState(io, room.code);
+        if (typeof ack === 'function') ack({ ok: true });
+      } catch (err) {
+        handleError(socket, ack, err);
+      }
+    });
+
+    socket.on('mimica_start', (_payload, ack) => {
+      try {
+        const room = requireRoom(socket);
+        game.mimicaStart(room, socket.data.playerId);
+        broadcastState(io, room.code);
+        if (typeof ack === 'function') ack({ ok: true });
+      } catch (err) {
+        handleError(socket, ack, err);
+      }
+    });
+
+    socket.on('mimica_resolve', ({ guessed } = {}, ack) => {
+      try {
+        const room = requireRoom(socket);
+        game.mimicaResolve(room, socket.data.playerId, guessed);
+        broadcastState(io, room.code);
+        if (typeof ack === 'function') ack({ ok: true });
+      } catch (err) {
+        handleError(socket, ack, err);
+      }
+    });
+
+    socket.on('roleta_answer', (_payload, ack) => {
+      try {
+        const room = requireRoom(socket);
+        game.roletaAnswer(room, socket.data.playerId);
+        broadcastState(io, room.code);
+        if (typeof ack === 'function') ack({ ok: true });
+      } catch (err) {
+        handleError(socket, ack, err);
+      }
+    });
+
+    socket.on('roleta_pass', async (_payload, ack) => {
+      try {
+        const room = requireRoom(socket);
+        await game.roletaPass(room, socket.data.playerId); // async: sorteia pergunta nova
+        broadcastState(io, room.code);
+        if (typeof ack === 'function') ack({ ok: true });
+      } catch (err) {
+        handleError(socket, ack, err);
+      }
+    });
+
+    socket.on('duelo_result', ({ winnerId } = {}, ack) => {
+      try {
+        const room = requireRoom(socket);
+        game.dueloResult(room, socket.data.playerId, winnerId);
+        broadcastState(io, room.code);
+        if (typeof ack === 'function') ack({ ok: true });
+      } catch (err) {
+        handleError(socket, ack, err);
+      }
+    });
+
     socket.on('skip_turn', (_payload, ack) => {
       try {
         const room = requireRoom(socket);
@@ -443,6 +532,8 @@ export function registerSocketHandlers(io) {
         // Tabuleiro: se quem saiu estava a jogar, não deixar o turno preso.
         const room = rooms.getRoom(code);
         if (room && room.mode === 'board' && room.board) board.boardOnDisconnect(room, playerId);
+        // Torneio: quem sai a meio de um duelo perde por W.O. (não prender o quadro).
+        if (room && room.tournament) tournament.tournamentOnDisconnect(room, playerId);
         broadcastState(io, code);
       } catch (err) {
         // Um erro no disconnect não pode partir o servidor nem prender a sala.
@@ -474,7 +565,11 @@ function broadcastState(io, code) {
   if (room.mode === 'board' && room.board) {
     for (const p of room.players.values()) {
       if (!p.connected) continue;
-      io.to(p.id).emit('board_hand', { cards: board.boardHand(room, p.id) || [] });
+      // As maldições escondidas seguem a mesma regra das cartas: só o dono sabe onde estão.
+      io.to(p.id).emit('board_hand', {
+        cards: board.boardHand(room, p.id) || [],
+        traps: board.boardTraps(room, p.id),
+      });
     }
   }
 }
@@ -501,6 +596,10 @@ function announceSpin(io, room, round) {
       const role = game.vascoRole(room, p.id);
       if (role) io.to(p.id).emit('vasco_role', { roundId: round.id, ...role });
     }
+  }
+  if (round.gameTypeKey === 'mimica') {
+    const w = game.mimicaWord(room, round.currentPlayerId);
+    if (w) io.to(round.currentPlayerId).emit('mimica_word', { roundId: round.id, ...w });
   }
   io.to(room.code).emit('round_started', { gameTypeKey: round.gameTypeKey });
 }

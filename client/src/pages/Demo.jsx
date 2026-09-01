@@ -4,6 +4,7 @@
 import { useState } from 'react';
 import Board from './Board.jsx';
 import { PromptCard, ChoiceCard, IntrigasCard } from './games/cards.jsx';
+import { RelampagoCard, MimicaCard, RoletaCard, DueloCard } from './games/quickCards.jsx';
 
 const PAWNS = ['🦊', '🐸', '🐵', '🦄', '🐙', '🐝', '🦁', '🐨', '🐼', '🐷', '🐧', '🐢', '🐔', '🦖'];
 const CARD_META = {
@@ -14,6 +15,7 @@ const CARD_META = {
   shield: { emoji: '🛡️', name: 'Escudo', desc: 'Bloqueia a próxima carta contra ti' },
   drink3: { emoji: '🍺', name: 'Ronda', desc: 'Obrigas alguém a beber 3 golos' },
   steal: { emoji: '🎁', name: 'Roubo', desc: 'Roubas uma carta a alguém' },
+  curse_drink: { emoji: '☠️', name: 'Maldição da Golada', desc: 'Escondes numa casa: quem lá parar bebe 4 golos' },
 };
 const GAME_LABEL = { boca_calada: 'Boca Calada', desafio: 'Desafio', isto_ou_aquilo: 'Isto ou Aquilo' };
 
@@ -66,6 +68,7 @@ const noop = () => {};
 const boardHandlers = (back) => ({
   onPickPawn: noop, onRoll: noop, onAdvance: noop, onResolve: noop, onGamble: noop,
   onEventoPick: noop, onBlackjack: noop, onBeerpong: noop, onPlayCard: noop,
+  onBid: noop, onRuleFail: noop,
   onSkip: noop, onEnd: noop, onKick: noop, onReset: noop, onLeave: back,
 });
 const renderBoard = (patch) => (back) => <Board room={boardMock(patch)} youId="me" {...boardHandlers(back)} />;
@@ -111,8 +114,36 @@ const SCENARIOS = [
     render: () => <ChoiceCard round={{ gameTypeKey: 'isto_ou_aquilo', currentPlayerName: 'Tu', currentPlayerId: 'me', options: ['Beber 2 golos', 'Ligar a um ex'], status: 'active', chosen: null, needsBuddy: false }} room={{ players: mkPlayers() }} youId="me" canControl onChooseBuddy={noop} onChooseOption={noop} onContinue={noop} />,
   },
   {
+    id: 'b-leilao', kind: 'board', group: 'Tabuleiro', label: '🔨 Casa Leilão (licitação secreta)',
+    render: renderBoard({ pending: { kind: 'auction', playerId: 'me', squares: 3, maxBid: 6, bidders: ['p2'] } }),
+  },
+  {
+    id: 'b-regras', kind: 'board', group: 'Tabuleiro', label: '📜 Roleta de Regras (regra ativa)',
+    render: renderBoard({ activeRules: [{ id: 'r1', text: 'Ninguém pode dizer nomes próprios', remaining: 3, byName: 'Bea' }] }),
+  },
+  {
+    id: 'b-maldicao', kind: 'board', group: 'Tabuleiro', label: '☠️ Maldição disparada',
+    render: renderBoard({ trapCount: 1, lastEvent: { text: '☠️ MALDIÇÃO na casa 14: Tu bebes 4 golos (deixada por Bea)', trap: { key: 'curse_drink', emoji: '☠️', square: 14, victim: 'Tu', owner: 'Bea' } } }),
+  },
+  {
     id: 'w-intrigas', kind: 'wheel', group: 'Roda', label: '🗳️ Intrigas',
     render: () => <IntrigasCard round={{ gameTypeKey: 'intrigas', substate: 'choosing', currentPlayerName: 'Tu', currentPlayerId: 'me' }} room={{ players: mkPlayers() }} youId="me" reason="Quem é mais provável de acabar a noite a dormir no chão?" isAccuser isAccused={false} canControl onChooseTarget={noop} onSubmitRps={noop} onContinue={noop} />,
+  },
+  {
+    id: 'w-relampago', kind: 'wheel', group: 'Roda', label: '⚡ Categoria Relâmpago',
+    render: () => <RelampagoCard round={{ id: 'r1', gameTypeKey: 'categoria_relampago', currentPlayerId: 'me', currentPlayerName: 'Tu', category: 'Marcas de cerveja', seconds: 8, substate: 'ready', result: null }} youId="me" canControl onStart={noop} onResolve={noop} onContinue={noop} />,
+  },
+  {
+    id: 'w-mimica', kind: 'wheel', group: 'Roda', label: '🎭 Mímica',
+    render: () => <MimicaCard round={{ id: 'r2', gameTypeKey: 'mimica', currentPlayerId: 'me', currentPlayerName: 'Tu', modeLabel: 'Mímica', modeHint: 'Só gestos — nem uma palavra, nem sons.', seconds: 60, substate: 'ready', result: null }} youId="me" word={{ word: 'Ressaca' }} canControl onStart={noop} onResolve={noop} onContinue={noop} />,
+  },
+  {
+    id: 'w-roleta', kind: 'wheel', group: 'Roda', label: '🎯 Roleta Russa',
+    render: () => <RoletaCard round={{ id: 'r3', gameTypeKey: 'roleta_russa', currentPlayerId: 'me', currentPlayerName: 'Tu', question: 'Qual foi o encontro mais desastroso da tua vida?', passes: 1, tab: 1, nextCost: 2, maxPasses: 3, substate: 'asking', result: null }} youId="me" canControl onAnswer={noop} onPass={noop} onContinue={noop} />,
+  },
+  {
+    id: 'w-duelo', kind: 'wheel', group: 'Roda', label: '⚔️ Duelo 1v1',
+    render: () => <DueloCard round={{ id: 'r4', gameTypeKey: 'duelo', currentPlayerId: 'me', currentPlayerName: 'Tu', opponentId: 'p2', opponentName: 'Bea', duel: { key: 'par_impar', emoji: '✌️', label: 'Par ou Ímpar', desc: 'Contagem até três e cada um mostra os dedos de uma mão.' }, substate: 'duelling', result: null }} youId="me" canControl onResult={noop} onContinue={noop} />,
   },
 ];
 

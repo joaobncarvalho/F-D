@@ -7,6 +7,10 @@ import { dealPiramide, serializePiramide } from './game/piramide.js';
 import { dealVasco, tallyVascoVotes, buildVascoResult, serializeVasco } from './game/vasco.js';
 import { setupIntrigas, serializeIntrigas } from './game/intrigas.js';
 import { pickSecret, setupSegredos, revealSegredos, serializeSegredos } from './game/segredos.js';
+import { setupRelampago, serializeRelampago } from './game/relampago.js';
+import { setupMimica, serializeMimica } from './game/mimica.js';
+import { setupRoleta, serializeRoleta } from './game/roleta.js';
+import { setupDuelo, serializeDuelo } from './game/duelo.js';
 // Ações dos mini-jogos chamadas diretamente pelo socket.js — re-exportadas daqui.
 export {
   piramideReady,
@@ -26,6 +30,10 @@ export {
 } from './game/vasco.js';
 export { chooseTarget, submitRps } from './game/intrigas.js';
 export { castGuess } from './game/segredos.js';
+export { relampagoStart, relampagoResolve } from './game/relampago.js';
+export { mimicaWord, mimicaStart, mimicaResolve } from './game/mimica.js';
+export { roletaAnswer, roletaPass } from './game/roleta.js';
+export { dueloResult } from './game/duelo.js';
 
 // Motor de jogo. Opera sobre `room.game` (criado por initGame).
 //
@@ -35,6 +43,10 @@ export { castGuess } from './game/segredos.js';
 //   'prompt'   — Boca Calada / Desafio: o jogador da vez aceita ou recusa (bebe)
 //   'voting'   — Intrigas: TODOS votam anonimamente; mais votado bebe
 //   'guessing' — Segredos: mostra segredo anónimo; todos adivinham o autor
+//   'relampago'— Categoria Relâmpago: cronómetro; travar custa golos
+//   'mimica'   — Mímica/Desenho: palavra privada + cronómetro; ninguém acerta = bebe
+//   'roleta'   — Roleta Russa: responder ou passar (o passe fica cada vez mais caro)
+//   'duelo'    — Duelo 1v1: dois jogadores, mini-duelo presencial; quem perde bebe
 //   'gameover'
 //
 // Vidas: só se perdem em recusas (Boca Calada / Desafio). Intrigas/Segredos dão
@@ -254,6 +266,28 @@ export async function spinWheel(room, playerId) {
     round.prompt = null;
     await dealVasco(room, round); // escolhe palavra + impostor(es), papéis privados
     g.phase = 'vasco';
+  } else if (gt.key === 'categoria_relampago') {
+    const p = await repo.getRandomPrompt('categoria_relampago', g.intensity);
+    setupRelampago(round, p);
+    g.phase = 'relampago';
+  } else if (gt.key === 'mimica') {
+    const p = await repo.getRandomPrompt('mimica', g.intensity);
+    setupMimica(round, p); // palavra privada (canal mimica_word)
+    g.phase = 'mimica';
+  } else if (gt.key === 'roleta_russa') {
+    const p = await repo.getRandomPrompt('roleta_russa', g.intensity);
+    setupRoleta(round, p);
+    g.phase = 'roleta';
+  } else if (gt.key === 'duelo') {
+    if (setupDuelo(room, round)) {
+      g.phase = 'duelo';
+    } else {
+      // Sem adversário disponível (todos os outros saíram) → desafio simples.
+      const p = await repo.getRandomPrompt('desafio', g.intensity);
+      round.gameTypeKey = 'desafio';
+      round.prompt = p ? { text: p.text } : null;
+      g.phase = 'prompt';
+    }
   }
 
   g.round = round;
@@ -381,9 +415,10 @@ export function continueRound(room, playerId) {
     return { game: g, rewarded: [] };
   }
 
-  // Isto ou Aquilo: avança depois de a escolha estar feita.
-  if (g.phase === 'choice') {
-    if (g.round?.status !== 'resolved') throw new AppError('Escolhe uma opção primeiro.');
+  // Tipos que se fecham com um veredicto simples (escolha / marcação manual):
+  // só avançam depois de a ronda estar resolvida.
+  if (['choice', 'relampago', 'mimica', 'roleta', 'duelo'].includes(g.phase)) {
+    if (g.round?.status !== 'resolved') throw new AppError('Esta ronda ainda não terminou.');
     advanceTurn(room);
     g.round = null;
     g.phase = 'wheel';
@@ -425,6 +460,7 @@ export function resetToLobby(room, playerId) {
   if (!host || !host.isHost) throw new AppError('Só o host pode voltar ao lobby.');
   room.game = null;
   room.board = null; // limpa o tabuleiro (mantém o modo escolhido)
+  room.tournament = null; // e o quadro do torneio
   room.status = 'lobby';
   room.intensityVotes = {}; // nova votação de intensidade
   return room;
@@ -477,6 +513,10 @@ function serializeRound(g) {
   if (r.gameTypeKey === 'segredos') serializeSegredos(base, r);
   if (r.gameTypeKey === 'piramide') serializePiramide(base, r);
   if (r.gameTypeKey === 'vasco') serializeVasco(base, r);
+  if (r.gameTypeKey === 'categoria_relampago') serializeRelampago(base, r);
+  if (r.gameTypeKey === 'mimica') serializeMimica(base, r);
+  if (r.gameTypeKey === 'roleta_russa') serializeRoleta(base, r);
+  if (r.gameTypeKey === 'duelo') serializeDuelo(base, r);
   return base;
 }
 

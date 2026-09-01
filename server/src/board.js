@@ -14,7 +14,19 @@
 // PRIVADAS: o broadcast só leva a contagem; a mão vai por canal privado.
 import * as repo from './repo.js';
 import { AppError } from './errors.js';
-import { requireBoard, nameOf, checkWin, advanceBoardTurn, applyPrison, activeIds, MINI_DRINK } from './board/core.js';
+import { randomUUID } from 'node:crypto';
+import {
+  requireBoard,
+  nameOf,
+  checkWin,
+  advanceBoardTurn,
+  applyPrison,
+  activeIds,
+  drinkFromSquare,
+  breakAlliance,
+  isCurseCard,
+  MINI_DRINK,
+} from './board/core.js';
 import { openBlackjack, handValue } from './board/blackjack.js';
 import { openEvento } from './board/evento.js';
 // Ações das casas chamadas diretamente pelo socket.js/bots.js — re-exportadas daqui.
@@ -30,6 +42,23 @@ const N_EVENTO = 6;
 const N_GAMBLE = 4;
 const N_BLACKJACK = 3;
 const N_BEERPONG = 3;
+const N_LEILAO = 3;
+const AUCTION_SQUARES = 3; // casas que o vencedor do leilão avança
+const MAX_BID = 6;
+const RULE_FAIL_GOLOS = 2;
+// Maldições presas a uma casa (cartas curse_*): disparam em QUEM lá parar.
+const CURSE_EFFECTS = {
+  curse_drink: { emoji: '☠️', text: 'bebe 4 golos', apply: (room, id) => drinkFromSquare(room, id, 4) },
+  curse_back: {
+    emoji: '🕳️',
+    text: 'recua 3 casas',
+    apply: (room, id) => {
+      const p = room.board.players[id];
+      p.pos = Math.max(0, p.pos - 3);
+    },
+  },
+  curse_prison: { emoji: '👻', text: 'vai preso', apply: (room, id) => applyPrison(room, id, 'maldição') },
+};
 export const PAWNS = ['🦊', '🐸', '🐵', '🦄', '🐙', '🐝', '🦁', '🐨', '🐼', '🐷', '🐧', '🐢', '🐔', '🦖'];
 // Casas de mini-jogo: só os jogos RÁPIDOS single-player (os de grupo ficam na Roda).
 const BOARD_MINI_TYPES = ['boca_calada', 'desafio', 'isto_ou_aquilo'];
@@ -64,6 +93,7 @@ async function generateSquares() {
   for (let i = 0; i < N_GAMBLE; i++) bag.push({ kind: 'gamble' });
   for (let i = 0; i < N_BLACKJACK; i++) bag.push({ kind: 'blackjack' });
   for (let i = 0; i < N_BEERPONG; i++) bag.push({ kind: 'beerpong' });
+  for (let i = 0; i < N_LEILAO; i++) bag.push({ kind: 'leilao' });
   const miniCount = BOARD_SIZE - 1 - bag.length;
   for (let i = 0; i < miniCount; i++) {
     const gt = miniPool[Math.floor(Math.random() * miniPool.length)];
@@ -81,6 +111,8 @@ export async function initBoard(room, { intensity = 'leve' } = {}) {
     players[p.id] = {
       pawn: null, pos: 0, golos: 0, slowStreak: 0, fastStreak: 0, skipTurns: 0,
       finished: false, cards: [], shield: false,
+      allianceWith: null, allianceTurnsLeft: 0, // Casa Aliança (bebe metade pelo parceiro)
+      mirrorOf: null, // Casa Espelho: o próximo ?? deste jogador também me acerta
       prisonCount: 0, cardsPlayed: 0, // estatísticas do fim
     };
   }
@@ -96,6 +128,8 @@ export async function initBoard(room, { intensity = 'leve' } = {}) {
     order: [],
     currentPlayerId: null,
     pending: null, // { kind:'mini'|'gamble', ... } — bloqueia o fim da vez até resolver
+    activeRules: [], // Roleta de Regras: { id, text, remaining, byId, byName }
+    trapCards: [], // maldições escondidas: { id, key, square, ownerId, ownerName }
     lastMove: null,
     lastEvent: null, // feedback de ?? / prisão / cartas / gamble
     winnerId: null,
@@ -182,6 +216,13 @@ export async function advance(room, playerId, squares) {
     return { board: b, over: b.phase === 'over' };
   }
 
+  // Maldição escondida nesta casa? Dispara antes de a casa se resolver — é a
+  // surpresa: quem a pôs pode até ser a vítima.
+  if (fireTrap(room, playerId)) {
+    if (b.phase !== 'over') advanceBoardTurn(room);
+    return { board: b, over: b.phase === 'over' };
+  }
+
   const sq = b.squares[me.pos];
   b.lastMove.landedKind = sq.kind;
   if (sq.kind === 'mini') {
@@ -204,8 +245,101 @@ export async function advance(room, playerId, squares) {
     openEvento(room, playerId); // 3 cartas viradas ao contrário; a vez só passa ao escolher (board_evento_pick)
     return { board: b, over: false };
   }
+  if (sq.kind === 'leilao') {
+    openAuction(room, playerId); // licitações secretas; resolve quando todos licitarem
+    return { board: b, over: false };
+  }
   advanceBoardTurn(room); // partida
   return { board: b, over: false };
+}
+
+/** Dispara (e consome) a maldição escondida na casa onde o jogador parou. */
+function fireTrap(room, playerId) {
+  const b = room.board;
+  const me = b.players[playerId];
+  const idx = b.trapCards.findIndex((t) => t.square === me.pos);
+  if (idx < 0) return false;
+  const trap = b.trapCards[idx];
+  b.trapCards.splice(idx, 1);
+  const fx = CURSE_EFFECTS[trap.key];
+  if (!fx) return false;
+  fx.apply(room, playerId);
+  const nm = nameOf(room, playerId);
+  const own = trap.ownerId === playerId ? ' — e a maldição era dele/a próprio/a! 💀' : ` (deixada por ${trap.ownerName})`;
+  b.lastEvent = {
+    text: `${fx.emoji} MALDIÇÃO na casa ${trap.square}: ${nm} ${fx.text}${own}`,
+    trap: { key: trap.key, emoji: fx.emoji, square: trap.square, victim: nm, owner: trap.ownerName },
+  };
+  return true;
+}
+
+// ----- Casa Leilão -----------------------------------------------------------
+// Todos licitam golos EM SEGREDO pelo direito de avançar 3 casas. Quem licitar
+// mais avança e bebe o que licitou; empate → sorteio entre os empatados. As
+// licitações só aparecem no payload depois de resolvidas (serializePending).
+
+function openAuction(room, playerId) {
+  const b = room.board;
+  b.pending = { kind: 'auction', playerId, squares: AUCTION_SQUARES, maxBid: MAX_BID, bids: {} };
+}
+
+/** Licitar (0..MAX_BID). Quando todos os ativos licitarem, resolve sozinho. */
+export function boardBid(room, playerId, amount) {
+  const b = requireBoard(room, ['playing']);
+  if (!b.pending || b.pending.kind !== 'auction') throw new AppError('Não há leilão a decorrer.');
+  if (!b.players[playerId] || !room.players.get(playerId)?.connected)
+    throw new AppError('Não estás no leilão.');
+  if (b.pending.bids[playerId] != null) throw new AppError('Já licitaste.');
+  const n = Number(amount);
+  if (!Number.isFinite(n) || n < 0 || n > MAX_BID) throw new AppError(`Licita entre 0 e ${MAX_BID} golos.`);
+  b.pending.bids[playerId] = Math.floor(n);
+  const eligible = activeIds(room);
+  if (eligible.length && eligible.every((id) => b.pending.bids[id] != null)) resolveAuction(room);
+  return b;
+}
+
+function resolveAuction(room) {
+  const b = room.board;
+  const bids = b.pending.bids;
+  const entries = Object.entries(bids).filter(([id]) => b.players[id]);
+  const top = entries.reduce((m, [, v]) => Math.max(m, v), -1);
+  const tied = entries.filter(([, v]) => v === top).map(([id]) => id);
+  const winnerId = tied[Math.floor(Math.random() * tied.length)];
+  const detail = entries
+    .map(([id, v]) => `${nameOf(room, id)} ${v}`)
+    .join(' · ');
+  b.pending = null;
+
+  if (!winnerId || top <= 0) {
+    b.lastEvent = { text: `🔨 Leilão sem licitações a sério (${detail}) — ninguém avança.`, auction: { bids, winnerId: null } };
+    advanceBoardTurn(room);
+    return b;
+  }
+  const w = b.players[winnerId];
+  drinkFromSquare(room, winnerId, top);
+  w.pos = Math.min(b.size, w.pos + AUCTION_SQUARES);
+  b.lastEvent = {
+    text: `🔨 LEILÃO: ${nameOf(room, winnerId)} arrematou por ${top} golos e avança ${AUCTION_SQUARES} casas!${tied.length > 1 ? ' (sorteio entre empatados)' : ''} — ${detail}`,
+    auction: { bids, winnerId, amount: top, tie: tied.length > 1 },
+  };
+  if (!checkWin(room, winnerId)) advanceBoardTurn(room);
+  return b;
+}
+
+/** Roleta de Regras: qualquer jogador marca quem falhou — o falhado bebe. */
+export function boardRuleFail(room, reporterId, ruleId, targetId) {
+  const b = requireBoard(room, ['playing']);
+  const rule = b.activeRules.find((r) => r.id === ruleId);
+  if (!rule) throw new AppError('Essa regra já não está ativa.');
+  if (!room.players.get(reporterId)) throw new AppError('Jogador inválido.');
+  const target = b.players[targetId];
+  if (!target || !room.players.get(targetId)) throw new AppError('Escolhe um jogador válido.');
+  drinkFromSquare(room, targetId, RULE_FAIL_GOLOS);
+  b.lastEvent = {
+    text: `📜 ${nameOf(room, targetId)} falhou a regra "${rule.text}" — ${RULE_FAIL_GOLOS} golos! (marcado por ${nameOf(room, reporterId)})`,
+    ruleFail: { ruleId, targetId, golos: RULE_FAIL_GOLOS },
+  };
+  return b;
 }
 
 // Azar da ganância: 99% algo mau, 1% escapa. Punição direta (não é escolha).
@@ -223,11 +357,11 @@ function applyGreed(room, playerId) {
       b.lastEvent = { text: `🐍 Ganância castigada — ${nm} recua 3 casas!`, greed: true };
       break;
     case 1:
-      me.golos += 4;
+      drinkFromSquare(room, playerId, 4);
       b.lastEvent = { text: `🐍 Ganância castigada — ${nm} bebe 4 golos!`, greed: true };
       break;
     case 2:
-      me.golos += 6;
+      drinkFromSquare(room, playerId, 6);
       b.lastEvent = { text: `🐍 Ganância castigada — ${nm} vira 6 golos de uma vez! 🥴`, greed: true };
       break;
     case 3:
@@ -258,8 +392,10 @@ export function boardResolve(room, playerId, { action, choice } = {}) {
   const p = b.pending;
   if (p.variant === 'dare') {
     if (action === 'drink') {
-      b.players[playerId].golos += MINI_DRINK;
-      b.lastEvent = { text: `🍺 ${nm} bebeu ${MINI_DRINK} golos em vez do desafio` };
+      const ally = drinkFromSquare(room, playerId, MINI_DRINK);
+      b.lastEvent = {
+        text: `🍺 ${nm} bebeu ${MINI_DRINK} golos em vez do desafio${ally ? ` · 🤝 ${ally.allyName} bebe ${ally.golos}` : ''}`,
+      };
     } else {
       b.lastEvent = { text: `✅ ${nm} fez o desafio!` };
     }
@@ -297,8 +433,8 @@ export function boardGamble(room, playerId, bet) {
   return b;
 }
 
-/** Jogar uma carta na tua vez (antes de avançar). */
-export function playCard(room, playerId, cardId, targetId) {
+/** Jogar uma carta na tua vez (antes de avançar). `squareIndex` só p/ maldições. */
+export function playCard(room, playerId, cardId, targetId, squareIndex) {
   const b = requireBoard(room, ['playing']);
   if (b.currentPlayerId !== playerId) throw new AppError('Só jogas cartas na tua vez.');
   if (b.pending) throw new AppError('Resolve a casa primeiro.');
@@ -311,6 +447,23 @@ export function playCard(room, playerId, cardId, targetId) {
 
   // Info para a animação de "carta a ser usada" (mostrada a todos).
   const cardInfo = { key: card.key, emoji: meta.emoji, name: meta.name, by: nm };
+
+  // Maldição: não se joga contra ninguém — esconde-se numa casa à FRENTE e fica
+  // à espera de quem lá parar (o dono incluído).
+  if (isCurseCard(card.key)) {
+    const sq = Number(squareIndex);
+    if (!Number.isInteger(sq) || sq <= me.pos || sq >= b.size)
+      throw new AppError('Escolhe uma casa à tua frente (antes da meta).');
+    if (b.trapCards.some((t) => t.square === sq)) throw new AppError('Já há uma maldição nessa casa.');
+    me.cards.splice(idx, 1);
+    me.cardsPlayed += 1;
+    b.trapCards.push({ id: randomUUID(), key: card.key, square: sq, ownerId: playerId, ownerName: nm });
+    b.lastEvent = {
+      text: `${meta.emoji} ${nm} escondeu uma maldição algures no tabuleiro… 👀`,
+      card: { ...cardInfo, target: null },
+    };
+    return b;
+  }
 
   if (card.key === 'shield') {
     me.shield = true;
@@ -353,7 +506,7 @@ export function playCard(room, playerId, cardId, targetId) {
       b.lastEvent = { text: `⏭️ ${nm} fez ${tnm} perder a próxima vez` };
       break;
     case 'drink3':
-      target.golos += 3;
+      target.golos += 3; // carta é escolha de quem joga, não azar de casa → sem aliança
       b.lastEvent = { text: `🍺 ${nm} obrigou ${tnm} a beber 3 golos` };
       break;
     case 'steal':
@@ -399,6 +552,10 @@ export function boardOnDisconnect(room, playerId) {
       b.pending = null; // limpa a casa pendente de quem saiu (senão bloqueia todos)
       b.lastEvent = { text: `👋 ${nameOf(room, playerId) || 'Um jogador'} saiu — a vez passa.` };
       advanceBoardTurn(room);
+    } else if (b.pending?.kind === 'auction') {
+      // Sem quem faltava licitar, o leilão fechava-se sozinho — força a apuração.
+      const eligible = activeIds(room);
+      if (eligible.length && eligible.every((id) => b.pending.bids[id] != null)) resolveAuction(room);
     }
     boardEnsureCurrent(room);
   }
@@ -449,6 +606,9 @@ export function boardHostKick(room, hostId, targetId) {
   if (!target) throw new AppError('Jogador não encontrado.');
   if (target.connected) throw new AppError('Só podes expulsar quem já saiu.');
   const wasCurrent = b.currentPlayerId === targetId;
+  breakAlliance(b, targetId); // não deixar o parceiro ligado a um fantasma
+  for (const pl of Object.values(b.players)) if (pl.mirrorOf === targetId) pl.mirrorOf = null;
+  b.trapCards = b.trapCards.filter((t) => t.ownerId !== targetId);
   room.players.delete(targetId);
   delete b.players[targetId];
   b.order = b.order.filter((id) => id !== targetId);
@@ -467,6 +627,13 @@ export function boardHand(room, playerId) {
   return b.players[playerId].cards;
 }
 
+/** Maldições que ESTE jogador escondeu — privadas (para os outros são surpresa). */
+export function boardTraps(room, playerId) {
+  const b = room.board;
+  if (!b) return [];
+  return b.trapCards.filter((t) => t.ownerId === playerId).map((t) => ({ id: t.id, key: t.key, square: t.square }));
+}
+
 // Serializa o pending escondendo o que não pode vazar:
 //  - ?? : só o número de cartas (o conteúdo é surpresa até escolher).
 //  - blackjack: a carta tapada do dealer fica escondida enquanto o jogador decide.
@@ -474,6 +641,16 @@ function serializePending(pending) {
   if (!pending) return null;
   if (pending.kind === 'evento') {
     return { kind: 'evento', playerId: pending.playerId, count: pending.cards.length };
+  }
+  // Leilão: as licitações são SECRETAS até todos licitarem — só vai quem já licitou.
+  if (pending.kind === 'auction') {
+    return {
+      kind: 'auction',
+      playerId: pending.playerId,
+      squares: pending.squares,
+      maxBid: pending.maxBid,
+      bidders: Object.keys(pending.bids),
+    };
   }
   if (pending.kind === 'blackjack') {
     const revealDealer = pending.stage !== 'player';
@@ -513,6 +690,9 @@ export function serializeBoard(room) {
           skipTurns: p.skipTurns,
           finished: p.finished,
           shield: p.shield,
+          allianceWith: p.allianceWith || null,
+          allianceTurnsLeft: p.allianceTurnsLeft || 0,
+          mirrorOf: p.mirrorOf || null,
           cardCount: p.cards.length, // cartas PRIVADAS: só a contagem no broadcast
           prisonCount: p.prisonCount,
           cardsPlayed: p.cardsPlayed,
@@ -523,6 +703,10 @@ export function serializeBoard(room) {
     order: b.order,
     currentPlayerId: b.currentPlayerId,
     pending: serializePending(b.pending),
+    activeRules: (b.activeRules || []).map((r) => ({ id: r.id, text: r.text, remaining: r.remaining, byName: r.byName })),
+    // As maldições são SURPRESA: no broadcast vai só quantas estão no tabuleiro
+    // (cada dono recebe as suas por canal privado, com board_hand).
+    trapCount: (b.trapCards || []).length,
     lastMove: b.lastMove,
     lastEvent: b.lastEvent,
     winner: b.winnerId ? { id: b.winnerId, name: nameOf(room, b.winnerId) } : null,

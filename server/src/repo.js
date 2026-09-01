@@ -7,7 +7,7 @@
 // chamam estas funções (mesma assinatura async de sempre).
 
 import { GAME_TYPES, VASCO_BOARDS } from './content/prompts.data.js';
-import { BOARD_EVENTS, BOARD_PRISON, BOARD_CARDS } from './content/board.data.js';
+import { BOARD_EVENTS, BOARD_PRISON, BOARD_CARDS, BOARD_RULES } from './content/board.data.js';
 import { log } from './log.js';
 
 // Cliente Prisma lazy: só carrega se houver DATABASE_URL. Cacheado (promessa).
@@ -100,6 +100,7 @@ const FALLBACK_BANKS = {
   events: BOARD_EVENTS.map((e) => ({ ...e, weight: 1 })),
   prison: BOARD_PRISON.map((p) => ({ ...p, weight: 1 })),
   cards: BOARD_CARDS.map((c) => ({ ...c, weight: 1 })),
+  rules: BOARD_RULES.map((r) => ({ ...r, weight: 1 })),
 };
 
 export async function getBoardBanks() {
@@ -114,8 +115,12 @@ export async function getBoardBanks() {
           .map((r) => ({ note: r.title, skipTurns: r.skipTurns, drink: r.drink, back: r.back, loseCard: r.loseCard, weight: r.weight }));
         const cards = rows.filter((r) => r.category === 'carta')
           .map((r) => ({ key: r.effect, emoji: r.emoji, name: r.title, desc: r.desc, weight: r.weight }));
+        const rules = rows.filter((r) => r.category === 'regra')
+          .map((r) => ({ text: r.title, turns: r.value || 3, weight: r.weight }));
         // Só usa a BD se cada banco tiver conteúdo (senão o jogo ficava sem opções).
-        if (events.length && prison.length && cards.length) return { events, prison, cards };
+        // As regras são recentes: uma BD antiga não as tem → cai no banco em código.
+        if (events.length && prison.length && cards.length)
+          return { events, prison, cards, rules: rules.length ? rules : FALLBACK_BANKS.rules.map((r) => ({ ...r })) };
       }
     } catch (e) {
       log.warn('repo: getBoardBanks DB falhou, uso memória:', { error: e.message });
@@ -125,6 +130,7 @@ export async function getBoardBanks() {
     events: FALLBACK_BANKS.events.map((e) => ({ ...e })),
     prison: FALLBACK_BANKS.prison.map((p) => ({ ...p })),
     cards: FALLBACK_BANKS.cards.map((c) => ({ ...c })),
+    rules: FALLBACK_BANKS.rules.map((r) => ({ ...r })),
   };
 }
 

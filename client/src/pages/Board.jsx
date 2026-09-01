@@ -7,7 +7,9 @@ import { GambleReveal, CardPlayReveal, OrderReveal } from './board/reveals.jsx';
 import { Beerpong } from './board/Beerpong.jsx';
 import { EventoOverlay } from './board/EventoOverlay.jsx';
 
-const KIND_ICON = { partida: '🏁', evento: '❓', gamble: '🎲', blackjack: '🃏', beerpong: '🏓' };
+const KIND_ICON = { partida: '🏁', evento: '❓', gamble: '🎲', blackjack: '🃏', beerpong: '🏓', leilao: '🔨' };
+const CURSE_PREFIX = 'curse_';
+const isCurse = (key) => String(key || '').startsWith(CURSE_PREFIX);
 const GAME_EMOJI = {
   boca_calada: '🤐',
   desafio: '🔥',
@@ -24,11 +26,12 @@ const ADVANCE = [
   { n: 3, golos: 6 },
 ];
 
-export default function Board({ room, youId, myHand, onPickPawn, onRoll, onAdvance, onResolve, onGamble, onEventoPick, onBlackjack, onBeerpong, onPlayCard, onSkip, onEnd, onKick, onReset, onLeave }) {
+export default function Board({ room, youId, myHand, myTraps, onPickPawn, onRoll, onAdvance, onResolve, onGamble, onEventoPick, onBlackjack, onBeerpong, onPlayCard, onBid, onRuleFail, onSkip, onEnd, onKick, onReset, onLeave }) {
   const b = room.board;
   const you = room.players.find((p) => p.id === youId);
   const isHost = you?.isHost;
   const [selCard, setSelCard] = useState(null); // carta selecionada p/ jogar (à espera de alvo)
+  const [ruleFail, setRuleFail] = useState(null); // regra a marcar como falhada (à espera de quem falhou)
   const [orderReveal, setOrderReveal] = useState(null); // { dice, order } — revelação da ordem
 
   // Efeitos por evento (vitória / prisão / passo / blackjack).
@@ -313,11 +316,18 @@ export default function Board({ room, youId, myHand, onPickPawn, onRoll, onAdvan
   const eventoPending = pending?.kind === 'evento' ? pending : null;
   const bjPending = pending?.kind === 'blackjack' ? pending : null;
   const beerpongPending = pending?.kind === 'beerpong' ? pending : null;
+  const auctionPending = pending?.kind === 'auction' ? pending : null;
   const miniGamblePending =
-    pending && pending.kind !== 'evento' && pending.kind !== 'blackjack' && pending.kind !== 'beerpong' ? pending : null;
+    pending && !['evento', 'blackjack', 'beerpong', 'auction'].includes(pending.kind) ? pending : null;
   const targets = room.players.filter((p) => p.connected && p.id !== youId);
   const selMeta = selCard ? meta[selCard.key] : null;
-  const needsTarget = selMeta && selCard.key !== 'shield';
+  const selIsCurse = selCard ? isCurse(selCard.key) : false;
+  const needsTarget = selMeta && selCard.key !== 'shield' && !selIsCurse;
+  const myPos = b.players[youId]?.pos ?? 0;
+  const trapSquares = (myTraps || []).map((t) => t.square);
+  const freeSquares = b.squares.filter((sq) => sq.i > myPos && sq.i < b.size && !trapSquares.includes(sq.i));
+  const iBid = auctionPending?.bidders?.includes(youId);
+  const rules = b.activeRules || [];
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex-1 flex flex-col gap-3">
@@ -370,7 +380,9 @@ export default function Board({ room, youId, myHand, onPickPawn, onRoll, onAdvan
                           ? 'bg-emerald-500/15'
                           : sq.kind === 'beerpong'
                             ? 'bg-sky-500/15'
-                            : 'bg-white/5'
+                            : sq.kind === 'leilao'
+                              ? 'bg-orange-500/15'
+                              : 'bg-white/5'
                 } ${isCur ? 'ring-2 ring-pink-500' : ''}`}
                 animate={
                   isCur
@@ -407,6 +419,12 @@ export default function Board({ room, youId, myHand, onPickPawn, onRoll, onAdvan
               {r.pawn} {r.name}
               {r.connected === false && ' 📴'}
               {r.shield && ' 🛡️'}
+              {r.allianceTurnsLeft > 0 && (
+                <span className="text-cyan-300" title={`Aliado de ${room.players.find((p) => p.id === r.allianceWith)?.name || '?'} (${r.allianceTurnsLeft} jogadas)`}>
+                  {' '}🤝
+                </span>
+              )}
+              {r.mirrorOf && <span className="text-fuchsia-300" title="Tem um espelho armado"> 🪞</span>}
               {r.skipTurns > 0 && <span className="text-rose-300"> 🚔</span>}
               {isHost && r.connected === false && r.id !== youId && (
                 <button onClick={() => { sfx.click(); onKick(r.id); }} className="ml-1 text-rose-300 underline underline-offset-2">expulsar</button>
@@ -424,6 +442,69 @@ export default function Board({ room, youId, myHand, onPickPawn, onRoll, onAdvan
           </div>
         )}
       </div>
+
+      {/* Roleta de Regras — regras ativas para a mesa toda; qualquer um marca quem falhou */}
+      {rules.length > 0 && (
+        <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} className="fd-card p-2.5 flex flex-col gap-1.5">
+          <p className="text-xs font-bold text-amber-300">📜 Regras em vigor</p>
+          {rules.map((r) => (
+            <div key={r.id} className="flex flex-col gap-1">
+              <p className="text-xs text-white/75 leading-snug">
+                {r.text}{' '}
+                <span className="text-amber-300 whitespace-nowrap">· resta{r.remaining > 1 ? 'm' : ''} {r.remaining}</span>
+              </p>
+              {ruleFail === r.id ? (
+                <div className="flex flex-wrap gap-1.5">
+                  {room.players.filter((p) => p.connected).map((p) => (
+                    <button
+                      key={p.id}
+                      onClick={() => { sfx.click(); onRuleFail(r.id, p.id); setRuleFail(null); }}
+                      className="fd-chip text-[11px] py-1"
+                    >
+                      {b.players[p.id]?.pawn} {p.name}
+                    </button>
+                  ))}
+                  <button onClick={() => setRuleFail(null)} className="fd-chip text-[11px] py-1 opacity-60">
+                    cancelar
+                  </button>
+                </div>
+              ) : (
+                <button onClick={() => { sfx.click(); setRuleFail(r.id); }} className="fd-btn fd-btn-ghost py-1 text-[11px] self-start px-3">
+                  🚨 Alguém falhou
+                </button>
+              )}
+            </div>
+          ))}
+        </motion.div>
+      )}
+
+      {/* Casa Leilão — todos licitam em segredo pelo direito de avançar */}
+      {auctionPending && (
+        <motion.div
+          initial={{ opacity: 0, scale: 0.92, y: 12 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          transition={{ type: 'spring', stiffness: 280, damping: 20 }}
+          className="fd-card p-3.5 flex flex-col gap-2 text-center"
+          style={{ boxShadow: '0 10px 30px -12px #ffb02099' }}
+        >
+          <p className="text-sm font-bold uppercase tracking-wide text-amber-300">🔨 Leilão</p>
+          <p className="text-xs text-white/60">
+            Licitação SECRETA em golos pelo direito de avançar {auctionPending.squares} casas. Quem
+            licitar mais avança… e bebe o que licitou. Empate → sorteio.
+          </p>
+          {iBid ? (
+            <p className="text-sm text-emerald-300">Licitaste! À espera dos outros… ({auctionPending.bidders.length}/{rows.filter((r) => r.connected && !r.finished).length})</p>
+          ) : (
+            <div className="flex flex-wrap gap-1.5 justify-center">
+              {Array.from({ length: auctionPending.maxBid + 1 }, (_, n) => (
+                <button key={n} onClick={() => { sfx.click(); onBid(n); }} className="fd-chip w-11 py-2">
+                  {n}
+                </button>
+              ))}
+            </div>
+          )}
+        </motion.div>
+      )}
 
       <AnimatePresence mode="wait">
         {ev && !ev.blackjack && !ev.gamble && !ev.beerpong ? (
@@ -563,7 +644,24 @@ export default function Board({ room, youId, myHand, onPickPawn, onRoll, onAdvan
               {selCard && (
                 <div className="flex flex-col gap-1">
                   <p className="text-xs text-white/50">{selMeta?.desc}</p>
-                  {needsTarget ? (
+                  {selIsCurse ? (
+                    <>
+                      <p className="text-[11px] text-fuchsia-300">
+                        Escolhe a casa onde escondes a maldição — dispara em QUEM lá parar (até em ti). 👀
+                      </p>
+                      <div className="flex flex-wrap gap-1.5 max-h-28 overflow-y-auto">
+                        {freeSquares.map((sq) => (
+                          <button
+                            key={sq.i}
+                            onClick={() => { sfx.click(); onPlayCard(selCard.id, null, sq.i); setSelCard(null); }}
+                            className="fd-chip text-[11px] py-1 px-2"
+                          >
+                            {squareIcon(sq)} {sq.i}
+                          </button>
+                        ))}
+                      </div>
+                    </>
+                  ) : needsTarget ? (
                     <div className="flex flex-wrap gap-2">
                       {targets.map((p) => (
                         <button key={p.id} onClick={() => { sfx.click(); onPlayCard(selCard.id, p.id); setSelCard(null); }} className="fd-chip">
@@ -577,6 +675,12 @@ export default function Board({ room, youId, myHand, onPickPawn, onRoll, onAdvan
                     </button>
                   )}
                 </div>
+              )}
+              {(myTraps?.length > 0 || b.trapCount > 0) && (
+                <p className="text-[11px] text-white/40">
+                  ☠️ {b.trapCount} maldição(ões) escondida(s) no tabuleiro
+                  {myTraps?.length ? ` · as tuas: ${myTraps.map((t) => `casa ${t.square}`).join(', ')}` : ''}
+                </p>
               )}
             </div>
           )}

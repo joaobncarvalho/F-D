@@ -84,9 +84,9 @@ export function createAdminRouter() {
   }));
 
   // ----- Bancos do Tabuleiro (?? / prisão / cartas) -----
-  const CATEGORIES = ['evento', 'prisao', 'carta'];
-  const EVENT_EFFECTS = ['advance', 'back', 'drink', 'card', 'prison', 'others_drink'];
-  const CARD_KEYS = ['swap', 'back2', 'prison', 'skip', 'shield', 'drink3', 'steal'];
+  const CATEGORIES = ['evento', 'prisao', 'carta', 'regra'];
+  const EVENT_EFFECTS = ['advance', 'back', 'drink', 'card', 'prison', 'others_drink', 'alliance', 'rule_roulette', 'mirror'];
+  const CARD_KEYS = ['swap', 'back2', 'prison', 'skip', 'shield', 'drink3', 'steal', 'curse_drink', 'curse_back', 'curse_prison'];
   const intOr = (v, def = 0) => {
     const n = parseInt(v, 10);
     return Number.isFinite(n) ? n : def;

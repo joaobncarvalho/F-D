@@ -10,6 +10,7 @@
 
 import * as game from './game.js';
 import * as board from './board.js';
+import * as tournament from './tournament.js';
 import { PAWNS } from './board.js';
 import { log } from './log.js';
 
@@ -49,6 +50,7 @@ const BOT_SECRETS = [
  */
 export async function driveBots(room, hooks = {}) {
   if (room?.mode === 'board' && room.board) return driveBoardBots(room);
+  if (room?.mode === 'tournament' && room.tournament) return driveTournamentBots(room);
   if (!room?.game) return false;
   const g = room.game;
   const bots = players(room).filter((p) => p.isBot && p.connected && !p.eliminated);
@@ -114,6 +116,57 @@ export async function driveBots(room, hooks = {}) {
         game.continueRound(room, cur.id);
         return true;
       }
+      return false;
+    }
+
+    // RELÂMPAGO / MÍMICA: arrancar o cronómetro → marcar o veredicto → continuar.
+    if (g.phase === 'relampago' || g.phase === 'mimica') {
+      const r = g.round;
+      const cur = room.players.get(r.currentPlayerId);
+      if (!cur?.isBot) return false;
+      const isRelampago = g.phase === 'relampago';
+      if (r.substate === 'ready') {
+        if (isRelampago) game.relampagoStart(room, cur.id);
+        else game.mimicaStart(room, cur.id);
+        return true;
+      }
+      if (r.substate === 'running') {
+        const ok = rand() < 0.6;
+        if (isRelampago) game.relampagoResolve(room, cur.id, ok);
+        else game.mimicaResolve(room, cur.id, ok);
+        return true;
+      }
+      game.continueRound(room, cur.id);
+      return true;
+    }
+
+    // ROLETA RUSSA: passa umas quantas vezes e acaba por responder.
+    if (g.phase === 'roleta') {
+      const r = g.round;
+      const cur = room.players.get(r.currentPlayerId);
+      if (!cur?.isBot) return false;
+      if (r.substate === 'asking') {
+        if (rand() < 0.35) await game.roletaPass(room, cur.id);
+        else game.roletaAnswer(room, cur.id);
+        return true;
+      }
+      game.continueRound(room, cur.id);
+      return true;
+    }
+
+    // DUELO 1v1: um dos duelistas (ou o host) marca o vencedor; depois continua.
+    if (g.phase === 'duelo') {
+      const r = g.round;
+      const cur = room.players.get(r.currentPlayerId);
+      if (r.substate === 'duelling') {
+        const marker = [r.currentPlayerId, r.opponentId].find((id) => room.players.get(id)?.isBot);
+        if (marker) {
+          game.dueloResult(room, marker, rand() < 0.5 ? r.currentPlayerId : r.opponentId);
+          return true;
+        }
+        return false;
+      }
+      if (cur?.isBot) { game.continueRound(room, cur.id); return true; }
       return false;
     }
 
@@ -219,6 +272,66 @@ export async function driveBots(room, hooks = {}) {
 }
 
 /**
+ * Conduz os bots no Modo Torneio: arrancar duelos, jogar o duelo quando é com
+ * eles, votar como espetadores e fechar o resultado. Uma ação por chamada.
+ */
+async function driveTournamentBots(room) {
+  const t = room.tournament;
+  const bots = players(room).filter((p) => p.isBot && p.connected);
+  if (!bots.length || t.phase === 'over') return false;
+
+  try {
+    if (t.phase === 'bracket') {
+      const starter = bots[0];
+      await tournament.tournamentNext(room, starter.id);
+      return true;
+    }
+
+    const d = t.duel;
+    if (!d) return false;
+
+    if (d.substate === 'daring') {
+      for (const id of [d.aId, d.bId]) {
+        const p = room.players.get(id);
+        if (p?.isBot && !d.actions[id]) {
+          tournament.tournamentAction(room, id, rand() < 0.7 ? 'accept' : 'refuse');
+          return true;
+        }
+      }
+      return false;
+    }
+    if (d.substate === 'choosing') {
+      for (const id of [d.aId, d.bId]) {
+        const p = room.players.get(id);
+        if (p?.isBot && d.actions[id] === undefined) {
+          tournament.tournamentChoose(room, id, rand() < 0.5 ? 0 : 1);
+          return true;
+        }
+      }
+      return false;
+    }
+    if (d.substate === 'judging') {
+      for (const bot of bots) {
+        if (bot.id !== d.aId && bot.id !== d.bId && !d.votes[bot.id]) {
+          tournament.tournamentVote(room, bot.id, rand() < 0.5 ? d.aId : d.bId);
+          return true;
+        }
+      }
+      return false;
+    }
+    if (d.substate === 'result') {
+      const closer = [d.aId, d.bId].find((id) => room.players.get(id)?.isBot);
+      if (closer) { tournament.tournamentContinue(room, closer); return true; }
+      return false;
+    }
+  } catch (err) {
+    log.warn('bot (torneio): jogada ignorada', { phase: t?.phase, message: err?.message });
+    return false;
+  }
+  return false;
+}
+
+/**
  * Conduz os bots no Modo Tabuleiro (uma ação por chamada, ao ritmo do tick):
  * escolher peão → lançar dado da ordem → na sua vez, resolver a casa pendente
  * (mini/gamble/blackjack/beerpong/??) ou avançar 1–3 casas.
@@ -251,6 +364,16 @@ async function driveBoardBots(room) {
 
     // Corrida (fase playing): só age se for a vez de um bot.
     if (b.phase === 'playing') {
+      // Leilão: licitam TODOS (não só quem está à vez) — senão o leilão encravava.
+      if (b.pending?.kind === 'auction') {
+        for (const bot of bots) {
+          if (b.players[bot.id] && b.pending.bids[bot.id] == null) {
+            board.boardBid(room, bot.id, Math.floor(rand() * (b.pending.maxBid + 1)));
+            return true;
+          }
+        }
+        return false;
+      }
       const cur = room.players.get(b.currentPlayerId);
       if (!cur?.isBot) return false;
 

@@ -13,6 +13,10 @@ export const TYPES = [
   { key: 'piramide', label: 'Piramide', color: '#5b8cff', emoji: '🔺' },
   { key: 'vasco', label: 'Vasco', color: '#ff8c42', emoji: '🕵️' },
   { key: 'isto_ou_aquilo', label: 'Isto/Aquilo', color: '#4ade80', emoji: '⚖️' },
+  { key: 'categoria_relampago', label: 'Relâmpago', color: '#facc15', emoji: '⚡' },
+  { key: 'mimica', label: 'Mímica', color: '#f472b6', emoji: '🎭' },
+  { key: 'roleta_russa', label: 'Roleta Russa', color: '#ef4444', emoji: '🎯' },
+  { key: 'duelo', label: 'Duelo 1v1', color: '#38bdf8', emoji: '⚔️' },
 ];
 
 export function CardShell({ children, typeKey }) {
