@@ -91,7 +91,9 @@ Legenda: ✅ feito · 🚧 em curso · ⬜ por fazer · 🔗 ponto de integraç�
       intensidade (leve/picante/hardcore). `server/src/admin.{html,js}` + repo CRUD.
 
 **Colega (BD)**
-- [ ] Finalizar schema definitivo, disponibilizar Prisma client estável
+- [x] Schema aplicado e estável na Supabase (2026-09-01c) — inclui `prompts.tag`
+      (packs) e `room_snapshots` (recuperação de salas)
+- [ ] Rever índices/limpeza de `room_snapshots` (hoje: TTL de 6h no código)
 - [ ] Queries de estatísticas finais ("quem bebeu mais")
 
 ---
@@ -123,9 +125,10 @@ Legenda: ✅ feito · 🚧 em curso · ⬜ por fazer · 🔗 ponto de integraç�
 - [x] **SQL da pasta `db/` regenerado** (2026-09-01b) — `db/generate.mjs` gera
       `01_schema.sql` (cria OU atualiza) e `02_seed.sql` (18 tipos, 360 prompts)
       das fontes de verdade. `npm run db:sql` · `npm run db:sync`.
-- [ ] 🔗 **Correr na Supabase**: `cd server && npm run db:sync` (ou colar
-      `db/01_schema.sql` + `db/02_seed.sql` no SQL editor). **Falta só isto** —
-      precisa do `server/.env`, que não está nesta máquina.
+- [x] 🔗 **Supabase em dia** (2026-09-01c) — `db push` (diff conferido antes:
+      só aditivo) + seed. 18 tipos · 361 prompts · packs · `room_snapshots`.
+      Cadeia verificada a jogar contra a BD e a recuperar uma sala com o disco
+      local apagado (`origem: "bd"`).
 - [x] Deploy no ar (Railway, imagem única) — inclui **ambos os modos**. Falta só o
       `db push`+seed da tabela `board_items` na Supabase p/ ativar a edição na admin.
 - [x] **Bancos do tabuleiro em dados/BD** (melhoria): ?? / prisão / cartas passam a

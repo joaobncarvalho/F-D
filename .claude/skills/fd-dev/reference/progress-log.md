@@ -5,6 +5,43 @@
 
 ---
 
+## 2026-09-01 (c) — Supabase em dia: schema aplicado e conteúdo semeado
+
+Com as credenciais à mão, ficou fechado o último ponto em aberto.
+
+- **Antes de aplicar**, `prisma migrate diff --from-url` contra a BD real para ver
+  exatamente o que mudava. Era tudo **aditivo** — nada apagado:
+  `ALTER TYPE "BoardItemCategory" ADD VALUE 'regra'` · `prompts.tag` (nullable) ·
+  tabela `room_snapshots` + 2 índices. Só depois se correu o `db push`.
+- `db push` + `generate` + `db seed` ✓.
+
+**Estado real da Supabase (conferido por query):**
+- 18 game_types · **361 prompts** (leve 138 · picante 107 · hardcore 59 · caos 57)
+- packs: aniversário 4 · despedida 4 · reencontro 4 (os outros 349 servem sempre)
+- 3 prompts com buddy, 5 com duração · 34 board_items (10 regras)
+- `room_snapshots` criada
+
+> **361 e não 360:** há 1 prompt na BD que já não existe no código
+> (`intrigas/picante`: "Faz de teu buddy, durante 3 jogadas, a pessoa que achas
+> mais atraente nesta mesa."). O seed faz upsert, nunca apaga — é conteúdo válido,
+> ficou. Se um dia quiseres a BD a espelhar o código ao milímetro, é preciso um
+> passo de limpeza no `seed.js` (apagar o que não está no ficheiro) — decisão a
+> tomar de propósito, não por acidente.
+
+**Cadeia verificada ponta-a-ponta contra a Supabase, não só os comandos:**
+1. servidor com `.env` → sala criada, pack "despedida" aceite (prova que a coluna
+   `tag` está lá), 8 tipos sorteados em 12 voltas, 5 prompts todos diferentes
+   (prova o saco anti-repetição a correr sobre a BD), zero avisos no log;
+2. passados 15s, a gravação profunda apareceu na tabela `room_snapshots`;
+3. servidor morto + **ficheiro local apagado** (simula um deploy que troca de
+   máquina) → arranque novo: `salas recuperadas {origem: "bd"}`;
+4. `rejoin_room` com o id do jogador → religou, com sala, pack e 2 jogadores.
+5. Linhas de teste limpas da Supabase no fim.
+
+**Nota:** a password da BD passou por uma conversa de chat. Vale a pena rodá-la no
+dashboard da Supabase (Settings → Database → Reset password) e atualizar o `.env`
+local e as variáveis do Railway.
+
 ## 2026-09-01 (b) — Snapshot na Postgres + SQL da BD regenerado
 
 Os dois pontos que tinham ficado em aberto na sessão anterior.
