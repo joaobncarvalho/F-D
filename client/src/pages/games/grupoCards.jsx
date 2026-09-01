@@ -9,9 +9,22 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { CardShell, Avatar } from './shared.jsx';
 import { sfx } from '../../sfx.js';
 
-/** Bolinhas de progresso: quem já respondeu acende. */
-function Progresso({ room, answeredIds, hiddenId }) {
-  const votantes = room.players.filter((p) => p.connected && !p.eliminated && p.id !== hiddenId);
+/**
+ * Bolinhas de progresso: quem já respondeu acende.
+ *
+ * No "Quem Disse" NÃO se mostram nomes: o autor não vota, por isso a bolinha
+ * dele nunca acenderia — e ao fim de dez segundos toda a gente saberia quem era.
+ * Aí mostra-se só a contagem.
+ */
+function Progresso({ room, answeredIds, anonimo }) {
+  const votantes = room.players.filter((p) => p.connected && !p.eliminated);
+  if (anonimo) {
+    return (
+      <p className="text-sm text-white/50">
+        {answeredIds.length} de {votantes.length - 1} já votaram…
+      </p>
+    );
+  }
   return (
     <div className="flex flex-wrap gap-1.5 justify-center">
       {votantes.map((p) => {
@@ -73,7 +86,7 @@ export function GrupoCard({ round, room, youId, isAuthor, canControl, onAnswer, 
 
       {!round.revealed && (
         <>
-          <Progresso room={room} answeredIds={answered} hiddenId={kind === 'quem_disse' ? undefined : null} />
+          <Progresso room={room} answeredIds={answered} anonimo={kind === 'quem_disse'} />
 
           {podeResponder && kind === 'eu_nunca' && (
             <div className="grid grid-cols-2 gap-2">
