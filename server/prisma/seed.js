@@ -21,10 +21,11 @@ async function main() {
     for (const [text, intensity, opts = {}] of gt.prompts) {
       const buddy = !!opts.buddy;
       const duration = opts.duration ?? null;
+      const tag = opts.tag ?? null;
       await prisma.prompt.upsert({
         where: { gameTypeId_text: { gameTypeId: gameType.id, text } },
-        update: { intensity, active: true, buddy, duration },
-        create: { gameTypeId: gameType.id, text, intensity, active: true, buddy, duration },
+        update: { intensity, active: true, buddy, duration, tag },
+        create: { gameTypeId: gameType.id, text, intensity, active: true, buddy, duration, tag },
       });
       totalPrompts++;
     }

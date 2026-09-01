@@ -2,6 +2,9 @@ import { randomUUID } from 'node:crypto';
 import * as repo from './repo.js';
 import { AppError } from './errors.js';
 import { sanitizeText } from './util.js';
+import { pickPrompt, resetBags } from './content/bag.js';
+import { effectiveIntensity } from './game/intensity.js';
+import { pushFeed, clearFeed } from './feed.js';
 import { connectedOrder, statsFor, drink, nameOf } from './game/helpers.js';
 import { dealPiramide, serializePiramide } from './game/piramide.js';
 import { dealVasco, tallyVascoVotes, buildVascoResult, serializeVasco } from './game/vasco.js';
@@ -11,6 +14,10 @@ import { setupRelampago, serializeRelampago } from './game/relampago.js';
 import { setupMimica, serializeMimica } from './game/mimica.js';
 import { setupRoleta, serializeRoleta } from './game/roleta.js';
 import { setupDuelo, serializeDuelo } from './game/duelo.js';
+import { GRUPO_KEYS, setupGrupo, serializeGrupo } from './game/grupo.js';
+import { setupCascata, serializeCascata } from './game/cascata.js';
+import { setupDesenho, serializeDesenho } from './game/desenho.js';
+import { setupReacaoRoda, serializeReacaoRoda } from './game/reacao.js';
 // Ações dos mini-jogos chamadas diretamente pelo socket.js — re-exportadas daqui.
 export {
   piramideReady,
@@ -34,6 +41,10 @@ export { relampagoStart, relampagoResolve } from './game/relampago.js';
 export { mimicaWord, mimicaStart, mimicaResolve } from './game/mimica.js';
 export { roletaAnswer, roletaPass } from './game/roleta.js';
 export { dueloResult } from './game/duelo.js';
+export { grupoAnswer, grupoForceReveal, revealGrupo, grupoVoters } from './game/grupo.js';
+export { cascataStart, cascataStop } from './game/cascata.js';
+export { desenhoStart, desenhoGuess, desenhoGiveUp, desenhoWord, finishDesenho } from './game/desenho.js';
+export { reacaoTap, resolveReacaoRoda } from './game/reacao.js';
 
 // Motor de jogo. Opera sobre `room.game` (criado por initGame).
 //
@@ -47,6 +58,11 @@ export { dueloResult } from './game/duelo.js';
 //   'mimica'   — Mímica/Desenho: palavra privada + cronómetro; ninguém acerta = bebe
 //   'roleta'   — Roleta Russa: responder ou passar (o passe fica cada vez mais caro)
 //   'duelo'    — Duelo 1v1: dois jogadores, mini-duelo presencial; quem perde bebe
+//   'grupo'    — TODA a mesa responde em segredo e revela-se de uma vez
+//                (eu_nunca / mais_provavel / termometro / quem_disse)
+//   'cascata'  — corrente: só paras depois de quem está à tua frente
+//   'desenho'  — desenha e adivinha (traços por canal próprio, palavra privada)
+//   'reacao'   — primeiro a carregar; o último bebe
 //   'gameover'
 //
 // Vidas: só se perdem em recusas (Boca Calada / Desafio). Intrigas/Segredos dão
@@ -139,16 +155,21 @@ export function tallyIntensity(room) {
   return { intensity, randomized, candidates, counts };
 }
 
-export function initGame(room, { lives = DEFAULT_LIVES, intensity = 'leve' } = {}) {
+export function initGame(room, { lives = DEFAULT_LIVES, intensity = 'leve', curve = true } = {}) {
   const n = Math.max(MIN_LIVES, Math.min(MAX_LIVES, Number(lives) || DEFAULT_LIVES));
   for (const p of room.players.values()) {
     p.lives = n;
     p.eliminated = false; // novo jogo → todos voltam a jogar
   }
 
+  resetBags(room); // conteúdo todo outra vez disponível (saco anti-repetição)
+  clearFeed(room);
+
   room.game = {
     phase: 'prep',
     intensity: INTENSITIES.includes(intensity) ? intensity : 'leve',
+    curve: !!curve, // a intensidade votada é o TETO; começa-se leve e sobe
+    startedAt: Date.now(),
     startingLives: n,
     questions: [], // { id, targetPlayerId, authorPlayerId, text, used }
     secrets: [], // { id, authorPlayerId, text, used }
@@ -209,6 +230,7 @@ export async function spinWheel(room, playerId) {
   const player = room.players.get(playerId);
   const types = await repo.getGameTypes();
   const gt = pickWeightedType(types);
+  const inten = effectiveIntensity(g); // curva: leve no aquecimento, sobe até ao teto votado
 
   const round = {
     id: randomUUID(),
@@ -225,26 +247,26 @@ export async function spinWheel(room, playerId) {
   };
 
   if (gt.key === 'boca_calada') {
-    const q = pickQuestion(g, playerId) || (await repo.getRandomPrompt('boca_calada', g.intensity));
+    const q = pickQuestion(g, playerId) || (await pickPrompt(room, 'boca_calada', inten));
     round.prompt = q ? { text: q.text } : null;
     round.needsBuddy = !!q?.buddy;
     round.ruleDuration = q?.duration || null;
     g.phase = 'prompt';
   } else if (gt.key === 'desafio') {
-    const p = await repo.getRandomPrompt('desafio', g.intensity);
+    const p = await pickPrompt(room, 'desafio', inten);
     round.prompt = p ? { text: p.text } : null;
     round.needsBuddy = !!p?.buddy;
     round.ruleDuration = p?.duration || null;
     g.phase = 'prompt';
   } else if (gt.key === 'isto_ou_aquilo') {
-    const p = await repo.getRandomPrompt('isto_ou_aquilo', g.intensity);
+    const p = await pickPrompt(room, 'isto_ou_aquilo', inten);
     const parts = String(p?.text || '||').split('||');
     round.options = [(parts[0] || '—').trim(), (parts[1] || '—').trim()];
     round.chosen = null;
     round.needsBuddy = !!p?.buddy;
     g.phase = 'choice';
   } else if (gt.key === 'intrigas') {
-    const p = await repo.getRandomPrompt('intrigas', g.intensity);
+    const p = await pickPrompt(room, 'intrigas', inten);
     setupIntrigas(round, p?.text); // razão SERVER-SIDE (nunca no broadcast)
     g.phase = 'intrigas';
   } else if (gt.key === 'segredos') {
@@ -254,7 +276,7 @@ export async function spinWheel(room, playerId) {
       g.phase = 'guessing';
     } else {
       // Sem segredos submetidos → confissão simples (aceita/recusa).
-      const p = await repo.getRandomPrompt('segredos', g.intensity);
+      const p = await pickPrompt(room, 'segredos', inten);
       round.prompt = p ? { text: p.text } : null;
       g.phase = 'prompt';
     }
@@ -267,15 +289,15 @@ export async function spinWheel(room, playerId) {
     await dealVasco(room, round); // escolhe palavra + impostor(es), papéis privados
     g.phase = 'vasco';
   } else if (gt.key === 'categoria_relampago') {
-    const p = await repo.getRandomPrompt('categoria_relampago', g.intensity);
+    const p = await pickPrompt(room, 'categoria_relampago', inten);
     setupRelampago(round, p);
     g.phase = 'relampago';
   } else if (gt.key === 'mimica') {
-    const p = await repo.getRandomPrompt('mimica', g.intensity);
+    const p = await pickPrompt(room, 'mimica', inten);
     setupMimica(round, p); // palavra privada (canal mimica_word)
     g.phase = 'mimica';
   } else if (gt.key === 'roleta_russa') {
-    const p = await repo.getRandomPrompt('roleta_russa', g.intensity);
+    const p = await pickPrompt(room, 'roleta_russa', inten);
     setupRoleta(round, p);
     g.phase = 'roleta';
   } else if (gt.key === 'duelo') {
@@ -283,16 +305,38 @@ export async function spinWheel(room, playerId) {
       g.phase = 'duelo';
     } else {
       // Sem adversário disponível (todos os outros saíram) → desafio simples.
-      const p = await repo.getRandomPrompt('desafio', g.intensity);
-      round.gameTypeKey = 'desafio';
-      round.prompt = p ? { text: p.text } : null;
-      g.phase = 'prompt';
+      await fallbackDesafio(room, round, inten);
     }
+  } else if (GRUPO_KEYS.includes(gt.key)) {
+    // Jogos de mesa inteira: o quem_disse vive das perguntas da preparação.
+    const p = gt.key === 'quem_disse' ? null : await pickPrompt(room, gt.key, inten);
+    if (setupGrupo(room, round, gt.key, p)) g.phase = 'grupo';
+    else await fallbackDesafio(room, round, inten); // ninguém escreveu perguntas
+  } else if (gt.key === 'cascata') {
+    if (setupCascata(room, round)) g.phase = 'cascata';
+    else await fallbackDesafio(room, round, inten);
+  } else if (gt.key === 'desenho') {
+    const p = await pickPrompt(room, 'desenho', inten);
+    setupDesenho(round, p); // palavra privada (canal desenho_word)
+    g.phase = 'desenho';
+  } else if (gt.key === 'reacao') {
+    if (setupReacaoRoda(room, round)) g.phase = 'reacao';
+    else await fallbackDesafio(room, round, inten);
   }
 
   g.round = round;
   g.roundCount += 1;
+  pushFeed(room, '🎡', `${player.name} girou a roda → ${round.gameTypeLabel}`);
   return round;
+}
+
+/** Rede de segurança: um tipo que não dá para montar agora vira um Desafio. */
+async function fallbackDesafio(room, round, inten) {
+  const p = await pickPrompt(room, 'desafio', inten);
+  round.gameTypeKey = 'desafio';
+  round.gameTypeLabel = 'Desafio';
+  round.prompt = p ? { text: p.text } : null;
+  room.game.phase = 'prompt';
 }
 
 /** Boca Calada / Desafio: aceitar (passa) ou recusar (bebe → vida/shot). */
@@ -309,17 +353,20 @@ export function resolveAction(room, playerId, action) {
   if (action === 'refuse') {
     st.refusals += 1;
     st.drinks += 1;
+    pushFeed(room, '🍺', `${player.name} recusou e bebeu`);
     player.lives = Math.max(0, player.lives - 1);
     if (player.lives === 0) {
       player.eliminated = true; // sem vidas → fora (telemóvel partido)
       st.shots += 1; // o "shot" fatal
       effect = { type: 'eliminated', playerId };
+      pushFeed(room, '💀', `${player.name} ficou sem vidas — shot!`);
     } else {
       effect = { type: 'vida_perdida', playerId, lives: player.lives };
     }
     g.round.status = 'refused';
   } else {
     effect = { type: 'accepted', playerId };
+    pushFeed(room, '🎉', `${player.name} aceitou o desafio`);
     g.round.status = 'resolved';
   }
 
@@ -417,7 +464,7 @@ export function continueRound(room, playerId) {
 
   // Tipos que se fecham com um veredicto simples (escolha / marcação manual):
   // só avançam depois de a ronda estar resolvida.
-  if (['choice', 'relampago', 'mimica', 'roleta', 'duelo'].includes(g.phase)) {
+  if (['choice', 'relampago', 'mimica', 'roleta', 'duelo', 'grupo', 'cascata', 'desenho', 'reacao'].includes(g.phase)) {
     if (g.round?.status !== 'resolved') throw new AppError('Esta ronda ainda não terminou.');
     advanceTurn(room);
     g.round = null;
@@ -430,6 +477,20 @@ export function continueRound(room, playerId) {
   g.round = null;
   g.phase = 'wheel';
   return { game: g, rewarded: [] };
+}
+
+/**
+ * Fecha a ronda atual e passa a vez, sem veredicto nem castigo. É a última linha
+ * do auto-resolve (autoresolve.js) para fases com sub-passos a mais (Piramide,
+ * Vasco) em que adivinhar a intenção da mesa seria pior do que seguir em frente.
+ */
+export function abandonRound(room) {
+  const g = room.game;
+  if (!g || ['prep', 'gameover'].includes(g.phase)) return g;
+  advanceTurn(room);
+  g.round = null;
+  g.phase = 'wheel';
+  return g;
 }
 
 export function skipTurn(room, playerId) {
@@ -517,6 +578,10 @@ function serializeRound(g) {
   if (r.gameTypeKey === 'mimica') serializeMimica(base, r);
   if (r.gameTypeKey === 'roleta_russa') serializeRoleta(base, r);
   if (r.gameTypeKey === 'duelo') serializeDuelo(base, r);
+  if (GRUPO_KEYS.includes(r.gameTypeKey)) serializeGrupo(base, r);
+  if (r.gameTypeKey === 'cascata') serializeCascata(base, r);
+  if (r.gameTypeKey === 'desenho') serializeDesenho(base, r);
+  if (r.gameTypeKey === 'reacao') serializeReacaoRoda(base, r);
   return base;
 }
 
@@ -526,7 +591,9 @@ export function serializeGame(room) {
   if (!g) return null;
   return {
     phase: g.phase,
-    intensity: g.intensity,
+    intensity: effectiveIntensity(g), // a que está em vigor AGORA (curva)
+    intensityCeiling: g.intensity, // a votada no lobby (teto da noite)
+    curve: !!g.curve,
     startingLives: g.startingLives,
     roundCount: g.roundCount,
     currentPlayerId: g.currentPlayerId,

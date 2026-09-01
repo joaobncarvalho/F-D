@@ -4,6 +4,7 @@
 
 import { randomUUID } from 'node:crypto';
 import { AppError } from '../errors.js';
+import { pushFeed } from '../feed.js';
 
 /** Garante que há tabuleiro (e, opcionalmente, a fase certa). */
 export function requireBoard(room, phases) {
@@ -96,6 +97,7 @@ export function checkWin(room, playerId) {
     me.finished = true;
     b.winnerId = playerId;
     b.phase = 'over';
+    pushFeed(room, '🏁', `${nameOf(room, playerId)} deu a volta ao tabuleiro e ganhou!`);
     return true;
   }
   return false;
@@ -114,6 +116,7 @@ export function applyPrison(room, playerId, reason = 'prisão') {
   if (p.back) me.pos = Math.max(0, me.pos - p.back);
   if (p.loseCard && me.cards.length) me.cards.shift();
   b.lastEvent = { text: `🚔 ${nm} foi PRESO (${reason}): ${p.note}` };
+  pushFeed(room, '🚔', `${nm} foi preso (${reason}) — ${p.note}`);
 }
 
 /** IDs ativos na corrida (ligados, não terminados), por ordem. */

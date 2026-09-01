@@ -25,6 +25,18 @@ export function registerBoardHandlers(socket, { io, requireRoom, broadcastState,
     });
   }
 
+  // Duelo de reação (casa ⚡): qualquer um dos dois duelistas carrega.
+  socket.on('board_reacao_tap', (_payload, ack) => {
+    try {
+      const room = requireRoom(socket);
+      const res = board.boardReacao(room, socket.data.playerId);
+      broadcastState(io, room.code);
+      if (typeof ack === 'function') ack({ ok: true, ...res });
+    } catch (err) {
+      handleError(socket, ack, err);
+    }
+  });
+
   socket.on('board_pick_pawn', ({ pawn } = {}, ack) => {
     try {
       const room = requireRoom(socket);

@@ -170,6 +170,91 @@ export async function driveBots(room, hooks = {}) {
       return false;
     }
 
+    // GRUPO (Eu Nunca / Mais Provável / Termómetro / Quem Disse): todos respondem
+    // e o reveal é automático; depois o spinner (se bot) continua.
+    if (g.phase === 'grupo') {
+      const r = g.round;
+      if (!r.revealed) {
+        const voters = game.grupoVoters(room).filter((p) => p.isBot);
+        for (const bot of voters) {
+          if (r.answers[bot.id] !== undefined) continue;
+          let value;
+          if (r.gameTypeKey === 'eu_nunca') value = rand() < 0.5 ? 'ja' : 'nunca';
+          else if (r.gameTypeKey === 'termometro') value = Math.floor(rand() * 11);
+          else {
+            const t = pick(activeOthers(room, bot.id));
+            if (!t) continue;
+            value = t.id;
+          }
+          game.grupoAnswer(room, bot.id, value);
+          return true;
+        }
+        return false;
+      }
+      const cur = room.players.get(g.currentPlayerId);
+      if (cur?.isBot) { game.continueRound(room, cur.id); return true; }
+      return false;
+    }
+
+    // CASCATA: arrancar → parar por ORDEM (o servidor não deixa furar a fila).
+    if (g.phase === 'cascata') {
+      const r = g.round;
+      const cur = room.players.get(r.currentPlayerId);
+      if (r.substate === 'ready') {
+        if (cur?.isBot) { game.cascataStart(room, cur.id); return true; }
+        return false;
+      }
+      if (r.substate === 'running') {
+        const next = room.players.get(r.order[r.stopped.length]?.id);
+        if (next?.isBot) { game.cascataStop(room, next.id); return true; }
+        return false;
+      }
+      if (cur?.isBot) { game.continueRound(room, cur.id); return true; }
+      return false;
+    }
+
+    // DESENHO: quem desenha arranca; os outros palpitam (metade das vezes acertam,
+    // porque um bot não sabe desenhar); se ninguém acerta, o desenhista desiste.
+    if (g.phase === 'desenho') {
+      const r = g.round;
+      const drawer = room.players.get(r.currentPlayerId);
+      if (r.substate === 'ready') {
+        if (drawer?.isBot) { game.desenhoStart(room, drawer.id); return true; }
+        return false;
+      }
+      if (r.substate === 'drawing') {
+        const guesser = bots.find((b) => b.id !== r.currentPlayerId);
+        if (guesser && r.guesses.length < 3) {
+          game.desenhoGuess(room, guesser.id, rand() < 0.5 ? r.word : 'uma cerveja');
+          return true;
+        }
+        if (drawer?.isBot) { game.desenhoGiveUp(room, drawer.id); return true; }
+        return false;
+      }
+      const cur = room.players.get(g.currentPlayerId);
+      if (cur?.isBot) { game.continueRound(room, cur.id); return true; }
+      return false;
+    }
+
+    // REAÇÃO: espera pelo GO e carrega. Numa sala SÓ de bots (playtest/testes) não
+    // se espera de verdade — adianta-se o relógio, senão o tick ficava parado.
+    if (g.phase === 'reacao') {
+      const r = g.round;
+      if (r.substate === 'racing') {
+        const semHumanos = players(room).every((p) => p.isBot || !p.connected);
+        if (semHumanos && Date.now() < r.reaction.goAt) r.reaction.goAt = Date.now();
+        if (Date.now() < r.reaction.goAt) return false; // ainda não é o GO
+        const next = bots.find(
+          (b) => r.reaction.taps[b.id] === undefined && !r.reaction.falseStarts.includes(b.id)
+        );
+        if (next) { game.reacaoTap(room, next.id); return true; }
+        return false;
+      }
+      const cur = room.players.get(g.currentPlayerId);
+      if (cur?.isBot) { game.continueRound(room, cur.id); return true; }
+      return false;
+    }
+
     // INTRIGAS: choosing → escolher alvo; rps → jogar; reveal → continuar.
     if (g.phase === 'intrigas') {
       const r = g.round;
@@ -310,6 +395,20 @@ async function driveTournamentBots(room) {
       }
       return false;
     }
+    // Duelo de Reação: espera pelo GO (numa sala só de bots, adianta-o).
+    if (d.substate === 'racing') {
+      const semHumanos = players(room).every((p) => p.isBot || !p.connected);
+      if (semHumanos && Date.now() < d.reaction.goAt) d.reaction.goAt = Date.now();
+      if (Date.now() < d.reaction.goAt) return false;
+      for (const id of [d.aId, d.bId]) {
+        const p = room.players.get(id);
+        if (p?.isBot && d.reaction.taps[id] === undefined && !d.reaction.falseStarts.includes(id)) {
+          tournament.tournamentTap(room, id);
+          return true;
+        }
+      }
+      return false;
+    }
     if (d.substate === 'judging') {
       for (const bot of bots) {
         if (bot.id !== d.aId && bot.id !== d.bId && !d.votes[bot.id]) {
@@ -374,6 +473,23 @@ async function driveBoardBots(room) {
         }
         return false;
       }
+      // Casa de Reação: carregam os DOIS duelistas, não só quem está à vez.
+      // Numa sala só de bots adianta-se o GO (senão o tick ficava à espera).
+      if (b.pending?.kind === 'reacao') {
+        const reac = b.pending.reaction;
+        const semHumanos = players(room).every((p) => p.isBot || !p.connected);
+        if (semHumanos && Date.now() < reac.goAt) reac.goAt = Date.now();
+        if (Date.now() < reac.goAt) return false;
+        for (const id of [b.pending.playerId, b.pending.opponentId]) {
+          const p = room.players.get(id);
+          if (p?.isBot && reac.taps[id] === undefined && !reac.falseStarts.includes(id)) {
+            board.boardReacao(room, id);
+            return true;
+          }
+        }
+        return false;
+      }
+
       const cur = room.players.get(b.currentPlayerId);
       if (!cur?.isBot) return false;
 

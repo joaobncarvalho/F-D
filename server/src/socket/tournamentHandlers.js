@@ -4,6 +4,18 @@
 import * as tournament from '../tournament.js';
 
 export function registerTournamentHandlers(socket, { io, requireRoom, broadcastState, handleError }) {
+  // Duelo de Reação: cada duelista carrega assim que o ecrã acender.
+  socket.on('tournament_tap', (_payload, ack) => {
+    try {
+      const room = requireRoom(socket);
+      const res = tournament.tournamentTap(room, socket.data.playerId);
+      broadcastState(io, room.code);
+      if (typeof ack === 'function') ack({ ok: true, ...res });
+    } catch (err) {
+      handleError(socket, ack, err);
+    }
+  });
+
   socket.on('tournament_next', async (_payload, ack) => {
     try {
       const room = requireRoom(socket);

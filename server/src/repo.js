@@ -50,27 +50,31 @@ export async function getGameTypes() {
   return GAME_TYPES.map((g) => ({ key: g.key, label: g.label }));
 }
 
-export async function getRandomPrompt(gameTypeKey, intensity) {
+/**
+ * Sorteia UM prompt de um tipo.
+ *
+ * @param gameTypeKey  tipo de jogo ('desafio', 'mimica'…)
+ * @param intensity    intensidade pedida (cai para qualquer uma se não houver)
+ * @param opts.exclude textos já usados NESTA sala — evita repetir (saco em content/bag.js)
+ * @param opts.tag     pack temático ('aniversario' | 'despedida' | 'reencontro'); null = tudo
+ * @returns null quando não sobra nada (o chamador esvazia o saco e repete)
+ */
+export async function getRandomPrompt(gameTypeKey, intensity, { exclude = [], tag = null } = {}) {
+  const excluded = exclude instanceof Set ? exclude : new Set(exclude);
   const prisma = await client();
   if (prisma) {
     try {
       const base = { active: true, gameType: { key: gameTypeKey } };
-      let where = intensity ? { ...base, intensity } : base;
-      let n = await prisma.prompt.count({ where });
-      if (!n && intensity) {
-        where = base; // sem prompts nessa intensidade → cai para qualquer uma
-        n = await prisma.prompt.count({ where });
-      }
-      if (n) {
-        const [p] = await prisma.prompt.findMany({
-          where,
-          take: 1,
-          skip: Math.floor(Math.random() * n),
-        });
-        if (p) return { text: p.text, intensity: p.intensity, buddy: p.buddy, duration: p.duration };
-      }
-      return null;
+      // Os packs são aditivos: um prompt SEM tag serve qualquer ocasião.
+      const withTag = (w) => (tag ? { ...w, OR: [{ tag }, { tag: null }] } : w);
+      let rows = await prisma.prompt.findMany({ where: withTag({ ...base, intensity }) });
+      if (!rows.length) rows = await prisma.prompt.findMany({ where: withTag(base) }); // sem essa intensidade
+      const pool = rows.filter((r) => !excluded.has(r.text));
+      if (!pool.length) return null; // saco vazio → quem chama repõe e repete
+      const p = pool[Math.floor(Math.random() * pool.length)];
+      return { text: p.text, intensity: p.intensity, buddy: p.buddy, duration: p.duration };
     } catch (e) {
+      // Uma BD antiga (sem a coluna `tag`) cai aqui — o jogo segue com o conteúdo em código.
       log.warn('repo: getRandomPrompt DB falhou, uso memória:', { error: e.message });
     }
   }
@@ -78,12 +82,14 @@ export async function getRandomPrompt(gameTypeKey, intensity) {
   const gt = GAME_TYPES.find((g) => g.key === gameTypeKey);
   if (!gt) return null;
   let pool = gt.prompts;
+  if (tag) pool = pool.filter(([, , o = {}]) => !o.tag || o.tag === tag);
   if (intensity) {
     const filtered = pool.filter(([, inten]) => inten === intensity);
     if (filtered.length) pool = filtered;
   }
-  if (!pool.length) return null;
-  const [text, inten, opts = {}] = pool[Math.floor(Math.random() * pool.length)];
+  const fresh = pool.filter(([text]) => !excluded.has(text));
+  if (!fresh.length) return null;
+  const [text, inten, opts = {}] = fresh[Math.floor(Math.random() * fresh.length)];
   return { text, intensity: inten, buddy: !!opts.buddy, duration: opts.duration ?? null };
 }
 
@@ -152,6 +158,7 @@ const PROMPT_SELECT = {
   active: true,
   buddy: true,
   duration: true,
+  tag: true,
   gameType: { select: { key: true, label: true } },
 };
 
@@ -165,17 +172,17 @@ export async function adminListPrompts(gameTypeKey) {
   });
 }
 
-export async function adminCreatePrompt({ gameTypeKey, text, intensity = 'leve', buddy = false, duration = null }) {
+export async function adminCreatePrompt({ gameTypeKey, text, intensity = 'leve', buddy = false, duration = null, tag = null }) {
   const prisma = await requirePrisma();
   const gt = await prisma.gameType.findUnique({ where: { key: gameTypeKey } });
   if (!gt) throw new Error('Tipo de jogo inválido.');
   return prisma.prompt.create({
-    data: { gameTypeId: gt.id, text, intensity, active: true, buddy, duration },
+    data: { gameTypeId: gt.id, text, intensity, active: true, buddy, duration, tag },
     select: PROMPT_SELECT,
   });
 }
 
-export async function adminUpdatePrompt(id, { text, intensity, active, buddy, duration }) {
+export async function adminUpdatePrompt(id, { text, intensity, active, buddy, duration, tag }) {
   const prisma = await requirePrisma();
   const data = {};
   if (text !== undefined) data.text = text;
@@ -183,6 +190,7 @@ export async function adminUpdatePrompt(id, { text, intensity, active, buddy, du
   if (active !== undefined) data.active = active;
   if (buddy !== undefined) data.buddy = buddy;
   if (duration !== undefined) data.duration = duration;
+  if (tag !== undefined) data.tag = tag;
   return prisma.prompt.update({ where: { id }, data, select: PROMPT_SELECT });
 }
 

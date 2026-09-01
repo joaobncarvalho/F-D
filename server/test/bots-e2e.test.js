@@ -36,7 +36,11 @@ test('Roda e2e (bots): joga todas as mecânicas sem encravar nem fugas', async (
   let leaked = null;
   let iters = 0;
   // Joga até visitar todas as mecânicas OU um tecto de rondas — o que vier primeiro.
-  const WANT = ['boca_calada', 'desafio', 'isto_ou_aquilo', 'intrigas', 'segredos', 'piramide', 'vasco'];
+  const WANT = [
+    'boca_calada', 'desafio', 'isto_ou_aquilo', 'intrigas', 'segredos', 'piramide', 'vasco',
+    // Tipos de mesa inteira / mecânica (2026-09-01) — se algum encravar, este teste pendura.
+    'eu_nunca', 'mais_provavel', 'termometro', 'quem_disse', 'cascata', 'desenho', 'reacao',
+  ];
   while (room.game && room.game.phase !== 'gameover' && iters++ < 8000) {
     await bots.driveBots(room, {
       onSpin: (round) => {
@@ -47,11 +51,11 @@ test('Roda e2e (bots): joga todas as mecânicas sem encravar nem fugas', async (
         if (round.gameTypeKey === 'piramide' && r && 'hands' in r) leaked = 'piramide.hands';
       },
     });
-    if (WANT.every((t) => seenTypes.has(t)) && room.game.roundCount >= 20) break;
+    if (WANT.every((t) => seenTypes.has(t)) && room.game.roundCount >= 30) break;
   }
 
   assert.equal(leaked, null, `não pode haver fuga de anonimato (${leaked})`);
-  assert.ok(room.game.roundCount >= 20, `esperava ≥20 rondas, houve ${room.game.roundCount} (bots encravaram?)`);
+  assert.ok(room.game.roundCount >= 30, `esperava ≥30 rondas, houve ${room.game.roundCount} (bots encravaram?)`);
   for (const t of WANT) {
     assert.ok(seenTypes.has(t), `a mecânica "${t}" nunca foi exercida (${[...seenTypes].join(', ')})`);
   }

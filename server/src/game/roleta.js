@@ -6,6 +6,7 @@
 // a ronda acaba na mesma.
 
 import { AppError } from '../errors.js';
+import { pickPrompt } from '../content/bag.js';
 import * as repo from '../repo.js';
 import { drink } from './helpers.js';
 
@@ -48,7 +49,7 @@ export async function roletaPass(room, playerId) {
   r.passes += 1;
   r.tab += r.passes; // o passe nº N custa N golos
   if (r.passes >= MAX_PASSES) return finish(room, r, 'estourou');
-  const next = await repo.getRandomPrompt('roleta_russa', room.game.intensity);
+  const next = await pickPrompt(room, 'roleta_russa', room.game.intensity);
   if (next?.text) r.question = next.text;
   return r;
 }

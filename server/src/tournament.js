@@ -16,10 +16,15 @@
 
 import { randomUUID } from 'node:crypto';
 import * as repo from './repo.js';
+import { pickPrompt, resetBags } from './content/bag.js';
 import { AppError } from './errors.js';
 import { shuffle, nameOf } from './game/helpers.js';
+import { pushFeed } from './feed.js';
+import { createReaction, tapReaction, finishReaction, reactionRanking, serializeReaction } from './game/reacao.js';
 
-const DUEL_TYPES = ['boca_calada', 'desafio', 'isto_ou_aquilo'];
+// A Reação é o duelo mais puro que há: dois dedos, um GO, um vencedor. Não usa
+// conteúdo nenhum, por isso nunca repete e não depende do banco de prompts.
+const DUEL_TYPES = ['boca_calada', 'desafio', 'isto_ou_aquilo', 'reacao'];
 const REFUSE_GOLOS = 3; // quem recusa (e cai) bebe
 const TIEBREAK_GOLOS = 2; // ambos fizeram o mesmo → os dois bebem antes do sorteio
 
@@ -50,6 +55,7 @@ function buildRound(ids) {
 }
 
 export function initTournament(room, { intensity = 'leve' } = {}) {
+  resetBags(room); // saco de prompts limpo (anti-repetição)
   const players = connectedPlayers(room);
   if (players.length < 2) throw new AppError('São precisos pelo menos 2 jogadores.');
   const ids = shuffle(players.map((p) => p.id)); // sorteio do quadro
@@ -106,6 +112,7 @@ export async function tournamentNext(room, playerId) {
       t.championId = winners[0] || null;
       t.phase = 'over';
       room.status = 'ended';
+      if (t.championId) pushFeed(room, '👑', `${nameOf(room, t.championId)} é o rei/rainha da noite!`);
       return t;
     }
     t.rounds.push(buildRound(winners));
@@ -122,7 +129,7 @@ export async function tournamentNext(room, playerId) {
 
 async function openDuel(room, t, match) {
   const key = DUEL_TYPES[Math.floor(Math.random() * DUEL_TYPES.length)];
-  const prompt = await repo.getRandomPrompt(key, t.intensity);
+  const prompt = key === 'reacao' ? null : await pickPrompt(room, key, t.intensity);
   const duel = {
     matchId: match.id,
     gameTypeKey: key,
@@ -130,7 +137,7 @@ async function openDuel(room, t, match) {
     aName: nameOf(room, match.aId),
     bId: match.bId,
     bName: nameOf(room, match.bId),
-    substate: key === 'isto_ou_aquilo' ? 'choosing' : 'daring', // daring|choosing → judging → result
+    substate: key === 'isto_ou_aquilo' ? 'choosing' : key === 'reacao' ? 'racing' : 'daring', // daring|choosing|racing → judging → result
     actions: {}, // playerId -> 'accept'|'refuse' (daring) ou 0|1 (choosing)
     votes: {}, // espetador -> duelista (só no isto_ou_aquilo)
     result: null,
@@ -138,6 +145,9 @@ async function openDuel(room, t, match) {
   if (key === 'isto_ou_aquilo') {
     const parts = String(prompt?.text || '||').split('||');
     duel.options = [(parts[0] || '—').trim(), (parts[1] || '—').trim()];
+  } else if (key === 'reacao') {
+    duel.reaction = createReaction([match.aId, match.bId]);
+    duel.text = 'Assim que o ecrã acender: CARREGA! Quem carregar antes, perde.';
   } else {
     duel.text = prompt?.text || '—';
   }
@@ -171,6 +181,7 @@ function finishDuel(room, t, winnerId, how) {
   };
   d.substate = 'result';
   t.lastResult = { ...d.result, gameTypeKey: d.gameTypeKey };
+  pushFeed(room, '⚔️', `${d.result.winnerName} eliminou ${d.result.loserName} (${how})`);
   return d;
 }
 
@@ -243,6 +254,32 @@ export function tournamentVote(room, voterId, duelistId) {
   return t;
 }
 
+/** Reação: cada duelista carrega. Falso arranque = derrota direta. */
+export function tournamentTap(room, playerId) {
+  const t = requireTournament(room, ['duel']);
+  const d = t.duel;
+  if (d.substate !== 'racing') throw new AppError('Não é altura de carregar.');
+  if (![d.aId, d.bId].includes(playerId)) throw new AppError('Só os duelistas carregam.');
+  const res = tapReaction(d.reaction, playerId);
+  if (!res.ok) throw new AppError('Já carregaste.');
+  if (d.reaction.done) resolveTournamentReaction(room, t);
+  return res;
+}
+
+/** Fecha a corrida: ganha o mais rápido; quem perde bebe e sai do quadro. */
+export function resolveTournamentReaction(room, t) {
+  const d = t.duel;
+  if (!d || d.substate !== 'racing') return t;
+  finishReaction(d.reaction);
+  const ranking = reactionRanking(d.reaction);
+  const winnerId = ranking[0].early || ranking[0].missed ? ranking[ranking.length - 1].id : ranking[0].id;
+  const loserId = winnerId === d.aId ? d.bId : d.aId;
+  d.actions = Object.fromEntries(ranking.map((x) => [x.id, x.early ? 'cedo' : x.missed ? 'nada' : `${x.ms}ms`]));
+  drink(t, loserId, REFUSE_GOLOS);
+  finishDuel(room, t, winnerId, ranking.some((x) => x.early) ? 'falso arranque' : 'reflexos');
+  return t;
+}
+
 /** Fecha o duelo resolvido e volta ao quadro (host ou um dos duelistas). */
 export function tournamentContinue(room, playerId) {
   const t = requireTournament(room, ['duel']);
@@ -263,6 +300,24 @@ export function tournamentSkip(room, hostId) {
   if (!host || !host.isHost) throw new AppError('Só o host pode saltar.');
   if (t.phase === 'duel' && t.duel && t.duel.substate !== 'result') {
     finishDuel(room, t, Math.random() < 0.5 ? t.duel.aId : t.duel.bId, 'sorteio');
+  }
+  return t;
+}
+
+/**
+ * Auto-resolução por inatividade (autoresolve.js): o duelo decide-se à sorte,
+ * como no "saltar" do host. Um duelo sem resposta não pode prender o quadro.
+ */
+export async function tournamentAutoResolve(room) {
+  const t = room.tournament;
+  if (!t) return null;
+  if (t.phase === 'duel' && t.duel?.substate === 'racing') {
+    resolveTournamentReaction(room, t); // a corrida decide-se pelos toques que houve
+  } else if (t.phase === 'duel' && t.duel && t.duel.substate !== 'result') {
+    finishDuel(room, t, Math.random() < 0.5 ? t.duel.aId : t.duel.bId, 'sorteio');
+  } else if (t.phase === 'bracket') {
+    const match = nextPendingMatch(t); // ninguém carregou em "próximo duelo"
+    if (match) await openDuel(room, t, match);
   }
   return t;
 }
@@ -297,6 +352,7 @@ export function tournamentOnDisconnect(room, playerId) {
 function serializeDuel(room, t) {
   const d = t.duel;
   if (!d) return null;
+  const reaction = d.gameTypeKey === 'reacao' ? serializeReaction(d.reaction) : null;
   const revealed = d.substate === 'judging' || d.substate === 'result';
   return {
     matchId: d.matchId,
@@ -312,6 +368,7 @@ function serializeDuel(room, t) {
     played: Object.keys(d.actions),
     actions: revealed ? d.actions : null,
     voters: Object.keys(d.votes),
+    reaction, // só no duelo de Reação: instante do GO + quem já carregou
     result: d.result,
   };
 }

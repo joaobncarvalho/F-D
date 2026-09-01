@@ -4,6 +4,8 @@ import { serializeGame } from './game.js';
 import { serializeBoard } from './board.js';
 import { serializeTournament } from './tournament.js';
 import { sanitizeText } from './util.js';
+import { serializeFeed } from './feed.js';
+import { EMOJIS, COLORS, defaultIdentity } from './content/identity.js';
 
 export { AppError }; // re-exportado para compatibilidade (socket.js importa daqui)
 
@@ -60,7 +62,11 @@ export class RoomManager {
       createdAt: new Date().toISOString(),
       players: new Map(),
       intensityVotes: {}, // playerId -> intensidade (votação no lobby)
-      mode: 'wheel', // 'wheel' (roda) | 'board' (tabuleiro)
+      mode: 'wheel', // 'wheel' (roda) | 'board' (tabuleiro) | 'tournament' (torneio)
+      pack: null, // pack temático: null | 'aniversario' | 'despedida' | 'reencontro'
+      curve: true, // curva de intensidade (leve → teto votado ao longo da noite)
+      paused: false, // pausa do host: congela ações e cronómetros
+      feed: [], // feed de eventos da sala (feed.js)
     };
 
     const player = this.#addPlayer(room, name, /* isHost */ true);
@@ -183,6 +189,62 @@ export class RoomManager {
     return room;
   }
 
+  /** Identidade (emoji + cor). Qualquer jogador, só no lobby, sem repetir emoji. */
+  setIdentity(code, playerId, { emoji, color } = {}) {
+    const room = this.getRoom(code);
+    if (!room) throw new AppError('Sala não encontrada.');
+    if (room.status !== 'lobby') throw new AppError('O jogo já começou.');
+    const player = room.players.get(playerId);
+    if (!player) throw new AppError('Jogador inválido.');
+    if (emoji !== undefined && emoji !== null) {
+      if (!EMOJIS.includes(emoji)) throw new AppError('Emoji inválido.');
+      const taken = [...room.players.values()].some((p) => p.id !== playerId && p.emoji === emoji);
+      if (taken) throw new AppError('Esse emoji já está a ser usado.');
+      player.emoji = emoji;
+    }
+    if (color !== undefined && color !== null) {
+      if (!COLORS.includes(color)) throw new AppError('Cor inválida.');
+      player.color = color;
+    }
+    return room;
+  }
+
+  /** Pack temático do conteúdo (só host, só no lobby). */
+  setPack(code, playerId, pack) {
+    const room = this.getRoom(code);
+    if (!room) throw new AppError('Sala não encontrada.');
+    const player = room.players.get(playerId);
+    if (!player || !player.isHost) throw new AppError('Só o host escolhe o pack.');
+    if (room.status !== 'lobby') throw new AppError('O jogo já começou.');
+    room.pack = ['aniversario', 'despedida', 'reencontro'].includes(pack) ? pack : null;
+    return room;
+  }
+
+  /** Liga/desliga a curva de intensidade (só host, só no lobby). */
+  setCurve(code, playerId, on) {
+    const room = this.getRoom(code);
+    if (!room) throw new AppError('Sala não encontrada.');
+    const player = room.players.get(playerId);
+    if (!player || !player.isHost) throw new AppError('Só o host muda isto.');
+    if (room.status !== 'lobby') throw new AppError('O jogo já começou.');
+    room.curve = !!on;
+    return room;
+  }
+
+  /**
+   * Pausa do host ("intervalo, casa de banho"). Enquanto a sala está em pausa o
+   * servidor recusa ações de jogo e os cronómetros do cliente congelam.
+   */
+  setPaused(code, playerId, paused) {
+    const room = this.getRoom(code);
+    if (!room) throw new AppError('Sala não encontrada.');
+    const player = room.players.get(playerId);
+    if (!player || !player.isHost) throw new AppError('Só o host pode pausar.');
+    room.paused = !!paused;
+    room.pausedAt = room.paused ? Date.now() : null;
+    return room;
+  }
+
   /** Religa um jogador existente após queda de ligação. */
   reconnect(code, playerId) {
     const room = this.getRoom(code);
@@ -195,10 +257,14 @@ export class RoomManager {
   }
 
   #addPlayer(room, name, isHost) {
+    // Identidade por defeito pela ordem de entrada — trocável no lobby.
+    const ident = defaultIdentity(room.players.size);
     const player = {
       id: randomUUID(),
       roomId: room.id,
       name,
+      emoji: ident.emoji,
+      color: ident.color,
       lives: DEFAULT_LIVES,
       isHost,
       connected: true,
@@ -240,6 +306,8 @@ export function serializeRoom(room) {
       .map((p) => ({
         id: p.id,
         name: p.name,
+        emoji: p.emoji,
+        color: p.color,
         lives: p.lives,
         isHost: p.isHost,
         connected: p.connected,
@@ -248,6 +316,10 @@ export function serializeRoom(room) {
       })),
     intensityVotes: room.intensityVotes || {}, // votos no lobby (playerId -> intensidade)
     mode: room.mode || 'wheel',
+    pack: room.pack || null,
+    curve: room.curve !== false,
+    paused: !!room.paused,
+    feed: serializeFeed(room),
     // Estado de jogo (null enquanto no lobby). Serialização/anonimização em game.js/board.js.
     game: serializeGame(room),
     board: serializeBoard(room),

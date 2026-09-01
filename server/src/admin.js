@@ -40,6 +40,10 @@ export function createAdminRouter() {
     res.json(await repo.adminListPrompts(req.query.type || undefined));
   }));
 
+  // Packs temáticos: um prompt SEM tag serve qualquer ocasião (aditivos).
+  const PACKS = ['aniversario', 'despedida', 'reencontro'];
+  const cleanTag = (t) => (PACKS.includes(t) ? t : null);
+
   const cleanDuration = (d) => {
     if (d === '' || d === null || d === undefined) return null;
     const n = parseInt(d, 10);
@@ -47,7 +51,7 @@ export function createAdminRouter() {
   };
 
   router.post('/api/prompts', wrap(async (req, res) => {
-    const { gameTypeKey, text, intensity, buddy, duration } = req.body || {};
+    const { gameTypeKey, text, intensity, buddy, duration, tag } = req.body || {};
     const clean = String(text || '').trim();
     if (!gameTypeKey) return res.status(400).json({ error: 'Escolhe o tipo de jogo.' });
     if (clean.length < 3) return res.status(400).json({ error: 'Texto demasiado curto.' });
@@ -60,12 +64,13 @@ export function createAdminRouter() {
         intensity,
         buddy: !!buddy,
         duration: cleanDuration(duration),
+        tag: cleanTag(tag),
       })
     );
   }));
 
   router.patch('/api/prompts/:id', wrap(async (req, res) => {
-    const { text, intensity, active, buddy, duration } = req.body || {};
+    const { text, intensity, active, buddy, duration, tag } = req.body || {};
     const data = {};
     if (text !== undefined) data.text = String(text).trim().slice(0, 300);
     if (intensity !== undefined) {
@@ -76,6 +81,7 @@ export function createAdminRouter() {
     if (active !== undefined) data.active = !!active;
     if (buddy !== undefined) data.buddy = !!buddy;
     if (duration !== undefined) data.duration = cleanDuration(duration);
+    if (tag !== undefined) data.tag = cleanTag(tag);
     res.json(await repo.adminUpdatePrompt(req.params.id, data));
   }));
 

@@ -197,6 +197,15 @@
               <label>Duração (jogadas)</label>
               <input id="newDuration" type="number" min="1" max="10" placeholder="—" />
             </div>
+            <div style="flex: 0 0 170px">
+              <label>Pack temático</label>
+              <select id="newTag">
+                <option value="">— serve sempre —</option>
+                <option value="aniversario">🎂 Aniversário</option>
+                <option value="despedida">💍 Despedida</option>
+                <option value="reencontro">🫂 Reencontro</option>
+              </select>
+            </div>
             <span class="spacer"></span>
             <button id="add" class="btn-primary">Adicionar</button>
           </div>
@@ -377,6 +386,10 @@
         const buddyCb = el("input", { type: "checkbox", checked: !!p.buddy, style: "width:auto" });
         const buddyLbl = el("label", { title: "Buddy", style: "display:flex;gap:5px;align-items:center;margin:0;font-size:.85rem;color:#8fe" }, [buddyCb, "🤝"]);
         const dur = el("input", { type: "number", min: "1", max: "10", placeholder: "⏱", value: p.duration ?? "", title: "Duração (jogadas)", style: "width:62px;padding:6px 8px" });
+        const tagSel = el("select", { title: "Pack temático", style: "width:auto;padding:6px 8px" });
+        for (const [v, t] of [["", "🌐"], ["aniversario", "🎂"], ["despedida", "💍"], ["reencontro", "🫂"]]) {
+          tagSel.append(el("option", { value: v, textContent: t, selected: (p.tag || "") === v }));
+        }
         const save = el("button", { className: "btn-ghost small", textContent: "💾" });
         const del = el("button", { className: "btn-danger small", textContent: "🗑" });
 
@@ -385,7 +398,7 @@
           try {
             await api("/prompts/" + p.id, {
               method: "PATCH",
-              body: JSON.stringify({ text: ta.value, intensity: seg.get(), buddy: buddyCb.checked, duration: dur.value }),
+              body: JSON.stringify({ text: ta.value, intensity: seg.get(), buddy: buddyCb.checked, duration: dur.value, tag: tagSel.value || null }),
             });
             p.intensity = seg.get();
             toast("Guardado ✓");
@@ -399,7 +412,7 @@
           catch (e) { toast(e.message, false); }
         };
 
-        wrap.append(ta, el("div", { className: "prompt-actions" }, [chip, seg.node, buddyLbl, dur, el("span", { className: "spacer" }), save, del]));
+        wrap.append(ta, el("div", { className: "prompt-actions" }, [chip, seg.node, buddyLbl, dur, tagSel, el("span", { className: "spacer" }), save, del]));
         return wrap;
       }
 
@@ -613,6 +626,7 @@
               text,
               buddy: $("newBuddy").checked,
               duration: $("newDuration").value,
+              tag: $("newTag").value || null,
             }),
           });
           $("newText").value = "";
@@ -620,6 +634,7 @@
           $("newOptB").value = "";
           $("newBuddy").checked = false;
           $("newDuration").value = "";
+          $("newTag").value = "";
           toast("Desafio adicionado ✓");
           await load();
         } catch (e) { $("addErr").textContent = e.message; }

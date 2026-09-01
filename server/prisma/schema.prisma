@@ -115,12 +115,14 @@ model Prompt {
   active     Boolean   @default(true)
   buddy      Boolean   @default(false) // dispara a escolha de "buddy" (bebe junto)
   duration   Int?      // se >0: regra que dura N jogadas (aviso persistente no ecrã)
+  tag        String?   // pack temático: "aniversario" | "despedida" | "reencontro" (null = serve sempre)
 
   gameType GameType    @relation(fields: [gameTypeId], references: [id], onDelete: Cascade)
   rounds   GameRound[]
 
   @@unique([gameTypeId, text]) // permite seed idempotente (upsert)
   @@index([gameTypeId, intensity, active])
+  @@index([tag])
   @@map("prompts")
 }
 

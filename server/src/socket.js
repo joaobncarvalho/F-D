@@ -7,9 +7,18 @@ import * as bots from './bots.js';
 import * as tournament from './tournament.js';
 import { registerBoardHandlers } from './socket/boardHandlers.js';
 import { registerTournamentHandlers } from './socket/tournamentHandlers.js';
+import * as autoresolve from './autoresolve.js';
+import * as snapshot from './snapshot.js';
 
 const rooms = new RoomManager();
 const botTicks = new Map(); // code -> intervalId (tick dos bots de playtest)
+
+// Eventos permitidos com a sala em PAUSA (host foi à casa de banho, etc.).
+// Tudo o resto é recusado pelo servidor — a pausa tem de ser real, não decorativa.
+const ALLOWED_WHILE_PAUSED = new Set([
+  'pause_game', 'rejoin_room', 'send_message', 'end_game', 'reset_game',
+  'create_room', 'join_room', 'set_identity',
+]);
 
 /**
  * Regista os handlers de Socket.io.
@@ -26,10 +35,26 @@ const botTicks = new Map(); // code -> intervalId (tick dos bots de playtest)
  *   error_msg   { message }         -> erro legível para o utilizador
  */
 export function registerSocketHandlers(io) {
+  // Recupera salas de um reinício anterior e passa a gravar o estado (snapshot.js).
+  snapshot.restore(rooms);
+  snapshot.startAutosave(rooms);
+  startAutoResolveSweeper(io);
+
   io.on('connection', (socket) => {
     // Guardamos o contexto do jogador na própria socket.
     socket.data.code = null;
     socket.data.playerId = null;
+
+    // A pausa é validada AQUI, antes de qualquer handler: assim não é preciso
+    // repetir a verificação em cada um dos ~50 eventos (e não se esquece nenhum).
+    socket.use(([event] = [], next) => {
+      const room = rooms.getRoom(socket.data.code);
+      if (room?.paused && !ALLOWED_WHILE_PAUSED.has(event)) {
+        socket.emit('error_msg', { message: '⏸️ O jogo está em pausa.' });
+        return; // pacote descartado de propósito (não chama next)
+      }
+      next();
+    });
 
     socket.on('create_room', ({ name } = {}, ack) => {
       try {
@@ -83,6 +108,15 @@ export function registerSocketHandlers(io) {
           const w = game.mimicaWord(room, player.id);
           if (w) socket.emit('mimica_word', { roundId: room.game.round.id, ...w });
         }
+        // Desenho a decorrer: devolve a palavra privada a quem está a desenhar.
+        if (room.game?.round?.gameTypeKey === 'desenho') {
+          const w = game.desenhoWord(room, player.id);
+          if (w) socket.emit('desenho_word', { roundId: room.game.round.id, ...w });
+        }
+        // "Quem Disse" a decorrer: quem escreveu a pergunta volta a saber que é sua.
+        if (room.game?.round?.gameTypeKey === 'quem_disse' && room.game.round.authorId === player.id) {
+          socket.emit('you_are_author', { roundId: room.game.round.id });
+        }
         broadcastState(io, room.code);
       } catch (err) {
         // Falha de reconexão é terminal: a sessão guardada já não é válida.
@@ -97,6 +131,51 @@ export function registerSocketHandlers(io) {
       try {
         const { code, playerId } = socket.data;
         rooms.voteIntensity(code, playerId, intensity);
+        broadcastState(io, code);
+        if (typeof ack === 'function') ack({ ok: true });
+      } catch (err) {
+        handleError(socket, ack, err);
+      }
+    });
+
+    socket.on('set_identity', ({ emoji, color } = {}, ack) => {
+      try {
+        const { code, playerId } = socket.data;
+        rooms.setIdentity(code, playerId, { emoji, color });
+        broadcastState(io, code);
+        if (typeof ack === 'function') ack({ ok: true });
+      } catch (err) {
+        handleError(socket, ack, err);
+      }
+    });
+
+    socket.on('set_pack', ({ pack } = {}, ack) => {
+      try {
+        const { code, playerId } = socket.data;
+        rooms.setPack(code, playerId, pack);
+        broadcastState(io, code);
+        if (typeof ack === 'function') ack({ ok: true });
+      } catch (err) {
+        handleError(socket, ack, err);
+      }
+    });
+
+    socket.on('set_curve', ({ on } = {}, ack) => {
+      try {
+        const { code, playerId } = socket.data;
+        rooms.setCurve(code, playerId, on);
+        broadcastState(io, code);
+        if (typeof ack === 'function') ack({ ok: true });
+      } catch (err) {
+        handleError(socket, ack, err);
+      }
+    });
+
+    socket.on('pause_game', ({ paused } = {}, ack) => {
+      try {
+        const { code, playerId } = socket.data;
+        const room = rooms.setPaused(code, playerId, paused);
+        io.to(code).emit('paused_changed', { paused: room.paused });
         broadcastState(io, code);
         if (typeof ack === 'function') ack({ ok: true });
       } catch (err) {
@@ -473,6 +552,118 @@ export function registerSocketHandlers(io) {
       }
     });
 
+    // ----- Jogos de mesa inteira (Eu Nunca / Mais Provável / Termómetro / Quem Disse) -----
+    socket.on('grupo_answer', ({ value } = {}, ack) => {
+      try {
+        if (throttled(socket, 'submit', 150)) return void (typeof ack === 'function' && ack({ ok: true }));
+        const room = requireRoom(socket);
+        game.grupoAnswer(room, socket.data.playerId, value);
+        broadcastState(io, room.code);
+        if (typeof ack === 'function') ack({ ok: true });
+      } catch (err) {
+        handleError(socket, ack, err);
+      }
+    });
+
+    socket.on('grupo_reveal', (_payload, ack) => {
+      try {
+        const room = requireRoom(socket);
+        const p = room.players.get(socket.data.playerId);
+        if (!p || (!p.isHost && socket.data.playerId !== room.game?.currentPlayerId))
+          throw new AppError('Só o host ou quem girou pode revelar.');
+        game.grupoForceReveal(room);
+        broadcastState(io, room.code);
+        if (typeof ack === 'function') ack({ ok: true });
+      } catch (err) {
+        handleError(socket, ack, err);
+      }
+    });
+
+    // ----- Cascata -----
+    const cascataEvents = {
+      cascata_start: (room, pid) => game.cascataStart(room, pid),
+      cascata_stop: (room, pid) => game.cascataStop(room, pid),
+    };
+    for (const [event, fn] of Object.entries(cascataEvents)) {
+      socket.on(event, (_payload, ack) => {
+        try {
+          const room = requireRoom(socket);
+          fn(room, socket.data.playerId);
+          broadcastState(io, room.code);
+          if (typeof ack === 'function') ack({ ok: true });
+        } catch (err) {
+          handleError(socket, ack, err);
+        }
+      });
+    }
+
+    // ----- Desenha e Adivinha -----
+    socket.on('desenho_start', (_payload, ack) => {
+      try {
+        const room = requireRoom(socket);
+        game.desenhoStart(room, socket.data.playerId);
+        io.to(room.code).emit('draw_clear', {}); // tela limpa em todos os ecrãs
+        broadcastState(io, room.code);
+        if (typeof ack === 'function') ack({ ok: true });
+      } catch (err) {
+        handleError(socket, ack, err);
+      }
+    });
+
+    socket.on('desenho_guess', ({ text } = {}, ack) => {
+      try {
+        if (throttled(socket, 'guess', 300)) return void (typeof ack === 'function' && ack({ ok: true }));
+        const room = requireRoom(socket);
+        game.desenhoGuess(room, socket.data.playerId, text);
+        broadcastState(io, room.code);
+        if (typeof ack === 'function') ack({ ok: true });
+      } catch (err) {
+        handleError(socket, ack, err);
+      }
+    });
+
+    socket.on('desenho_giveup', (_payload, ack) => {
+      try {
+        const room = requireRoom(socket);
+        game.desenhoGiveUp(room, socket.data.playerId);
+        broadcastState(io, room.code);
+        if (typeof ack === 'function') ack({ ok: true });
+      } catch (err) {
+        handleError(socket, ack, err);
+      }
+    });
+
+    // Traços do desenho: canal PRÓPRIO (dezenas de pontos por segundo não têm
+    // nada que fazer no room_state). Só quem está a desenhar pode emitir.
+    socket.on('draw_stroke', (stroke = {}) => {
+      const room = rooms.getRoom(socket.data.code);
+      const r = room?.game?.round;
+      if (!r || r.gameTypeKey !== 'desenho' || r.substate !== 'drawing') return;
+      if (r.currentPlayerId !== socket.data.playerId) return;
+      const pts = Array.isArray(stroke.points) ? stroke.points.slice(0, 200) : null;
+      if (!pts) return;
+      socket.to(room.code).emit('draw_stroke', { points: pts, color: stroke.color, width: stroke.width });
+    });
+
+    socket.on('draw_clear', () => {
+      const room = rooms.getRoom(socket.data.code);
+      const r = room?.game?.round;
+      if (!r || r.gameTypeKey !== 'desenho' || r.currentPlayerId !== socket.data.playerId) return;
+      socket.to(room.code).emit('draw_clear', {});
+    });
+
+    // ----- Reação (Primeiro a Carregar) -----
+    socket.on('reacao_tap', (_payload, ack) => {
+      try {
+        const room = requireRoom(socket);
+        const res = game.reacaoTap(room, socket.data.playerId);
+        broadcastState(io, room.code);
+        if (typeof ack === 'function') ack({ ok: true, ...res });
+      } catch (err) {
+        handleError(socket, ack, err);
+      }
+    });
+
     socket.on('skip_turn', (_payload, ack) => {
       try {
         const room = requireRoom(socket);
@@ -543,6 +734,24 @@ export function registerSocketHandlers(io) {
   });
 }
 
+/**
+ * Varre todas as salas à procura de rondas encravadas (ver autoresolve.js). Um
+ * único temporizador para o servidor inteiro — não um por sala.
+ */
+function startAutoResolveSweeper(io) {
+  if (!autoresolve.ENABLED) return;
+  const id = setInterval(async () => {
+    for (const room of [...rooms.rooms.values()]) {
+      try {
+        if (await autoresolve.sweep(room)) broadcastState(io, room.code);
+      } catch (err) {
+        log.error('erro no varrimento de auto-resolve', { code: room.code, message: err?.message });
+      }
+    }
+  }, 3000);
+  id.unref?.();
+}
+
 function requireRoom(socket) {
   const room = rooms.getRoom(socket.data.code);
   if (!room) throw new AppError('Sala não encontrada.');
@@ -600,6 +809,14 @@ function announceSpin(io, room, round) {
   if (round.gameTypeKey === 'mimica') {
     const w = game.mimicaWord(room, round.currentPlayerId);
     if (w) io.to(round.currentPlayerId).emit('mimica_word', { roundId: round.id, ...w });
+  }
+  if (round.gameTypeKey === 'desenho') {
+    const w = game.desenhoWord(room, round.currentPlayerId);
+    if (w) io.to(round.currentPlayerId).emit('desenho_word', { roundId: round.id, ...w });
+  }
+  if (round.gameTypeKey === 'quem_disse' && round.authorId) {
+    // O autor da pergunta sabe que é dele (e o cliente esconde-lhe os botões).
+    io.to(round.authorId).emit('you_are_author', { roundId: round.id });
   }
   io.to(room.code).emit('round_started', { gameTypeKey: round.gameTypeKey });
 }

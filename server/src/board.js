@@ -13,6 +13,8 @@
 // initBoard — assim os handlers síncronos leem-nos sem `await`. As cartas são
 // PRIVADAS: o broadcast só leva a contagem; a mão vai por canal privado.
 import * as repo from './repo.js';
+import { pickPrompt, resetBags } from './content/bag.js';
+import { clearFeed } from './feed.js';
 import { AppError } from './errors.js';
 import { randomUUID } from 'node:crypto';
 import {
@@ -29,10 +31,12 @@ import {
 } from './board/core.js';
 import { openBlackjack, handValue } from './board/blackjack.js';
 import { openEvento } from './board/evento.js';
+import { openReacao, serializeReacaoPending } from './board/reacao.js';
 // Ações das casas chamadas diretamente pelo socket.js/bots.js — re-exportadas daqui.
 export { boardBlackjack } from './board/blackjack.js';
 export { boardBeerpong } from './board/beerpong.js';
 export { boardEventoPick } from './board/evento.js';
+export { boardReacao, resolveReacao } from './board/reacao.js';
 
 const BOARD_SIZE = 60;
 const GOLOS_PER_SQUARE = 2;
@@ -43,6 +47,7 @@ const N_GAMBLE = 4;
 const N_BLACKJACK = 3;
 const N_BEERPONG = 3;
 const N_LEILAO = 3;
+const N_REACAO = 3; // duelos de reação (⚡) — rápidos e barulhentos
 const AUCTION_SQUARES = 3; // casas que o vencedor do leilão avança
 const MAX_BID = 6;
 const RULE_FAIL_GOLOS = 2;
@@ -94,6 +99,7 @@ async function generateSquares() {
   for (let i = 0; i < N_BLACKJACK; i++) bag.push({ kind: 'blackjack' });
   for (let i = 0; i < N_BEERPONG; i++) bag.push({ kind: 'beerpong' });
   for (let i = 0; i < N_LEILAO; i++) bag.push({ kind: 'leilao' });
+  for (let i = 0; i < N_REACAO; i++) bag.push({ kind: 'reacao' });
   const miniCount = BOARD_SIZE - 1 - bag.length;
   for (let i = 0; i < miniCount; i++) {
     const gt = miniPool[Math.floor(Math.random() * miniPool.length)];
@@ -104,6 +110,8 @@ async function generateSquares() {
 }
 
 export async function initBoard(room, { intensity = 'leve' } = {}) {
+  resetBags(room); // saco de prompts limpo (anti-repetição nas casas de mini-jogo)
+  clearFeed(room);
   const squares = await generateSquares();
   const banks = await repo.getBoardBanks(); // { events, prison, cards } — snapshot p/ os handlers síncronos
   const players = {};
@@ -249,6 +257,10 @@ export async function advance(room, playerId, squares) {
     openAuction(room, playerId); // licitações secretas; resolve quando todos licitarem
     return { board: b, over: false };
   }
+  if (sq.kind === 'reacao') {
+    openReacao(room, playerId); // duelo relâmpago; resolve com os dois toques
+    return { board: b, over: false };
+  }
   advanceBoardTurn(room); // partida
   return { board: b, over: false };
 }
@@ -374,11 +386,11 @@ function applyGreed(room, playerId) {
 async function openMini(room, sq) {
   const b = room.board;
   if (sq.gameKey === 'isto_ou_aquilo') {
-    const p = await repo.getRandomPrompt('isto_ou_aquilo', b.intensity);
+    const p = await pickPrompt(room, 'isto_ou_aquilo', b.intensity);
     const parts = String(p?.text || '||').split('||');
     b.pending = { kind: 'mini', variant: 'choice', gameKey: sq.gameKey, gameLabel: sq.gameLabel, options: [(parts[0] || '—').trim(), (parts[1] || '—').trim()] };
   } else {
-    const p = await repo.getRandomPrompt(sq.gameKey, b.intensity);
+    const p = await pickPrompt(room, sq.gameKey, b.intensity);
     b.pending = { kind: 'mini', variant: 'dare', gameKey: sq.gameKey, gameLabel: sq.gameLabel, text: p?.text || '—' };
   }
 }
@@ -561,6 +573,21 @@ export function boardOnDisconnect(room, playerId) {
   }
 }
 
+/**
+ * Auto-avanço por inatividade (autoresolve.js): limpa a casa pendente e passa a
+ * vez. Mesmo efeito do "saltar" do host — mas sem precisar do host, que também
+ * pode estar distraído.
+ */
+export function boardAutoAdvance(room) {
+  const b = room.board;
+  if (!b || b.phase !== 'playing') return b;
+  b.pending = null;
+  b.lastEvent = { text: '⏱️ Tempo esgotado — a vez passa.' };
+  advanceBoardTurn(room);
+  boardEnsureCurrent(room);
+  return b;
+}
+
 /** Reconexão: se o turno tinha ficado sem dono, entrega-o a alguém ligado. */
 export function boardOnReconnect(room) {
   boardEnsureCurrent(room);
@@ -652,6 +679,8 @@ function serializePending(pending) {
       bidders: Object.keys(pending.bids),
     };
   }
+  // Reação: o instante do GO é público (é o que todos animam); os toques também.
+  if (pending.kind === 'reacao') return serializeReacaoPending(pending);
   if (pending.kind === 'blackjack') {
     const revealDealer = pending.stage !== 'player';
     return {
