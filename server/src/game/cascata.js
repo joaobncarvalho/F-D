@@ -32,8 +32,8 @@ function requireCascata(room, substate) {
 export function cascataStart(room, playerId) {
   const r = requireCascata(room, 'ready');
   const p = room.players.get(playerId);
-  if (!p || (!p.isHost && playerId !== r.currentPlayerId))
-    throw new AppError('Só quem está à vez (ou o host) pode arrancar.');
+  if (!p || playerId !== r.currentPlayerId)
+    throw new AppError('Só quem está à vez pode arrancar a cascata.');
   r.substate = 'running';
   r.startedAt = Date.now();
   return r;

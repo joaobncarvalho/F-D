@@ -42,6 +42,14 @@ test('Roda e2e (bots): joga todas as mecânicas sem encravar nem fugas', async (
     'eu_nunca', 'mais_provavel', 'termometro', 'quem_disse', 'cascata', 'desenho', 'reacao',
   ];
   while (room.game && room.game.phase !== 'gameover' && iters++ < 8000) {
+    // Este teste é sobre MECÂNICAS, não sobre desgaste: mantém-se a mesa de pé
+    // para todas poderem sair. Desde que falhar um jogo a tempo custa uma vida,
+    // quatro bots eliminavam-se uns aos outros antes de a roda calhar nos tipos
+    // raros (o Vasco tem peso 3 em ~110) e o teste falhava à sorte.
+    for (const p of room.players.values()) {
+      if (p.lives < 3) p.lives = 3;
+      p.eliminated = false;
+    }
     await bots.driveBots(room, {
       onSpin: (round) => {
         seenTypes.add(round.gameTypeKey);

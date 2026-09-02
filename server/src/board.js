@@ -15,6 +15,7 @@
 import * as repo from './repo.js';
 import { pickPrompt, resetBags } from './content/bag.js';
 import { clearFeed, pushFeed } from './feed.js';
+import * as eventos from './game/eventos.js';
 import { AppError } from './errors.js';
 import { randomUUID } from 'node:crypto';
 import {
@@ -150,9 +151,12 @@ export async function initBoard(room, { intensity = 'leve' } = {}) {
     activeRules: [], // Roleta de Regras: { id, text, remaining, byId, byName }
     trapCards: [], // maldições escondidas: { id, key, square, ownerId, ownerName }
     lastMove: null,
+    turnCount: 0, // jogadas — é o relógio do Evento da Noite neste modo
+    ultimoEvento: null, // Evento da Noite (game/eventos.js)
     lastEvent: null, // feedback de ?? / prisão / cartas / gamble
     winnerId: null,
   };
+  eventos.agendaProximo(room.board); // marca a jogada do primeiro evento
   return room.board;
 }
 
@@ -747,6 +751,8 @@ export function serializeBoard(room) {
     phase: b.phase,
     size: b.size,
     intensity: b.intensity,
+    ultimoEvento: b.ultimoEvento || null, // Evento da Noite
+    turnCount: b.turnCount || 0,
     squares: b.squares,
     pawns: PAWNS,
     cardMeta: cardMeta(b),

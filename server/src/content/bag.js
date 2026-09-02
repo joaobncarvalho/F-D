@@ -1,11 +1,8 @@
-// F&D — saco de prompts por sala (anti-repetição) + packs temáticos.
+// F&D — saco de prompts por sala (anti-repetição).
 //
 // Problema que resolve: `repo.getRandomPrompt` sorteia à sorte, por isso numa
 // noite de uma hora o mesmo desafio saía 3-4 vezes. Aqui guardamos, POR SALA e
 // POR TIPO, os textos que já saíram; só quando o saco esgota é que se repõe.
-//
-// Também é o sítio único onde se aplica o PACK temático da sala (room.pack) —
-// assim nenhum motor precisa de saber que os packs existem.
 
 import * as repo from '../repo.js';
 
@@ -27,11 +24,10 @@ export function resetBags(room) {
  */
 export async function pickPrompt(room, gameTypeKey, intensity) {
   const bag = bagFor(room, gameTypeKey);
-  const tag = room?.pack || null;
-  let p = await repo.getRandomPrompt(gameTypeKey, intensity, { exclude: bag, tag });
+  let p = await repo.getRandomPrompt(gameTypeKey, intensity, { exclude: bag });
   if (!p) {
     bag.clear(); // saco esgotado → volta a haver conteúdo
-    p = await repo.getRandomPrompt(gameTypeKey, intensity, { exclude: bag, tag });
+    p = await repo.getRandomPrompt(gameTypeKey, intensity, { exclude: bag });
   }
   if (p?.text) bag.add(p.text);
   return p;

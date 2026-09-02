@@ -23,6 +23,17 @@ import { abana, grau } from '../mood.js';
  * um momento bonito que atrasa o jogo passa a ser um momento irritante à
  * terceira vez. Nada aqui apanha toques (`pointer-events-none`) — o jogo
  * continua a andar por baixo.
+ *
+ * ONDE VIVE (e porquê não no meio do ecrã)
+ *
+ * A primeira versão era um ícone gigante ao centro: tapava a carta da ronda
+ * exatamente no instante em que a mesa queria lê-la. Passou a faixa — mas no
+ * TOPO tapava a tira de jogadores, que é onde os corações estão a mudar nesse
+ * preciso momento. Ficou em BAIXO, na faixa que separa a carta dos controlos do
+ * host: é a única zona do ecrã que costuma estar vazia, e assim vê-se ao mesmo
+ * tempo a batida e o coração a desaparecer lá em cima.
+ *
+ * A tinta de cor continua a apanhar o ecrã inteiro — não tapa nada, é só luz.
  */
 
 const BATIDAS = {
@@ -85,32 +96,46 @@ export default function Beat({ effect }) {
   const escala = 1 + grau() * 0.06;
 
   return (
-    <div className="fixed inset-0 z-50 pointer-events-none flex items-center justify-center">
-      {/* 1. Tinta — o ecrã inteiro apanha a cor, e larga-a logo. */}
+    <div className="fixed inset-x-0 bottom-0 z-50 pointer-events-none flex justify-center px-3 pb-24">
+      {/* 1. Tinta — o ecrã inteiro apanha a cor, e larga-a logo. Isto não tapa
+             nada: é luz, não é um painel. */}
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: [0, 1, 0] }}
         transition={{ duration: 0.55, times: [0, 0.18, 1], ease: 'easeOut' }}
-        className="absolute inset-0"
+        className="fixed inset-0"
         style={{ background: b.tinta }}
       />
 
-      <div className="relative flex flex-col items-center gap-1">
+      {/* 2+3. A faixa: ícone e palavra lado a lado, no topo. */}
+      <motion.div
+        initial={{ opacity: 0, y: 18, scale: 0.92 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={{ opacity: 0, y: 14, scale: 0.96 }}
+        transition={MOLA.pop}
+        className="relative flex items-center gap-3 rounded-2xl px-4 py-2 backdrop-blur"
+        style={{
+          background: 'rgba(12,12,20,0.72)',
+          border: `1px solid ${b.cor}66`,
+          boxShadow: `0 10px 34px -12px ${b.cor}`,
+          maxWidth: 'min(92vw, 26rem)',
+        }}
+      >
         {/* Halo por trás do ícone — dá-lhe corpo sobre qualquer fundo. */}
         <motion.div
           initial={{ opacity: 0, scale: 0.4 }}
-          animate={{ opacity: [0, 0.75, 0], scale: [0.4, 1.6, 2] }}
+          animate={{ opacity: [0, 0.7, 0], scale: [0.4, 1.5, 1.9] }}
           transition={{ duration: 0.8, ease: 'easeOut' }}
           className="absolute rounded-full"
           style={{
-            width: '9rem',
-            height: '9rem',
+            left: '0.75rem',
+            width: '3.5rem',
+            height: '3.5rem',
             background: `radial-gradient(circle, ${b.cor} 0%, transparent 68%)`,
-            filter: 'blur(14px)',
+            filter: 'blur(10px)',
           }}
         />
 
-        {/* 2. Ícone */}
         <motion.div
           initial={{ opacity: 0, scale: 0.4 }}
           animate={
@@ -133,38 +158,39 @@ export default function Beat({ effect }) {
                   opacity: { duration: 0.12, ease: 'easeOut' },
                 }
           }
-          className="relative leading-none"
-          style={{ fontSize: '5.5rem', filter: `drop-shadow(0 8px 26px ${b.cor}88)` }}
+          className="relative leading-none flex-shrink-0"
+          style={{ fontSize: '2.6rem', filter: `drop-shadow(0 6px 18px ${b.cor}88)` }}
         >
           {b.icone}
         </motion.div>
 
-        {/* 3. Palavra — chega depois do ícone, nunca ao mesmo tempo. */}
-        <motion.p
-          initial={{ opacity: 0, y: 10, scale: 0.8 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ ...MOLA.pop, delay: 0.16 }}
-          className="fd-title font-extrabold text-3xl text-center"
-          style={{ color: b.cor, textShadow: `0 2px 20px ${b.cor}66, 0 2px 10px rgba(0,0,0,0.8)` }}
-        >
-          {b.texto}
-        </motion.p>
-
-        {/* De quem foi, quando o servidor manda o nome (ex.: +1 vida do Vasco). */}
-        {effect.name && (
+        <div className="relative min-w-0">
+          {/* A palavra chega depois do ícone, nunca ao mesmo tempo. */}
           <motion.p
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
+            initial={{ opacity: 0, x: -8 }}
+            animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0 }}
-            transition={{ delay: 0.28 }}
-            className="text-sm font-bold text-white/80"
-            style={{ textShadow: '0 2px 8px rgba(0,0,0,0.9)' }}
+            transition={{ ...MOLA.pop, delay: 0.12 }}
+            className="fd-title font-extrabold text-xl leading-tight truncate"
+            style={{ color: b.cor, textShadow: `0 2px 14px ${b.cor}55` }}
           >
-            {effect.name}
+            {b.texto}
           </motion.p>
-        )}
-      </div>
+
+          {/* De quem foi, quando o servidor manda o nome (ex.: +1 vida do Vasco). */}
+          {effect.name && (
+            <motion.p
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ delay: 0.22 }}
+              className="text-xs font-bold text-white/70 truncate"
+            >
+              {effect.name}
+            </motion.p>
+          )}
+        </div>
+      </motion.div>
     </div>
   );
 }

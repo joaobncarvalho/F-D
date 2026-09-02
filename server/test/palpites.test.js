@@ -9,6 +9,9 @@ import assert from 'node:assert/strict';
 
 delete process.env.DATABASE_URL;
 process.env.SNAPSHOT = '0';
+// Este ficheiro mede goles ao golo; um Evento da Noite a cair a meio somava
+// bebidas a toda a mesa e partia as contas (ver game/eventos.js).
+process.env.EVENTOS = '0';
 
 const { RoomManager, serializeRoom } = await import('../src/rooms.js');
 const game = await import('../src/game.js');

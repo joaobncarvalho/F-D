@@ -13,7 +13,7 @@ const MODOS = {
   wheel: {
     titulo: '🎡 Roda',
     texto:
-      'Cada um, à sua vez, gira a roda. O tipo que sair decide o mini-jogo. Recusar um desafio custa uma vida ❤️ e um copo; sem vidas, levas um shot e ficas a ver.',
+      'Cada um, à sua vez, gira a roda. O tipo que sair decide o mini-jogo. Recusar um desafio custa uma vida ❤️ e um copo; sem vidas, levas um shot e ficas a ver. De tempos a tempos cai um Evento da Noite sobre a mesa toda — pode salvar-te ou arrasar-te.',
   },
   board: {
     titulo: '🎲 Tabuleiro',
@@ -35,8 +35,8 @@ const JOGOS = {
   segredos: 'Mostra-se um segredo anónimo; o grupo adivinha o autor. Quem erra bebe — se todos acertarem, bebe o autor.',
   piramide: 'Memorizas as tuas cartas. Vira-se a pirâmide: atribuis golos a alguém e essa pessoa pode desconfiar — quem se engana bebe a dobrar.',
   vasco: 'Todos sabem a palavra secreta menos o Vasco. Dão-se pistas e vota-se. O Vasco ainda se pode redimir adivinhando.',
-  categoria_relampago: 'Uma categoria, oito segundos, itens em voz alta. Travar custa golos.',
-  mimica: 'Mimas a palavra que só tu vês. Se ninguém adivinhar, bebes.',
+  categoria_relampago: 'Uma categoria, oito segundos, itens em voz alta. No fim a MESA vota se aguentaste — se não, perdes uma vida ❤️',
+  mimica: 'Mimas a palavra que só tu vês. No fim a MESA vota se percebeu — se não, perdes uma vida ❤️ (empate conta a teu favor).',
   roleta_russa: 'Pergunta embaraçosa: respondes ou passas — e cada passe fica mais caro.',
   duelo: 'Dois jogadores, um mini-duelo presencial. Quem perde bebe.',
   eu_nunca: 'Todos respondem ao mesmo tempo: "já fiz" ou "nunca". Quem já fez, bebe.',

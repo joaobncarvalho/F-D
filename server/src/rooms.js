@@ -67,8 +67,7 @@ export class RoomManager {
       players: new Map(),
       intensityVotes: {}, // playerId -> intensidade (votação no lobby)
       mode: 'wheel', // 'wheel' (roda) | 'board' (tabuleiro) | 'tournament' (torneio)
-      pack: null, // pack temático: null | 'aniversario' | 'despedida' | 'reencontro'
-      curve: true, // curva de intensidade (leve → teto votado ao longo da noite)
+        curve: true, // curva de intensidade (leve → teto votado ao longo da noite)
     duracaoMin: null, // duração planeada da noite (min) — null = sem fim previsto
       paused: false, // pausa do host: congela ações e cronómetros
       feed: [], // feed de eventos da sala (feed.js)
@@ -233,17 +232,6 @@ export class RoomManager {
     return room;
   }
 
-  /** Pack temático do conteúdo (só host, só no lobby). */
-  setPack(code, playerId, pack) {
-    const room = this.getRoom(code);
-    if (!room) throw new AppError('Sala não encontrada.');
-    const player = room.players.get(playerId);
-    if (!player || !player.isHost) throw new AppError('Só o host escolhe o pack.');
-    if (room.status !== 'lobby') throw new AppError('O jogo já começou.');
-    room.pack = ['aniversario', 'despedida', 'reencontro'].includes(pack) ? pack : null;
-    return room;
-  }
-
   /**
    * Duração planeada da noite, em minutos (só host, só no lobby).
    *
@@ -378,7 +366,6 @@ export function serializeRoom(room) {
       })),
     intensityVotes: room.intensityVotes || {}, // votos no lobby (playerId -> intensidade)
     mode: room.mode || 'wheel',
-    pack: room.pack || null,
     curve: room.curve !== false,
     duracaoMin: room.duracaoMin || null,
     paused: !!room.paused,

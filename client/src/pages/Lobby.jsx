@@ -10,13 +10,6 @@ import { loadProfile, saveProfile } from '../device.js';
 const EMOJIS = ['🦊', '🐸', '🐵', '🦄', '🐙', '🐝', '🦁', '🐨', '🐼', '🐷', '🐧', '🐢', '🐔', '🦖', '🦩', '🦉'];
 const COLORS = ['#ff3d8b', '#9b5cff', '#ffb020', '#1fd3b6', '#5b8cff', '#4ade80', '#f472b6', '#38bdf8'];
 
-const PACKS = [
-  { key: null, label: '🌐 Tudo' },
-  { key: 'aniversario', label: '🎂 Aniversário' },
-  { key: 'despedida', label: '💍 Despedida' },
-  { key: 'reencontro', label: '🫂 Reencontro' },
-];
-
 const INTENSITY_OPTS = [
   { key: 'leve', label: '🍃 Leve' },
   { key: 'picante', label: '🌶️ Picante +18' },
@@ -31,7 +24,7 @@ const DEV_MODE =
 
 export default function Lobby({
   room, youId, messages, error, onSendMessage, onStart, onVoteIntensity,
-  onSetMode, onSetIdentity, onSetPack, onSetCurve, onSetNightLength, onAddBots, onLeave,
+  onSetMode, onSetIdentity, onSetCurve, onSetNightLength, onAddBots, onLeave,
 }) {
   const [draft, setDraft] = useState('');
   const [showQR, setShowQR] = useState(false);
@@ -329,25 +322,6 @@ export default function Lobby({
 
       {isHost && (
         <div className="fd-card p-3 flex flex-col gap-2">
-          <span className="text-sm text-white/60">🎁 Pack temático</span>
-          <div className="grid grid-cols-2 gap-2">
-            {PACKS.map((p) => (
-              <button
-                key={p.key || 'all'}
-                onClick={() => {
-                  sfx.click();
-                  onSetPack(p.key);
-                }}
-                className={`fd-chip ${(room.pack || null) === p.key ? 'fd-chip-on' : ''}`}
-              >
-                {p.label}
-              </button>
-            ))}
-          </div>
-          <p className="text-xs text-white/40">
-            Os packs são aditivos: junta-se conteúdo da ocasião ao banco normal.
-          </p>
-
           <button
             onClick={() => {
               sfx.click();

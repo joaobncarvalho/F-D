@@ -5,6 +5,101 @@
 
 ---
 
+## 2026-09-02 (d) — Cinco pedidos do João: poderes do host, veredito da mesa, batidas, Evento da Noite e fim dos packs
+
+### 1. O host deixou de carregar pelos outros
+Havia um padrão espalhado por seis motores: `!p.isHost && playerId !== r.currentPlayerId`.
+Servia de escape, mas o preço era o host poder arrancar a mímica de outra pessoa,
+declarar o vencedor de um duelo em que não estava e dar a pista do vizinho.
+Removido em: Duelo, Cascata, Vasco (pista), Desenha, Mímica e Relâmpago.
+
+**O que o host mantém** — e de propósito: saltar vez, terminar, pausar, expulsar.
+São controlos de MESA, não decisões por outra pessoa. O anti-encravamento continua
+a existir: o `autoresolve` varre rondas paradas ao fim de 75 s e o "saltar vez"
+está sempre ali.
+
+### 2. Quem decide se conseguiu é a mesa (`game/veredito.js`)
+Nos jogos a tempo, quem marcava "conseguiu" era o próprio jogador — juiz em causa
+própria — ou o host. Agora vota a mesa toda MENOS quem atuou, e a maioria manda.
+Duas decisões que ficaram escritas no cabeçalho do módulo:
+· **empate favorece quem atuou** — perder uma vida por um empate é o género de
+  injustiça de que uma mesa se lembra a noite toda;
+· **quem não vota não conta** — numa festa metade da mesa está a olhar para a
+  pessoa, não para o telemóvel; o silêncio nunca tira vidas.
+
+E **falhar custa uma VIDA**, não uns goles: era mais barato falhar uma mímica do
+que recusar um desafio, e por isso ninguém se esforçava.
+
+Aplicado à Mímica e ao Relâmpago. O **Desenha ficou de fora da votação** porque
+ali os palpites são dados NA app — o resultado é objetivo e uma votação seria
+teatro; mas o preço passou a ser o mesmo (uma vida).
+
+Qualquer jogador pode dar o tempo por terminado (quem atua tem as mãos ocupadas),
+e o servidor confirma pelo relógio antes de aceitar.
+
+### 3. A batida deixou de tapar o layout
+Era um ícone de 5,5 rem ao centro do ecrã: tapava a carta da ronda no instante em
+que a mesa queria lê-la. Passou a faixa. Primeiro no topo — mas aí tapava a tira
+de jogadores, que é onde os corações estão a mudar nesse preciso momento. Ficou
+**em baixo**, na zona entre a carta e os controlos. Medido no jogo a sério: a
+faixa cai em 695–759 px, a tira de jogadores está em 12–52. A tinta de cor
+continua a apanhar o ecrã inteiro — não tapa nada, é só luz.
+
+### 4. Evento da Noite (`game/eventos.js`) — nos DOIS modos
+De 5 em 9 rondas (janela aleatória, para a mesa não conseguir contar), cai um
+evento entre rondas — nunca a meio de uma. Bom ou mau, e o cliente encena-os de
+forma inconfundível: **raios de luz + confetti** ou **tempestade** (ecrã escuro,
+dois relâmpagos, chuva na diagonal, o ecrã abana duas vezes).
+
+Bancos separados porque a moeda de cada modo é outra:
+· **Roda** (vidas): perdão geral · trégua de 2 rondas · ronda da casa (vida a quem
+  vai atrás) · tempestade (todos -1) · imposto do líder · roleta da mesa · a noite
+  aquece (sobe a intensidade) · inversão da ordem.
+· **Tabuleiro** (casas): boleia ao último · vento a favor · escudos · tempestade
+  (todos recuam 3) · **golpe de estado** (o 1.º troca de lugar com o último) ·
+  imposto do líder.
+
+A metade boa não é simpatia: um jogo em que só acontecem coisas más ensina a mesa
+a temer o ecrã, e é ela que equilibra as vidas que agora se perdem nos jogos a
+tempo. A **trégua** vive no `perdeVida` (helpers) e não em cada chamador — era
+assim que uma regra destas ficava esquecida num dos caminhos.
+
+Também se unificou a perda de vidas num `perdeVida`/`ganhaVida` partilhados: a
+regra "sem vidas → eliminado, com shot" estava escrita à mão dentro do
+`resolveAction` e passaria a estar em três sítios.
+
+### 5. Packs temáticos fora
+Removidos do lobby, do `RoomManager`, do socket, do saco de prompts e do `repo`.
+O conteúdo regula-se só pela intensidade. Os prompts que tinham `tag` continuam
+lá — passaram a estar sempre disponíveis, portanto o banco até cresceu. A coluna
+`tag` na BD fica (é do colega e não custa nada), só deixou de ser lida.
+
+### Verificação
+- `npm test`: **108 testes, 0 falhas** (eram 99). Ficheiro novo `eventos.test.js`
+  (10) a fixar o CONTRATO do evento — cai entre rondas, janela aleatória, tem tom,
+  reagenda-se, não cai na última ronda, e no Tabuleiro mexe em casas e não em
+  vidas. Mais 4 casos novos ao veredito (empate, mesa a dar por bom, host sem
+  poderes) em `roda-novos-tipos.test.js`.
+- **Flag `EVENTOS=0`** (como `SNAPSHOT` e `AUTO_RESOLVE_MS`): dois ficheiros de
+  teste medem goles e vidas ao golo, e um evento a cair a meio somava bebidas à
+  mesa toda — o teste falhava de vez em quando sem nada de errado no código.
+  Suite corrida 4× seguidas a confirmar que estabilizou.
+- Visual conferido no browser: os quatro estados do veredito, a tempestade e o
+  evento bom (palco novo no `?demo=1`), e o lobby já sem packs. A tempestade
+  precisou de fundo próprio no painel de texto — o gradiente é escuro nas bordas
+  e quase transparente no centro, que é onde o texto fica, e lia-se a carta por
+  trás das palavras.
+- Bots ensinados a votar o veredito, senão uma mesa só de bots encravava.
+
+### Nota de equilíbrio para o playtest
+Falhar um jogo a tempo passou a custar uma vida, e isso mudou o ritmo: no teste
+e2e com 4 bots a mesa esvaziava-se antes de todas as mecânicas saírem. Está
+compensado pelos eventos bons (trégua, perdão geral, ronda da casa), mas é a
+primeira coisa a observar no dia 11 — se as pessoas forem eliminadas cedo de mais,
+os números a mexer são `MIN_RONDAS`/`MAX_RONDAS` dos eventos e o peso dos bons.
+
+---
+
 ## 2026-09-02 (c) — Reestruturações grandes #1 e #2: o Diretor e o fim do espetador
 
 Primeiras duas das cinco reestruturações. Ambas ADITIVAS — entram sem mexer no

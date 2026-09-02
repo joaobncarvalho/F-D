@@ -119,21 +119,35 @@ export async function driveBots(room, hooks = {}) {
       return false;
     }
 
-    // RELÂMPAGO / MÍMICA: arrancar o cronómetro → marcar o veredicto → continuar.
+    // RELÂMPAGO / MÍMICA: arrancar o cronómetro → dar o tempo por terminado →
+    // a MESA vota o veredito → continuar. Os bots votam como plateia; se a mesa
+    // for só de bots, votam todos e a votação fecha sozinha.
     if (g.phase === 'relampago' || g.phase === 'mimica') {
       const r = g.round;
       const cur = room.players.get(r.currentPlayerId);
-      if (!cur?.isBot) return false;
       const isRelampago = g.phase === 'relampago';
+
+      if (r.substate === 'veredito') {
+        // Vota o primeiro bot que ainda não votou (um por tique, para se ver a
+        // votação a encher em vez de aparecer feita).
+        const porVotar = [...room.players.values()].find(
+          (p) => p.isBot && p.connected && !p.eliminated
+            && !r.veredito.atores.includes(p.id) && !r.veredito.votos[p.id]
+        );
+        if (!porVotar) return false;
+        game.votaVeredito(room, porVotar.id, rand() < 0.6 ? 'sim' : 'nao');
+        return true;
+      }
+
+      if (!cur?.isBot) return false;
       if (r.substate === 'ready') {
         if (isRelampago) game.relampagoStart(room, cur.id);
         else game.mimicaStart(room, cur.id);
         return true;
       }
       if (r.substate === 'running') {
-        const ok = rand() < 0.6;
-        if (isRelampago) game.relampagoResolve(room, cur.id, ok);
-        else game.mimicaResolve(room, cur.id, ok);
+        if (isRelampago) game.relampagoTimeUp(room, cur.id);
+        else game.mimicaTimeUp(room, cur.id);
         return true;
       }
       game.continueRound(room, cur.id);

@@ -79,8 +79,9 @@ export function vascoClueDone(room, playerId) {
   const r = requireVasco(room, ['clues']);
   const cur = r.clueOrder[r.clueIdx];
   const p = room.players.get(playerId);
-  if (!p || (playerId !== cur && !p.isHost && playerId !== room.game.currentPlayerId))
-    throw new AppError('Não é a tua vez de dar pista.');
+  // A pista é de quem é a vez de a dar. Se essa pessoa se desligar, o
+  // `skipToConnectedClue` salta-a — não é preciso o host carregar por ela.
+  if (!p || playerId !== cur) throw new AppError('Não é a tua vez de dar pista.');
   r.clueIdx += 1;
   skipToConnectedClue(room);
   return r;

@@ -157,14 +157,27 @@ async function resolveWheel(room) {
       if (r?.substate === 'racing') { game.resolveReacaoRoda(room); return true; }
       return continueOrAbandon(room);
 
+    // Jogos a tempo: ninguém marcou o fim → marca-se; ninguém votou o veredito →
+    // fecha-se com quem votou (a mesma regra dos jogos de grupo). O empate e a
+    // votação vazia favorecem quem atuou, por isso o silêncio nunca tira vidas.
     case 'relampago':
       if (r?.substate === 'ready') { game.relampagoStart(room, r.currentPlayerId); return true; }
-      if (r?.substate === 'running') { game.relampagoResolve(room, r.currentPlayerId, false); return true; }
+      if (r?.substate === 'running') { game.relampagoTimeUp(room, r.currentPlayerId); return true; }
+      if (r?.substate === 'veredito') {
+        game.fechaVeredito(room);
+        pushFeed(room, '⏱️', 'Fechou-se o veredito com quem votou a tempo.');
+        return true;
+      }
       return continueOrAbandon(room);
 
     case 'mimica':
       if (r?.substate === 'ready') { game.mimicaStart(room, r.currentPlayerId); return true; }
-      if (r?.substate === 'running') { game.mimicaResolve(room, r.currentPlayerId, false); return true; }
+      if (r?.substate === 'running') { game.mimicaTimeUp(room, r.currentPlayerId); return true; }
+      if (r?.substate === 'veredito') {
+        game.fechaVeredito(room);
+        pushFeed(room, '⏱️', 'Fechou-se o veredito com quem votou a tempo.');
+        return true;
+      }
       return continueOrAbandon(room);
 
     case 'roleta':

@@ -225,18 +225,22 @@ test('o final é anunciado antes de se jogar e o jogo acaba sozinho a seguir', a
   assert.equal(g.finaleFeito, true);
 });
 
-test('a roda respeita o Diretor: no aquecimento não sai um jogo longo', async () => {
-  const { room, jogadores } = mesa(['Ana', 'Rui', 'Zé', 'Nel', 'Bea']);
+test('a roda respeita o Diretor: no aquecimento os jogos longos são raros', async () => {
+  // Estatístico e não absoluto, de propósito. O Diretor baixa o peso do Vasco a
+  // 15%, não a zero — um teste que exigisse "nunca" falhava de vez em quando
+  // sozinho, e um teste que falha à sorte deixa de ser lido.
+  const { room } = mesa(['Ana', 'Rui', 'Zé', 'Nel', 'Bea']);
   const g = room.game;
-  const saidas = new Set();
-  // 40 voltas com a mesa fria: o Vasco e o Desenha ficam com peso quase zero.
-  for (let i = 0; i < 40; i++) {
+  const N = 400;
+  let longos = 0;
+  for (let i = 0; i < N; i++) {
     g.roundCount = 0;
     g.startedAt = Date.now();
     const round = await game.spinWheel(room, g.currentPlayerId);
-    saidas.add(round.gameTypeKey);
+    if (['vasco', 'desenho', 'piramide'].includes(round.gameTypeKey)) longos += 1;
     g.round = null;
     g.phase = 'wheel';
   }
-  assert.ok(!saidas.has('vasco'), 'o Vasco é jogo para mesa quente, não para o aquecimento');
+  const fracao = longos / N;
+  assert.ok(fracao < 0.05, `jogos longos no aquecimento: ${(fracao * 100).toFixed(1)}% (esperava <5%)`);
 });

@@ -6,6 +6,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 delete process.env.DATABASE_URL;
+process.env.EVENTOS = '0'; // aqui contam-se vidas exatas — sem eventos pelo meio
 
 const { RoomManager, serializeRoom } = await import('../src/rooms.js');
 const game = await import('../src/game.js');
@@ -51,24 +52,89 @@ test('Mímica: a palavra é privada até ao veredicto', async () => {
   assert.ok(!JSON.stringify(r).includes(round.secretWord), 'a palavra não vai no broadcast');
 
   game.mimicaStart(room, ana.id);
-  game.mimicaResolve(room, ana.id, false);
+  game.mimicaTimeUp(room, ana.id); // acabou o tempo → a MESA decide
+
+  // Durante a votação a palavra continua secreta: só se revela com o veredito.
+  r = serializeRoom(room).game.round;
+  assert.equal(r.substate, 'veredito');
+  assert.ok(!JSON.stringify(r).includes(round.secretWord), 'nem durante a votação');
+  assert.ok(r.veredito.atores.includes(ana.id), 'quem mimou não vota em si própria');
+
+  const vidasAntes = ana.lives;
+  game.votaVeredito(room, players[1].id, 'nao');
+  game.votaVeredito(room, players[2].id, 'nao'); // maioria: não conseguiu
+
   r = serializeRoom(room).game.round;
   assert.equal(r.result.word, round.secretWord, 'no fim é revelada a todos');
-  assert.ok(r.result.golos > 0, 'ninguém acertou → o mimo bebe');
+  assert.equal(ana.lives, vidasAntes - 1, 'falhar a tempo custa uma VIDA, não uns goles');
 
   game.continueRound(room, ana.id);
   assert.equal(room.game.phase, 'wheel', 'a ronda fecha e a roda volta');
 });
 
-test('Categoria Relâmpago: travar custa golos e a ronda fecha', async () => {
+test('Mímica: a mesa pode dar por bom — e aí não se perde nada', async () => {
+  const { room, players } = start();
+  const [ana] = players;
+  await spinUntil(room, 'mimica');
+  game.mimicaStart(room, ana.id);
+  game.mimicaTimeUp(room, ana.id);
+
+  const vidasAntes = ana.lives;
+  game.votaVeredito(room, players[1].id, 'sim');
+  game.votaVeredito(room, players[2].id, 'sim');
+  assert.equal(ana.lives, vidasAntes, 'a mesa deu por bom → não custa nada');
+  assert.equal(room.game.round.result.guessed, true);
+});
+
+test('Mímica: o empate favorece quem atuou', async () => {
+  const { room, players } = start(['Ana', 'Rui', 'Zé', 'Nel']);
+  const [ana] = players;
+  await spinUntil(room, 'mimica');
+  game.mimicaStart(room, ana.id);
+  game.mimicaTimeUp(room, ana.id);
+
+  const vidasAntes = ana.lives;
+  game.votaVeredito(room, players[1].id, 'sim');
+  game.votaVeredito(room, players[2].id, 'nao');
+  game.votaVeredito(room, players[3].id, 'nao');
+  // 1-2 já é maioria contra; para o empate faltava um voto a favor.
+  assert.equal(ana.lives, vidasAntes - 1);
+
+  // Agora o empate a sério: 1-1 numa mesa de três.
+  const outra = start();
+  await spinUntil(outra.room, 'mimica');
+  game.mimicaStart(outra.room, outra.players[0].id);
+  game.mimicaTimeUp(outra.room, outra.players[0].id);
+  const vidas2 = outra.players[0].lives;
+  game.votaVeredito(outra.room, outra.players[1].id, 'sim');
+  game.votaVeredito(outra.room, outra.players[2].id, 'nao');
+  assert.equal(outra.players[0].lives, vidas2, 'empate → benefício da dúvida');
+});
+
+test('o host deixou de poder carregar pelos outros', async () => {
+  const { room, players } = start();
+  const [ana, rui] = players; // a Ana é host
+  const round = await spinUntil(room, 'mimica');
+  assert.equal(round.currentPlayerId, ana.id, 'é a vez da Ana (que também é host)');
+
+  // Passa a vez ao Rui e confirma que a host já não arranca a mímica dele.
+  room.game.round.currentPlayerId = rui.id;
+  assert.throws(() => game.mimicaStart(room, ana.id), /só quem está à vez/i);
+});
+
+test('Categoria Relâmpago: travar custa uma vida e a ronda fecha', async () => {
   const { room, players } = start();
   const [ana] = players;
   await spinUntil(room, 'categoria_relampago');
   const before = room.game.stats[ana.id]?.drinks || 0;
 
   game.relampagoStart(room, ana.id);
-  game.relampagoResolve(room, ana.id, false);
-  assert.ok(room.game.stats[ana.id].drinks > before, 'travou → bebeu');
+  game.relampagoTimeUp(room, ana.id);
+  const vidasAntes = ana.lives;
+  game.votaVeredito(room, players[1].id, 'nao');
+  game.votaVeredito(room, players[2].id, 'nao');
+  assert.equal(ana.lives, vidasAntes - 1, 'travar custa uma vida');
+  assert.ok(room.game.round.result.perdeuVida);
 
   game.continueRound(room, ana.id);
   assert.equal(room.game.phase, 'wheel');

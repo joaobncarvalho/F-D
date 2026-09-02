@@ -13,6 +13,7 @@ import ErrorBoundary from './components/ErrorBoundary.jsx';
 import Display from './pages/Display.jsx';
 import Settings from './components/Settings.jsx';
 import Rules from './components/Rules.jsx';
+import EventoDaNoite from './components/EventoDaNoite.jsx';
 import { keepScreenAwake, loadA11y, applyA11y, registerServiceWorker, rememberRoom } from './device.js';
 import { aplicaHumor, humorDaSala } from './mood.js';
 import { setPaused } from './clock.js';
@@ -63,6 +64,7 @@ export default function App() {
   const [a11y, setA11y] = useState(loadA11y);
   const [showSettings, setShowSettings] = useState(false);
   const [showRules, setShowRules] = useState(false);
+  const [evento, setEvento] = useState(null); // Evento da Noite a encenar
 
   const sessionRef = useRef(loadSession());
 
@@ -119,6 +121,18 @@ export default function App() {
   useEffect(() => {
     aplicaHumor(humor);
   }, [humor]);
+
+  // O EVENTO DA NOITE. Vive ao nível da app e não de um ecrã porque acontece nos
+  // dois modos — a Roda guarda-o em `game`, o Tabuleiro em `board`. O carimbo
+  // `em` é que distingue um evento novo de um que já se viu: sem ele, qualquer
+  // `room_state` voltava a disparar a tempestade.
+  const eventoDaSala = room?.game?.ultimoEvento || room?.board?.ultimoEvento || null;
+  const eventoVistoRef = useRef(null);
+  useEffect(() => {
+    if (!eventoDaSala || eventoVistoRef.current === eventoDaSala.em) return;
+    eventoVistoRef.current = eventoDaSala.em;
+    setEvento(eventoDaSala);
+  }, [eventoDaSala?.em]);
 
   useEffect(() => {
     function onRoomJoined({ room, you, token }) {
@@ -287,7 +301,6 @@ export default function App() {
   const setMode = useCallback((mode) => socket.emit('set_mode', { mode }), []);
   const addBots = useCallback((count) => socket.emit('dev_add_bots', { count }), []); // playtest (dev)
   const setIdentity = useCallback((ident) => socket.emit('set_identity', ident), []);
-  const setPack = useCallback((pack) => socket.emit('set_pack', { pack }), []);
   const setCurve = useCallback((on) => socket.emit('set_curve', { on }), []);
   const setNightLength = useCallback((minutos) => socket.emit('set_night_length', { minutos }), []);
   const pauseGame = useCallback((paused) => socket.emit('pause_game', { paused }), []);
@@ -359,9 +372,10 @@ export default function App() {
   const vascoVote = useCallback((suspectId) => socket.emit('vasco_vote', { suspectId }), []);
   const vascoRedeem = useCallback((word) => socket.emit('vasco_redeem', { word }), []);
   const relampagoStart = useCallback(() => socket.emit('relampago_start'), []);
-  const relampagoResolve = useCallback((survived) => socket.emit('relampago_resolve', { survived }), []);
+  const relampagoTimeUp = useCallback(() => socket.emit('relampago_timeup'), []);
   const mimicaStart = useCallback(() => socket.emit('mimica_start'), []);
-  const mimicaResolve = useCallback((guessed) => socket.emit('mimica_resolve', { guessed }), []);
+  const mimicaTimeUp = useCallback(() => socket.emit('mimica_timeup'), []);
+  const votaVeredito = useCallback((valor) => socket.emit('veredito_vota', { valor }), []);
   const roletaAnswer = useCallback(() => socket.emit('roleta_answer'), []);
   const roletaPass = useCallback(() => socket.emit('roleta_pass'), []);
   const dueloResult = useCallback((winnerId) => socket.emit('duelo_result', { winnerId }), []);
@@ -449,6 +463,9 @@ export default function App() {
           />
         )}
         {showRules && <Rules key="rules" mode={room?.mode || 'wheel'} onClose={() => setShowRules(false)} />}
+        {evento && (
+          <EventoDaNoite key={`ev-${evento.em}`} evento={evento} onDone={() => setEvento(null)} />
+        )}
       </AnimatePresence>
 
       {room?.paused && screen !== 'home' && (
@@ -480,7 +497,6 @@ export default function App() {
             onVoteIntensity={voteIntensity}
             onSetMode={setMode}
             onSetIdentity={setIdentity}
-            onSetPack={setPack}
             onSetCurve={setCurve}
             onSetNightLength={setNightLength}
             onAddBots={addBots}
@@ -583,15 +599,16 @@ export default function App() {
             onVascoVote={vascoVote}
             onVascoRedeem={vascoRedeem}
             onRelampagoStart={relampagoStart}
-            onRelampagoResolve={relampagoResolve}
             onMimicaStart={mimicaStart}
-            onMimicaResolve={mimicaResolve}
             onRoletaAnswer={roletaAnswer}
             onRoletaPass={roletaPass}
             onDueloResult={dueloResult}
             onDueloCall={dueloCall}
             onSkip={skipTurn}
             onPalpite={darPalpite}
+            onRelampagoTimeUp={relampagoTimeUp}
+            onMimicaTimeUp={mimicaTimeUp}
+            onVotaVeredito={votaVeredito}
             onEnd={endGame}
             onReset={resetGame}
             onLeave={leaveRoom}

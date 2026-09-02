@@ -65,25 +65,23 @@ export async function getGameTypes() {
  * @param gameTypeKey  tipo de jogo ('desafio', 'mimica'…)
  * @param intensity    intensidade pedida (cai para qualquer uma se não houver)
  * @param opts.exclude textos já usados NESTA sala — evita repetir (saco em content/bag.js)
- * @param opts.tag     pack temático ('aniversario' | 'despedida' | 'reencontro'); null = tudo
+ * (os packs temáticos foram removidos: o conteúdo regula-se só pela intensidade)
  * @returns null quando não sobra nada (o chamador esvazia o saco e repete)
  */
-export async function getRandomPrompt(gameTypeKey, intensity, { exclude = [], tag = null } = {}) {
+export async function getRandomPrompt(gameTypeKey, intensity, { exclude = [] } = {}) {
   const excluded = exclude instanceof Set ? exclude : new Set(exclude);
   const prisma = await client();
   if (prisma) {
     try {
       const base = { active: true, gameType: { key: gameTypeKey } };
-      // Os packs são aditivos: um prompt SEM tag serve qualquer ocasião.
-      const withTag = (w) => (tag ? { ...w, OR: [{ tag }, { tag: null }] } : w);
-      let rows = await prisma.prompt.findMany({ where: withTag({ ...base, intensity }) });
-      if (!rows.length) rows = await prisma.prompt.findMany({ where: withTag(base) }); // sem essa intensidade
+      let rows = await prisma.prompt.findMany({ where: { ...base, intensity } });
+      if (!rows.length) rows = await prisma.prompt.findMany({ where: base }); // sem essa intensidade
       const pool = rows.filter((r) => !excluded.has(r.text));
       if (!pool.length) return null; // saco vazio → quem chama repõe e repete
       const p = pool[Math.floor(Math.random() * pool.length)];
       return { text: p.text, intensity: p.intensity, buddy: p.buddy, duration: p.duration };
     } catch (e) {
-      // Uma BD antiga (sem a coluna `tag`) cai aqui — o jogo segue com o conteúdo em código.
+      // Uma BD fora de sincronia cai aqui — o jogo segue com o conteúdo em código.
       log.warn('repo: getRandomPrompt DB falhou, uso memória:', { error: e.message });
     }
   }
@@ -91,7 +89,6 @@ export async function getRandomPrompt(gameTypeKey, intensity, { exclude = [], ta
   const gt = GAME_TYPES.find((g) => g.key === gameTypeKey);
   if (!gt) return null;
   let pool = gt.prompts;
-  if (tag) pool = pool.filter(([, , o = {}]) => !o.tag || o.tag === tag);
   if (intensity) {
     const filtered = pool.filter(([, inten]) => inten === intensity);
     if (filtered.length) pool = filtered;

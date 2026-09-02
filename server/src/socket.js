@@ -195,17 +195,6 @@ export function registerSocketHandlers(io) {
       }
     });
 
-    socket.on('set_pack', ({ pack } = {}, ack) => {
-      try {
-        const { code, playerId } = socket.data;
-        rooms.setPack(code, playerId, pack);
-        broadcastState(io, code);
-        if (typeof ack === 'function') ack({ ok: true });
-      } catch (err) {
-        handleError(socket, ack, err);
-      }
-    });
-
     socket.on('set_night_length', ({ minutos } = {}, ack) => {
       try {
         const { code, playerId } = socket.data;
@@ -565,10 +554,12 @@ export function registerSocketHandlers(io) {
       }
     });
 
-    socket.on('relampago_resolve', ({ survived } = {}, ack) => {
+    // Fim do tempo: qualquer jogador pode dá-lo por terminado (o servidor
+    // confirma pelo relógio) e abre-se o veredito da MESA.
+    socket.on('relampago_timeup', (_payload, ack) => {
       try {
         const room = requireRoom(socket);
-        game.relampagoResolve(room, socket.data.playerId, survived);
+        game.relampagoTimeUp(room, socket.data.playerId);
         broadcastState(io, room.code);
         if (typeof ack === 'function') ack({ ok: true });
       } catch (err) {
@@ -587,10 +578,27 @@ export function registerSocketHandlers(io) {
       }
     });
 
-    socket.on('mimica_resolve', ({ guessed } = {}, ack) => {
+    socket.on('mimica_timeup', (_payload, ack) => {
       try {
         const room = requireRoom(socket);
-        game.mimicaResolve(room, socket.data.playerId, guessed);
+        game.mimicaTimeUp(room, socket.data.playerId);
+        broadcastState(io, room.code);
+        if (typeof ack === 'function') ack({ ok: true });
+      } catch (err) {
+        handleError(socket, ack, err);
+      }
+    });
+
+    /**
+     * Voto no veredito da mesa (Mímica / Relâmpago). Quando toda a gente vota,
+     * fecha sozinho — e quem falhou perde uma vida, com a batida no ecrã.
+     */
+    socket.on('veredito_vota', ({ valor } = {}, ack) => {
+      try {
+        if (throttled(socket, 'submit', 150)) return void (typeof ack === 'function' && ack({ ok: true }));
+        const room = requireRoom(socket);
+        const res = game.votaVeredito(room, socket.data.playerId, valor);
+        if (res.fechado && res.efeito) io.to(room.code).emit('action_result', { effect: res.efeito });
         broadcastState(io, room.code);
         if (typeof ack === 'function') ack({ ok: true });
       } catch (err) {

@@ -5,6 +5,7 @@
 import { randomUUID } from 'node:crypto';
 import { AppError } from '../errors.js';
 import { pushFeed } from '../feed.js';
+import * as eventos from '../game/eventos.js';
 
 /** Garante que há tabuleiro (e, opcionalmente, a fase certa). */
 export function requireBoard(room, phases) {
@@ -143,6 +144,15 @@ function tickDurations(room) {
 export function advanceBoardTurn(room) {
   const b = room.board;
   tickDurations(room);
+  b.turnCount = (b.turnCount || 0) + 1;
+
+  // O EVENTO DA NOITE também cai aqui, ENTRE jogadas — nunca a meio da vez de
+  // alguém. No Tabuleiro mexe no que ali vale: casas e a ordem da corrida.
+  if (eventos.horaDeEvento(room, b)) {
+    const ev = eventos.dispara(room, b);
+    if (ev) pushFeed(room, ev.emoji, ev.texto);
+  }
+
   const order = activeIds(room);
   if (!order.length) {
     b.currentPlayerId = null;

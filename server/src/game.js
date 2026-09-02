@@ -5,7 +5,7 @@ import { sanitizeText } from './util.js';
 import { pickPrompt, resetBags } from './content/bag.js';
 import { effectiveIntensity } from './game/intensity.js';
 import { pushFeed, clearFeed } from './feed.js';
-import { connectedOrder, statsFor, drink, nameOf } from './game/helpers.js';
+import { connectedOrder, statsFor, drink, nameOf, perdeVida } from './game/helpers.js';
 import { dealPiramide, serializePiramide } from './game/piramide.js';
 import { dealVasco, tallyVascoVotes, buildVascoResult, serializeVasco } from './game/vasco.js';
 import { setupIntrigas, serializeIntrigas } from './game/intrigas.js';
@@ -20,6 +20,12 @@ import { setupDesenho, serializeDesenho } from './game/desenho.js';
 import { setupReacaoRoda, serializeReacaoRoda } from './game/reacao.js';
 import * as director from './game/director.js';
 import * as palpites from './game/palpites.js';
+import * as veredito from './game/veredito.js';
+import * as eventos from './game/eventos.js';
+// Importados (e não só re-exportados): o `export { x } from` não cria binding
+// local, e o fechaVeredito abaixo precisa mesmo de lhes chamar.
+import { mimicaVeredito } from './game/mimica.js';
+import { relampagoVeredito } from './game/relampago.js';
 // Ações dos mini-jogos chamadas diretamente pelo socket.js — re-exportadas daqui.
 export {
   piramideReady,
@@ -38,10 +44,34 @@ export {
   vascoRedeem,
 } from './game/vasco.js';
 export { chooseTarget, submitRps } from './game/intrigas.js';
+
+/**
+ * Voto no veredito da mesa. Um só handler para todos os jogos a tempo: quando a
+ * mesa toda vota, fecha-se e aplica-se — quem falhou perde uma vida.
+ */
+export function votaVeredito(room, playerId, valor) {
+  const g = room.game;
+  const r = g?.round;
+  if (!r?.veredito) throw new AppError('Não há veredito a decidir.');
+  veredito.vota(room, playerId, valor);
+  if (!veredito.completo(room)) return { fechado: false };
+  return fechaVeredito(room);
+}
+
+/** Fecha o veredito da ronda atual (votação completa, ou auto-resolve). */
+export function fechaVeredito(room) {
+  const g = room.game;
+  const r = g?.round;
+  if (!r?.veredito || r.veredito.fechado) return { fechado: false };
+  const res = r.gameTypeKey === 'mimica' ? mimicaVeredito(room) : relampagoVeredito(room);
+  if (!res) return { fechado: false };
+  pushFeed(room, res.conseguiu ? '👏' : '💔', veredito.frase(room, res.atorId, res.conseguiu, r.veredito));
+  return { fechado: true, ...res };
+}
 export { aposta as darPalpite } from './game/palpites.js';
 export { castGuess } from './game/segredos.js';
-export { relampagoStart, relampagoResolve } from './game/relampago.js';
-export { mimicaWord, mimicaStart, mimicaResolve } from './game/mimica.js';
+export { relampagoStart, relampagoTimeUp, relampagoVeredito } from './game/relampago.js';
+export { mimicaWord, mimicaStart, mimicaTimeUp, mimicaVeredito } from './game/mimica.js';
 export { roletaAnswer, roletaPass } from './game/roleta.js';
 export { dueloResult, dueloCall } from './game/duelo.js';
 export { grupoAnswer, grupoForceReveal, revealGrupo, grupoVoters } from './game/grupo.js';
@@ -104,6 +134,8 @@ function advanceTurn(room) {
     g.currentPlayerId = null;
     return;
   }
+  // Um evento pode ter virado a mesa ao contrário (eventos.js: 'inversao').
+  if (g.ordemInvertida) order.reverse();
   let idx = 0;
   if (g.currentPlayerId) {
     const cur = order.findIndex((p) => p.id === g.currentPlayerId);
@@ -147,6 +179,15 @@ function fecharRonda(room, { limpaRonda = true } = {}) {
   }
 
   g.phase = 'wheel';
+  eventos.passaRonda(g); // consome a trégua, se houver
+
+  // O EVENTO DA NOITE cai ENTRE rondas, nunca a meio de uma: interromper uma
+  // ronda a meio para anunciar um evento seria tirar a alguém a vez que já
+  // estava a jogar. Aqui a mesa está entre coisas e pode olhar toda para o ecrã.
+  if (eventos.horaDeEvento(room)) {
+    const ev = eventos.dispara(room);
+    if (ev) pushFeed(room, ev.emoji, ev.texto);
+  }
 
   // Chegou a hora do final? Anuncia-se ANTES de girar, para a mesa saber que o
   // que vem a seguir é o último momento — metade da graça é o aviso.
@@ -294,9 +335,14 @@ export function initGame(room, { lives = DEFAULT_LIVES, intensity = 'leve', curv
     finale: false, // a próxima ronda é a última
     finaleFeito: false, // já houve final (não se monta outro)
     ultimoSaltoRonda: -99, // trava saltos de rotação seguidos
+    // --- Evento da Noite (game/eventos.js) ---
+    ultimoEvento: null, // o que caiu sobre a mesa (o cliente encena)
+    tregua: 0, // rondas sem se perderem vidas
+    ordemInvertida: false, // um evento pode virar a mesa ao contrário
     activeRules: [], // regras com duração: { id, playerId, playerName, text, remaining }
     finalStats: null,
   };
+  eventos.agendaProximo(room.game); // marca a ronda do primeiro evento
   return room.game;
 }
 
@@ -489,15 +535,11 @@ export function resolveAction(room, playerId, action) {
     st.refusals += 1;
     st.drinks += 1;
     pushFeed(room, '🍺', `${player.name} recusou e bebeu`);
-    player.lives = Math.max(0, player.lives - 1);
-    if (player.lives === 0) {
-      player.eliminated = true; // sem vidas → fora (telemóvel partido)
-      st.shots += 1; // o "shot" fatal
-      effect = { type: 'eliminated', playerId };
-      pushFeed(room, '💀', `${player.name} ficou sem vidas — shot!`);
-    } else {
-      effect = { type: 'vida_perdida', playerId, lives: player.lives };
-    }
+    // Pelo helper partilhado (game/helpers.js) e não à mão: é ele que conhece a
+    // regra do "sem vidas → shot" E a trégua dos eventos da noite.
+    effect = perdeVida(room, playerId, { motivo: 'recusou' });
+    if (effect?.type === 'eliminated') pushFeed(room, '💀', `${player.name} ficou sem vidas — shot!`);
+    if (effect?.type === 'tregua') pushFeed(room, '🛡️', `A trégua salvou o ${player.name}`);
     g.round.status = 'refused';
   } else {
     effect = { type: 'accepted', playerId };
@@ -748,6 +790,10 @@ export function serializeGame(room) {
     faseNoite: director.faseDaNoite(room), // aquecimento | meio | final
     finale: !!g.finale, // a PRÓXIMA ronda é a última
     duracaoMin: g.plano?.duracaoMin || null,
+    // --- Evento da Noite ---
+    ultimoEvento: g.ultimoEvento || null,
+    tregua: g.tregua || 0,
+    ordemInvertida: !!g.ordemInvertida,
     startingLives: g.startingLives,
     roundCount: g.roundCount,
     currentPlayerId: g.currentPlayerId,

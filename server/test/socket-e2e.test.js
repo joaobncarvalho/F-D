@@ -124,7 +124,7 @@ async function sala(cliente) {
   return s;
 }
 
-test('socket: identidade, pack e curva chegam ao estado da sala', async (t) => {
+test('socket: identidade, duração e curva chegam ao estado da sala', async (t) => {
   const { cliente, fechar } = await arranca();
   t.after(fechar);
   const s = await sala(cliente);
@@ -138,13 +138,18 @@ test('socket: identidade, pack e curva chegam ao estado da sala', async (t) => {
   const repetido = await pede(s.b, 'set_identity', { emoji: '🦄' });
   assert.equal(repetido.ok, false);
 
-  assert.equal((await pede(s.a, 'set_pack', { pack: 'despedida' })).ok, true);
+  assert.equal((await pede(s.a, 'set_night_length', { minutos: 90 })).ok, true);
   assert.equal((await pede(s.a, 'set_curve', { on: false })).ok, true);
-  const r2 = await esperaEstado(s.c, (room) => room.pack === 'despedida' && room.curve === false, 'pack+curva');
-  assert.equal(r2.pack, 'despedida');
+  const r2 = await esperaEstado(
+    s.c,
+    (room) => room.duracaoMin === 90 && room.curve === false,
+    'duração+curva'
+  );
+  assert.equal(r2.duracaoMin, 90);
 
   // Só o host mexe nestas duas.
-  assert.equal((await pede(s.b, 'set_pack', { pack: 'aniversario' })).ok, false);
+  assert.equal((await pede(s.b, 'set_night_length', { minutos: 60 })).ok, false);
+  assert.equal((await pede(s.b, 'set_curve', { on: true })).ok, false);
 });
 
 test('socket: a pausa do host recusa mesmo as ações de jogo', async (t) => {
@@ -184,8 +189,8 @@ test('socket: modo TV entra sem ser jogador e recebe o estado', async (t) => {
   assert.equal(resposta.room.players.length, 3, 'a TV não ocupa lugar na sala');
 
   // E continua a receber atualizações como qualquer outro ecrã.
-  const atualizado = esperaEstado(tv, (room) => room.pack === 'aniversario', 'estado na TV');
-  await pede(s.a, 'set_pack', { pack: 'aniversario' });
+  const atualizado = esperaEstado(tv, (room) => room.duracaoMin === 60, 'estado na TV');
+  await pede(s.a, 'set_night_length', { minutos: 60 });
   await atualizado; // a TV vê a mudança sem ter feito nada
 
   const inexistente = await pede(tv, 'watch_room', { code: 'ZZZZ' });

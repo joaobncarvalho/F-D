@@ -367,10 +367,12 @@ export default function Game(props) {
           <RelampagoCard
             key={round.id}
             round={round}
+            room={room}
             youId={youId}
             canControl={isHost || isSpinner}
             onStart={props.onRelampagoStart}
-            onResolve={props.onRelampagoResolve}
+            onTimeUp={props.onRelampagoTimeUp}
+            onVota={props.onVotaVeredito}
             onContinue={props.onContinue}
           />
         )}
@@ -378,11 +380,13 @@ export default function Game(props) {
           <MimicaCard
             key={round.id}
             round={round}
+            room={room}
             youId={youId}
             word={props.mimicaWord?.roundId === round.id ? props.mimicaWord : null}
             canControl={isHost || isSpinner}
             onStart={props.onMimicaStart}
-            onResolve={props.onMimicaResolve}
+            onTimeUp={props.onMimicaTimeUp}
+            onVota={props.onVotaVeredito}
             onContinue={props.onContinue}
           />
         )}

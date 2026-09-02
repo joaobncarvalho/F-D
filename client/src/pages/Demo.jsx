@@ -8,6 +8,8 @@ import { PromptCard, ChoiceCard, IntrigasCard } from './games/cards.jsx';
 import { RelampagoCard, MimicaCard, RoletaCard, DueloCard } from './games/quickCards.jsx';
 import Beat from '../components/Beat.jsx';
 import PalpiteBand from './games/PalpiteBand.jsx';
+import VereditoBand from './games/VereditoBand.jsx';
+import EventoDaNoite from '../components/EventoDaNoite.jsx';
 import { aplicaHumor, humorAtual, NIVEIS } from '../mood.js';
 import { confetti } from '../confetti.js';
 
@@ -136,11 +138,11 @@ const SCENARIOS = [
   },
   {
     id: 'w-relampago', kind: 'wheel', group: 'Roda', label: '⚡ Categoria Relâmpago',
-    render: () => <RelampagoCard round={{ id: 'r1', gameTypeKey: 'categoria_relampago', currentPlayerId: 'me', currentPlayerName: 'Tu', category: 'Marcas de cerveja', seconds: 8, substate: 'ready', result: null }} youId="me" canControl onStart={noop} onResolve={noop} onContinue={noop} />,
+    render: () => <RelampagoCard round={{ id: 'r1', gameTypeKey: 'categoria_relampago', currentPlayerId: 'me', currentPlayerName: 'Tu', category: 'Marcas de cerveja', seconds: 8, substate: 'ready', result: null }} room={{ players: mkPlayers() }} youId="me" canControl onStart={noop} onTimeUp={noop} onVota={noop} onContinue={noop} />,
   },
   {
     id: 'w-mimica', kind: 'wheel', group: 'Roda', label: '🎭 Mímica',
-    render: () => <MimicaCard round={{ id: 'r2', gameTypeKey: 'mimica', currentPlayerId: 'me', currentPlayerName: 'Tu', modeLabel: 'Mímica', modeHint: 'Só gestos — nem uma palavra, nem sons.', seconds: 60, substate: 'ready', result: null }} youId="me" word={{ word: 'Ressaca' }} canControl onStart={noop} onResolve={noop} onContinue={noop} />,
+    render: () => <MimicaCard round={{ id: 'r2', gameTypeKey: 'mimica', currentPlayerId: 'me', currentPlayerName: 'Tu', modeLabel: 'Mímica', modeHint: 'Só gestos — nem uma palavra, nem sons.', seconds: 60, substate: 'ready', result: null }} room={{ players: mkPlayers() }} youId="me" word={{ word: 'Ressaca' }} canControl onStart={noop} onTimeUp={noop} onVota={noop} onContinue={noop} />,
   },
   {
     id: 'w-roleta', kind: 'wheel', group: 'Roda', label: '🎯 Roleta Russa',
@@ -238,6 +240,83 @@ function PalcoPalpites({ onBack }) {
   );
 }
 
+/**
+ * Palco do Evento da Noite e do veredito da mesa.
+ *
+ * O evento cai de cinco em cinco rondas ou mais, e o veredito exige uma mesa a
+ * meio de uma mímica — nenhum dos dois se consegue ver a pedido durante o
+ * desenvolvimento. Aqui disparam-se à vontade.
+ */
+function PalcoEventos({ onBack }) {
+  const [evento, setEvento] = useState(null);
+  const room = { players: mkPlayers().map((p) => ({ ...p, eliminated: false, connected: true })) };
+
+  const dispara = (tom) =>
+    setEvento(
+      tom === 'bom'
+        ? {
+            em: Date.now(),
+            tom: 'bom',
+            emoji: '🍀',
+            titulo: 'Ronda da casa',
+            texto: 'A Bea estava a levar com tudo — a casa devolve-lhe uma vida.',
+          }
+        : {
+            em: Date.now(),
+            tom: 'mau',
+            emoji: '⛈️',
+            titulo: 'Tempestade',
+            texto: 'Cai tudo ao mesmo tempo: menos uma vida para TODA a gente.',
+          }
+    );
+
+  const baseVeredito = { pergunta: 'A mesa percebeu a mímica?', atores: ['p2'] };
+  const estados = [
+    ['Por votar', { ...baseVeredito, jaVotaram: ['p3'], fechado: false }, 'me'],
+    ['Já votaste', { ...baseVeredito, jaVotaram: ['me', 'p3'], fechado: false }, 'me'],
+    ['És tu que atuaste', { ...baseVeredito, jaVotaram: ['me'], fechado: false }, 'p2'],
+    ['Fechado (falhou)', { ...baseVeredito, jaVotaram: ['me', 'p3'], fechado: true, resultado: 'nao', sim: 0, nao: 2 }, 'me'],
+  ];
+
+  return (
+    <div className="min-h-full mx-auto max-w-md px-5 py-6 flex flex-col gap-4">
+      <button onClick={onBack} className="text-sm text-white/50 self-start">← voltar aos demos</button>
+
+      <div className="fd-card p-4 flex flex-col gap-3">
+        <p className="text-sm font-bold">🌩️ Evento da Noite</p>
+        <p className="text-xs text-white/50">
+          Cai entre rondas, nos dois modos. O bom abre o ecrã de luz; o mau traz tempestade e
+          abana (só do Hardcore para cima, ver o palco do humor).
+        </p>
+        <div className="flex gap-2">
+          <button onClick={() => dispara('bom')} className="fd-btn fd-btn-success flex-1">
+            🍀 Bom
+          </button>
+          <button onClick={() => dispara('mau')} className="fd-btn fd-btn-danger flex-1">
+            ⛈️ Mau
+          </button>
+        </div>
+      </div>
+
+      <p className="text-xs text-white/45 mt-1">
+        ⚖️ Veredito da mesa — quem decide se a pessoa conseguiu deixou de ser ela (ou o host).
+      </p>
+      {estados.map(([rotulo, veredito, youId]) => (
+        <div key={rotulo} className="flex flex-col gap-1">
+          <p className="text-[11px] uppercase tracking-widest text-white/35 px-1">{rotulo}</p>
+          <VereditoBand veredito={veredito} room={room} youId={youId} onVota={noop} />
+        </div>
+      ))}
+
+      <AnimatePresence>
+        {evento && (
+          <EventoDaNoite key={evento.em} evento={evento} onDone={() => setEvento(null)} />
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
 function PalcoAmbiente({ onBack }) {
   const [humor, setHumor] = useState(humorAtual());
   const [batida, setBatida] = useState(null);
@@ -316,6 +395,7 @@ export default function Demo() {
 
   if (sel?.kind === 'ambiente') return <PalcoAmbiente onBack={back} />;
   if (sel?.kind === 'palpites') return <PalcoPalpites onBack={back} />;
+  if (sel?.kind === 'eventos') return <PalcoEventos onBack={back} />;
 
   if (sel?.kind === 'board') {
     return <div className="min-h-full mx-auto max-w-md px-5 py-6 flex flex-col relative">{sel.render(back)}</div>;
@@ -333,6 +413,7 @@ export default function Demo() {
   const groups = [...new Set(SCENARIOS.map((s) => s.group))];
   const ambiente = { id: 'ambiente', kind: 'ambiente', label: '🌡️ Humor da noite + batidas' };
   const palpitesDemo = { id: 'palpites', kind: 'palpites', label: '🎲 Palpites da mesa' };
+  const eventosDemo = { id: 'eventos', kind: 'eventos', label: '🌩️ Evento da Noite + veredito' };
   return (
     <div className="min-h-full mx-auto max-w-md px-5 py-6 flex flex-col gap-5">
       <header className="text-center">
@@ -346,6 +427,9 @@ export default function Demo() {
         </button>
         <button onClick={() => setSel(palpitesDemo)} className="fd-card text-left px-4 py-3 text-sm">
           {palpitesDemo.label}
+        </button>
+        <button onClick={() => setSel(eventosDemo)} className="fd-card text-left px-4 py-3 text-sm">
+          {eventosDemo.label}
         </button>
       </div>
       {groups.map((g) => (

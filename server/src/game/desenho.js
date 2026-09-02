@@ -11,7 +11,7 @@
 // Invariante: a palavra nunca entra no broadcast antes do fim da ronda.
 
 import { AppError } from '../errors.js';
-import { connectedOrder, drink, nameOf } from './helpers.js';
+import { connectedOrder, drink, nameOf, perdeVida } from './helpers.js';
 import { sanitizeText } from '../util.js';
 
 const SECONDS = 75;
@@ -58,10 +58,7 @@ export function desenhoWord(room, playerId) {
 /** Quem está a desenhar pode começar (todos os ecrãs abrem a tela ao mesmo tempo). */
 export function desenhoStart(room, playerId) {
   const r = requireDesenho(room, 'ready');
-  if (playerId !== r.currentPlayerId) {
-    const p = room.players.get(playerId);
-    if (!p?.isHost) throw new AppError('Só quem desenha pode começar.');
-  }
+  if (playerId !== r.currentPlayerId) throw new AppError('Só quem desenha pode começar.');
   r.substate = 'drawing';
   r.startedAt = Date.now();
   return r;
@@ -99,7 +96,10 @@ export function finishDesenho(room, winnerId = null) {
       drinkers.push(named(p.id));
     }
   } else {
-    drink(g, r.currentPlayerId, GOLOS_DESENHISTA);
+    // Ninguém acertou. Aqui a app SABE o resultado (os palpites são dados nela),
+    // por isso não há votação a fazer — mas o preço é o mesmo dos outros jogos a
+    // tempo: uma vida. Falhar contra o relógio tem de custar sempre o mesmo.
+    r.efeitoVida = perdeVida(room, r.currentPlayerId, { motivo: 'ninguém acertou o desenho' });
     drinkers.push(named(r.currentPlayerId));
   }
 

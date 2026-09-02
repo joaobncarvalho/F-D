@@ -9,6 +9,7 @@ import { sfx } from '../../sfx.js';
 import Timer from '../../components/Timer.jsx';
 import { CardShell } from './shared.jsx';
 import { MOLA } from '../../motion.js';
+import VereditoBand from './VereditoBand.jsx';
 
 function ContinueButton({ show, onContinue }) {
   if (!show) return null;
@@ -19,9 +20,9 @@ function ContinueButton({ show, onContinue }) {
   );
 }
 
-export function RelampagoCard({ round, youId, canControl, onStart, onResolve, onContinue }) {
+export function RelampagoCard({ round, room, youId, canControl, onStart, onTimeUp, onVota, onContinue }) {
   const isMine = round.currentPlayerId === youId;
-  const canMark = isMine || canControl;
+  const canMark = isMine; // o host deixou de poder arrancar pelos outros
 
   return (
     <CardShell typeKey="categoria_relampago">
@@ -41,7 +42,7 @@ export function RelampagoCard({ round, youId, canControl, onStart, onResolve, on
       {round.substate === 'ready' && (
         <>
           <p className="text-xs text-white/40">
-            {round.seconds}s a debitar sem repetir nem travar. Se travares, bebes {2} golos.
+            {round.seconds}s a debitar sem repetir nem travar. Se travares, perdes uma vida ❤️
           </p>
           {canMark ? (
             <button onClick={() => { sfx.click(); onStart(); }} className="fd-btn fd-btn-primary">
@@ -56,27 +57,23 @@ export function RelampagoCard({ round, youId, canControl, onStart, onResolve, on
       {round.substate === 'running' && (
         <div className="flex flex-col items-center gap-2">
           <Timer seconds={round.seconds} runKey={round.id} size={96} />
-          {canMark ? (
-            <div className="flex gap-2 w-full mt-1">
-              <button onClick={() => { sfx.click(); onResolve(true); }} className="fd-btn fd-btn-success flex-1">
-                💪 Aguentou
-              </button>
-              <button onClick={() => { sfx.click(); onResolve(false); }} className="fd-btn fd-btn-danger flex-1">
-                🍺 Travou
-              </button>
-            </div>
-          ) : (
-            <p className="text-sm text-white/40">A debitar… 👀</p>
-          )}
+          <button onClick={() => { sfx.click(); onTimeUp(); }} className="fd-btn fd-btn-ghost w-full mt-1">
+            ⏱️ {isMine ? 'Travei — que a mesa decida' : 'Acabou o tempo'}
+          </button>
+          {!isMine && <p className="text-sm text-white/40">A debitar… 👀</p>}
         </div>
+      )}
+
+      {round.substate === 'veredito' && (
+        <VereditoBand veredito={round.veredito} room={room} youId={youId} onVota={onVota} />
       )}
 
       {round.substate === 'result' && (
         <>
           <p className={`text-lg font-bold ${round.result?.survived ? 'text-emerald-300' : 'text-rose-300'}`}>
             {round.result?.survived
-              ? `🎉 ${round.currentPlayerName} aguentou!`
-              : `🍺 ${round.currentPlayerName} travou — ${round.result?.golos} golos!`}
+              ? `🎉 A mesa deu por bom (${round.result?.sim}-${round.result?.nao})`
+              : `💔 ${round.currentPlayerName} travou — perde uma vida`}
           </p>
           <ContinueButton show={canControl} onContinue={onContinue} />
         </>
@@ -85,9 +82,11 @@ export function RelampagoCard({ round, youId, canControl, onStart, onResolve, on
   );
 }
 
-export function MimicaCard({ round, youId, word, canControl, onStart, onResolve, onContinue }) {
+export function MimicaCard({ round, room, youId, word, canControl, onStart, onTimeUp, onVota, onContinue }) {
   const isMine = round.currentPlayerId === youId;
-  const canMark = isMine || canControl;
+  // Só quem está a mimar arranca (o host deixou de carregar pelos outros). O fim
+  // do tempo, esse, pode ser dado por qualquer um — não é uma decisão.
+  const canMark = isMine;
 
   return (
     <CardShell typeKey="mimica">
@@ -126,19 +125,15 @@ export function MimicaCard({ round, youId, word, canControl, onStart, onResolve,
       {round.substate === 'running' && (
         <div className="flex flex-col items-center gap-2">
           <Timer seconds={round.seconds} runKey={round.id} size={96} />
-          {canMark ? (
-            <div className="flex gap-2 w-full mt-1">
-              <button onClick={() => { sfx.click(); onResolve(true); }} className="fd-btn fd-btn-success flex-1">
-                ✅ Acertaram
-              </button>
-              <button onClick={() => { sfx.click(); onResolve(false); }} className="fd-btn fd-btn-danger flex-1">
-                🍺 Ninguém acertou
-              </button>
-            </div>
-          ) : (
-            <p className="text-sm text-white/40">Gritem palpites! 📣</p>
-          )}
+          <button onClick={() => { sfx.click(); onTimeUp(); }} className="fd-btn fd-btn-ghost w-full mt-1">
+            ⏱️ {isMine ? 'Desisto — que a mesa decida' : 'Acabou o tempo'}
+          </button>
+          {!isMine && <p className="text-sm text-white/40">Gritem palpites! 📣</p>}
         </div>
+      )}
+
+      {round.substate === 'veredito' && (
+        <VereditoBand veredito={round.veredito} room={room} youId={youId} onVota={onVota} />
       )}
 
       {round.substate === 'result' && (
@@ -147,8 +142,8 @@ export function MimicaCard({ round, youId, word, canControl, onStart, onResolve,
           <p className="text-2xl font-extrabold text-pink-200">{round.result?.word}</p>
           <p className={`text-base font-bold ${round.result?.guessed ? 'text-emerald-300' : 'text-rose-300'}`}>
             {round.result?.guessed
-              ? '🎉 O grupo acertou!'
-              : `🍺 Ninguém acertou — ${round.currentPlayerName} bebe ${round.result?.golos} golos!`}
+              ? `🎉 A mesa deu por bom (${round.result?.sim}-${round.result?.nao})`
+              : `💔 A mesa não deu por bom — ${round.currentPlayerName} perde uma vida`}
           </p>
           <ContinueButton show={canControl} onContinue={onContinue} />
         </>

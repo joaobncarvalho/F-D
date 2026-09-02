@@ -72,8 +72,10 @@ export function dueloResult(room, playerId, winnerId) {
   if (r.substate !== 'duelling') throw new AppError('O duelo já terminou.');
   const p = room.players.get(playerId);
   const duelists = [r.currentPlayerId, r.opponentId];
-  if (!p || (!p.isHost && !duelists.includes(playerId)))
-    throw new AppError('Só os duelistas (ou o host) registam o resultado.');
+  // Só os duelistas registam o resultado. O host tem "saltar vez" se isto
+  // encravar — o que não pode é decidir um duelo em que não está.
+  if (!p || !duelists.includes(playerId))
+    throw new AppError('Só os duelistas registam o resultado.');
   if (!duelists.includes(winnerId)) throw new AppError('O vencedor tem de ser um dos duelistas.');
 
   return fecharDuelo(room, r, winnerId);
