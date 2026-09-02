@@ -114,6 +114,8 @@ async function sala(cliente) {
     code,
     a, b, c,
     ids: { a: criada.you, b: entrouB.you, c: entrouC.you },
+    // Prova de identidade de cada jogador (o rejoin exige-a — ver rooms.reconnect).
+    tokens: { [criada.you]: criada.token, [entrouB.you]: entrouB.token, [entrouC.you]: entrouC.token },
     ultimo: criada.room, // último room_state visto (para saber de quem é a vez)
   };
   a.on('room_state', ({ room }) => {
@@ -235,7 +237,7 @@ test('socket: no Desenha, a palavra vai por canal privado e os traços não vão
   const desenhista = socketDe(s, room.game.round.currentPlayerId);
   const idDesenhista = room.game.round.currentPlayerId;
   const palavraPrometida = esperaEvento(desenhista, 'desenho_word');
-  desenhista.emit('rejoin_room', { code: s.code, playerId: idDesenhista });
+  desenhista.emit('rejoin_room', { code: s.code, playerId: idDesenhista, token: s.tokens[idDesenhista] });
   const { word } = await palavraPrometida;
   assert.ok(word, 'quem desenha recebe a palavra em privado');
 

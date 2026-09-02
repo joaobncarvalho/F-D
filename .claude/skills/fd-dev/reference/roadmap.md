@@ -126,6 +126,27 @@ Legenda: ✅ feito · 🚧 em curso · ⬜ por fazer · 🔗 ponto de integraç�
       · 🏆 Torneio: apostas dos espetadores (ninguém fica parado) + final à melhor
         de 3 + 5.º tipo de duelo
       · 🎲 Casa ??: 9 → 24 efeitos com pesos (18 tipos), fim da repetição
+- [x] **Revisão pré-playtest (2026-09-02)** — ver progress-log:
+      · 🔴 identidade por `token` no rejoin (dava para assumir a identidade de
+        outro jogador, e com ela as mãos/papéis privados e o host)
+      · 🔴 lotação da sala (`MAX_PLAYERS`, 12) — entravam 41 sem recusa
+      · 🟠 roda com `min` de jogadores por tipo + pesos por duração + anti-repetição
+      · 🟠 +227 prompts: nenhum nível abaixo de 12 por tipo (360 → 587)
+      · 🟠 entrar com o jogo a decorrer (Roda e Tabuleiro)
+      · 🟡 salas órfãs · sala sem host · ritmo do `draw_stroke` · bundle em 4 pedaços
+      · 72 testes (eram 58), `test/hardening.test.js` novo
+- [x] **Step up visual (2026-09-02b)** — ver progress-log:
+      · 🌡️ humor da noite: a app inteira muda com a intensidade (fundo, velocidade,
+        vinheta, halo das cartas); abanão de ecrã só do Hardcore para cima
+      · 🎡 roda com recuo, cauda longa, tiques por fatia e aterragem (fatia
+        vencedora acende, as outras apagam)
+      · 💥 batidas de ecrã inteiro (tinta → ícone com gesto → palavra) a substituir
+        o FlashOverlay
+      · 🎬 `motion.js`: molas e durações partilhadas (adotado no caminho da Roda;
+        tabela de conversão para os ~20 sítios do Tabuleiro/Torneio)
+      · 🐛 a "Curva de intensidade" do lobby não chegava ao motor — corrigido
+      · ✨ palco do Ambiente no showroom (`?demo=1`) para ver humores e batidas
+      · verificado no browser a sério (roda alinhada com o servidor, 50 rondas sem erros)
 - [ ] 2.º playtest (11 set) → validar estas mudanças com o grupo
 - [x] **Snapshot das salas na Postgres** (2026-09-01b) — modelo `RoomSnapshot`;
       ficheiro a cada 5s + BD a cada 15s e no SIGTERM. Sobrevive a um deploy que

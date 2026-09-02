@@ -5,6 +5,166 @@
 
 ---
 
+## 2026-09-02 (b) — Step up visual: humor da noite, a roda e as batidas
+
+Segunda parte do dia, agora do lado do design. O terreno já era bom (fundo
+animado, cartas glass, tipografia com carácter); o que faltava não era MAIS
+animação — era **linguagem** (cada componente inventava as suas molas) e
+**cerimónia** nos momentos em que a mesa inteira olha para o mesmo ecrã.
+
+### 🌡️ O humor da noite (`mood.js` + tokens no `index.css`)
+A intensidade em vigor já viajava no `room_state` e só mudava o TEXTO dos
+desafios: às três da manhã, em Caos, a app tinha exatamente o mesmo aspeto que às
+dez da noite. Agora vai para o `<html>` como `data-fd-mood` e o CSS muda a app
+toda — quatro variáveis (as duas cores do fundo, a velocidade dos halos, a
+vinheta, o realce) e nenhum componente sabe que os humores existem.
+
+    leve      teal/verde · halos a 26s · sem vinheta
+    picante   âmbar      · 19s
+    hardcore  vermelho   · 13s · vinheta 0.26 · cartas com halo
+    caos      magenta    · 9s  · vinheta 0.38 a respirar · ecrã treme
+
+O abanão (`mood.abana`) só existe do Hardcore para cima, pela mesma razão que os
+efeitos dramáticos da casa ?? são raros: o que é escasso continua a valer.
+
+### 🎡 A roda (`components/Wheel.jsx`)
+Eram 4 voltas, uma curva e um fim seco: a informação chegava, a tensão não.
+Passou a ter as quatro fases que o corpo reconhece — **recuo** (puxa para trás
+antes de arrancar), **giro** de 3,9 s com cauda longa, **tiques por fatia** com
+piparote no ponteiro, e **aterragem** (clarão, a fatia vencedora acende, as
+outras apagam para 0.22, vibração). Os tiques vêm da rotação REAL
+(`useMotionValue`), não de um temporizador — por isso abrandam sozinhos com a
+roda, que é o que vende a desaceleração. O som do arranque mudou-se para dentro
+da roda (o `Game.jsx` e o `IntensityReveal` tocavam-no cedo de mais e agora
+duplicavam).
+
+### 💥 As batidas (`components/Beat.jsx`)
+O `FlashOverlay` era uma linha de texto a cair do topo, igual para passar um
+desafio, perder uma vida ou ser eliminado — o momento mais duro da noite tinha o
+peso visual de um aviso de sistema. Agora cada tipo tem três camadas por ordem:
+**tinta** no ecrã inteiro, **ícone** grande com um gesto próprio (o coração parte
+e treme, o copo desce e bate, a vida nova cresce do nada), **palavra** só depois.
+Menos de 1,2 s: isto acontece dezenas de vezes por noite.
+
+### 🎬 Linguagem de movimento (`motion.js`)
+Quatro molas (`suave`/`pop`/`pesada`/`salto`), quatro durações e variantes
+partilhadas. Adotado no Home, Countdown, IntensityReveal, CardShell e quickCards
+— o caminho da Roda, que é o que consegui exercitar a sério. Ficam ~20 molas à
+mão nos ecrãs do Tabuleiro/Torneio: **não** foram convertidas às cegas porque o
+`damping` é que define o carácter e há reveals afinados a olho. A tabela de
+correspondência (por damping) está no topo do `motion.js` para quem lá mexer.
+
+### 🐛 Bug encontrado a testar isto: a curva do lobby não fazia nada
+O humor ficava em "leve" com o jogo em Caos. Não era do humor: o `socket.js`
+chamava `initGame(room, { lives, intensity })` **sem passar `curve`**, por isso o
+motor ficava sempre com o valor por omissão (ligada) e o interruptor "Curva de
+intensidade" do lobby era decorativo. Uma linha + teste.
+
+### ✨ Extra: palco do ambiente no showroom (`?demo=1`)
+O humor e as batidas eram as únicas coisas da app impossíveis de ver a pedido (um
+sobe ao fim de meia hora, o outro obriga a perder uma vida a sério). O showroom
+passa a ter um separador **Ambiente** com os quatro humores e as cinco batidas à
+distância de um toque — afinar as cores do Caos deixou de custar meia hora de jogo.
+
+### Verificação
+Corrido no browser a sério (Chrome, app em `localhost`), não só compilado:
+- **Roda:** a fatia acesa coincide sempre com o que o servidor escolheu — conferido
+  contra o feed ("girou a roda → Roleta Russa", "→ Termómetro"). Era o risco maior:
+  uma roda desalinhada apontava para o jogo errado à frente de toda a gente.
+- **Anti-repetição na prática:** 5 rondas seguidas, 5 tipos diferentes.
+- **Humor:** `leve` → fundo teal, vinheta 0; `caos` → magenta, vinheta 0.38, halos
+  a 9s, cartas com halo. Confirmado por computed style e a olho.
+- **Batidas:** disparadas uma a uma pelo palco novo. Apanhei um defeito real —
+  o ícone ia em 60% de opacidade quando o salto já estava no auge, porque o
+  `times: [0, 0.45, 1]` do gesto também governava a opacidade (3 fotogramas para
+  uma propriedade com 2). Opacidade passou a ter curva própria: 100% aos 130 ms.
+- **Movimento reduzido:** a batida continua legível (não se perde informação) e o
+  abanão desliga.
+- **Soak acidental:** a sessão religou-se sozinha com o token e os bots jogaram
+  **50 rondas** sem um único erro de consola.
+- `npm test` 73/73 · `npm run build` sem avisos.
+
+---
+
+## 2026-09-02 — Revisão pré-playtest: identidade, lotação, ritmo e conteúdo
+
+Revisão ao código todo antes do 2.º playtest. Onze correções, agrupadas pelo que
+custavam mesmo.
+
+### 🔴 Fazer-se passar por outro jogador
+O `rejoin_room` aceitava `{code, playerId}` sem prova nenhuma — e os `playerId`
+vão TODOS no `room_state` (têm de ir: o cliente precisa deles para desenhar a
+mesa). Reproduzido com dois clientes a sério: o segundo jogador religou-se como
+host e passou a poder escolher o modo. Pior do que os poderes de host era o resto
+— quem se faz passar por outro recebe a mão da Pirâmide dele, o papel do Vasco e
+o aviso de autor do Segredo. Isto furava a Regra de Ouro #7, que é o coração de
+metade dos jogos.
+
+Cada jogador passou a ter um `token` (`rooms.#addPlayer`), entregue só no
+`room_joined` do próprio e **nunca** no broadcast; o `rejoin_room` exige-o. O
+cliente guarda-o na sessão (`App.jsx`, sessionStorage + espelho em localStorage)
+e o snapshot preserva-o, por isso religar depois de um reinício continua a
+funcionar.
+
+### 🔴 Sala sem lotação
+Enchi uma sala com 41 pessoas sem uma única recusa. Não é ataque — é o QR code a
+passar de mão em mão. `MAX_PLAYERS` (12, configurável por ambiente) no
+`joinRoom`, com mensagem que aponta para o modo TV.
+
+### 🟠 A roda ignorava a mesa e repetia-se
+`pickWeightedType` sorteava **uniformemente entre 18 tipos**, com uma exceção
+codificada para a Pirâmide. Resultado: o Vasco saía com 3 pessoas (uma acusação a
+dois), e o mesmo tipo repetia-se dentro de 3 voltas em ~1 de cada 6 rondas.
+Passou a ter um `TYPE_PROFILE` com duas colunas — `min` (jogadores precisos) e
+`peso` (ritmo: os jogos de 5 minutos saem menos que os de 30 segundos) — e a
+evitar os 2 tipos mais recentes (`game.recentTypes`). Se evitar os recentes
+deixasse a roda com menos de 3 opções, prefere-se repetir a estreitar.
+
+### 🟠 O conteúdo esgotava-se onde a noite acaba
+A curva leva a mesa a hardcore/caos ao fim de ~25 min — e era aí que o saco tinha
+3 a 6 cartas por tipo (`isto_ou_aquilo/caos` tinha **2**: repetia à segunda).
+**+227 prompts**: nenhum nível de nenhum tipo fica agora abaixo de 12. Total de
+360 → **587**. O `db-sql.test.js` apanhou logo que o SQL não tinha sido
+regenerado (`npm run db:sql`) — o guarda funcionou.
+
+### 🟠 Entrar tarde era impossível
+`joinRoom` recusava com o jogo a decorrer e a mensagem mandava pedir ao host para
+terminar a ronda. Numa festa toda a gente chega tarde. Agora `playing` aceita:
+na Roda entra na rotação com as vidas com que a mesa começou; no Tabuleiro entra
+na casa de **quem vai em último** (não à partida, que era jogar sozinho; nem à
+frente, que era comprar lugar) e no fim da ordem; no Torneio assiste e aposta (o
+quadro já está sorteado). Só um jogo `ended` recusa.
+
+### 🟡 Robustez
+- **Salas órfãs:** um socket que criasse/entrasse numa segunda sala deixava na
+  primeira um jogador eternamente `connected` — sala nunca limpa e rotação de
+  vezes à espera de um fantasma. `leavePreviousRoom` no `socket.js`.
+- **Sala sem host:** descoberto a testar o ponto anterior — se o anfitrião saía e
+  alguém entrava no período de graça, ninguém era host e a sala ficava morta.
+  Quem entra assume, se não houver host ligado.
+- **`draw_stroke`:** era o único canal sem limite de ritmo. Limitador novo
+  (`util.rateLimited`, por janela e não por espaçamento) porque o cliente junta
+  os pontos em lotes de 12 — um limite por espaçamento cortava o último lote de um
+  traço curto.
+- **Bundle:** 511 KB num só ficheiro → 4 pedaços (react/motion/rede/app), com o
+  código da app nos 213 KB. Com 8 telemóveis a carregar ao mesmo tempo no wifi da
+  casa, e uma correção a meio da noite a invalidar só o pedaço pequeno.
+
+### Verificação
+- `npm test`: **72 testes, 0 falhas** (eram 58). Ficheiro novo
+  `test/hardening.test.js` com 11 casos — cada um fixa um buraco que existiu:
+  identidade por token (e o token fora do broadcast), lotação, entrada a meio na
+  Roda e no Tabuleiro, salas órfãs, e os três invariantes da roda (mínimo de
+  jogadores, anti-repetição, pesos). Mais 3 casos ao `rateLimited`.
+- `npm run build` no cliente: passa, agora sem o aviso dos 500 KB.
+- Repro dos quatro problemas originais com clientes Socket.io a sério, antes e
+  depois: os quatro deixaram de acontecer.
+- Dois testes existentes precisaram de acompanhar as regras novas (o do Vasco
+  passou a 4 jogadores, que é o mínimo do tipo; o do Desenha passou a mandar o
+  token no rejoin).
+
+---
+
 ## 2026-09-01 (d) — Correções e melhorias do 1.º playtest
 
 Quatro pontos vindos do teste com o grupo.

@@ -4,6 +4,7 @@
 
 import { motion } from 'framer-motion';
 import { sfx } from '../../sfx.js';
+import { ENTRA } from '../../motion.js';
 
 export const TYPES = [
   { key: 'boca_calada', label: 'Boca Calada', color: '#ff3d8b', emoji: '🤐' },
@@ -56,9 +57,7 @@ export function CardShell({ children, typeKey }) {
   const t = TYPES.find((x) => x.key === typeKey);
   return (
     <motion.div
-      initial={{ opacity: 0, y: 16, scale: 0.97 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      exit={{ opacity: 0 }}
+      {...ENTRA}
       className="fd-card p-5 flex flex-col gap-3 text-center"
       style={{ boxShadow: `0 12px 40px -14px ${t?.color}99` }}
     >

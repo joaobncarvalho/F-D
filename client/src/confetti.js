@@ -1,8 +1,12 @@
 // Confetti leve em canvas — sem dependências. Uma explosão que se limpa sozinha.
+//
+// As cores vêm do HUMOR da noite (mood.js): a mesma vitória atira verde-água em
+// Leve e magenta em Caos. É de graça e faz a festa parecer que acompanha a mesa.
 
-const COLORS = ['#ff3d8b', '#9b5cff', '#ffb020', '#1fd3b6', '#ffffff'];
+import { paleta } from './mood.js';
 
-export function confetti({ count = 90, power = 14 } = {}) {
+export function confetti({ count = 90, power = 14, cores } = {}) {
+  const COLORS = cores || paleta();
   if (typeof document === 'undefined') return;
   const canvas = document.createElement('canvas');
   canvas.style.cssText =

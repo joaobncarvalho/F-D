@@ -8,7 +8,7 @@
 -- Idempotente: os ids são derivados do texto (sempre iguais) e o ON CONFLICT
 -- atualiza em vez de duplicar. Correr DEPOIS de 01_schema.sql.
 --
--- 18 tipos de jogo · 360 prompts
+-- 18 tipos de jogo · 587 prompts
 -- =====================================================================
 
 BEGIN;
@@ -36,7 +36,7 @@ INSERT INTO game_types (id, key, label, active) VALUES
   ('b0f3dbf6-2842-54a5-82c1-f55f2ec64244', 'reacao', 'Reação', true)
 ON CONFLICT (key) DO UPDATE SET label = EXCLUDED.label, active = true;
 
--- Boca Calada (34)
+-- Boca Calada (48)
 INSERT INTO prompts (id, game_type_id, text, intensity, active, buddy, duration, tag) VALUES
   ('df12aaa0-979a-5271-8e9e-c0d144f535d8', 'c6c052d9-c5a9-5575-8eec-842faa169ebd', 'Fica sério durante 60s enquanto o grupo tenta fazer-te rir.', 'leve', true, false, NULL, NULL),
   ('1f7068fb-d252-5b3b-8363-5a4e9d14204d', 'c6c052d9-c5a9-5575-8eec-842faa169ebd', 'Não podes falar até ser a tua próxima vez. Falas = perdes vida.', 'leve', true, false, NULL, NULL),
@@ -71,12 +71,26 @@ INSERT INTO prompts (id, game_type_id, text, intensity, active, buddy, duration,
   ('830b4d5d-60f2-503b-8935-07a7aa2201d8', 'c6c052d9-c5a9-5575-8eec-842faa169ebd', 'Aguenta sem reagir enquanto dizem quem desta mesa aturam menos — e porquê.', 'caos', true, false, NULL, NULL),
   ('6f22e7d4-7a58-5ff6-8c0b-5679e13a277a', 'c6c052d9-c5a9-5575-8eec-842faa169ebd', 'Não podes falar enquanto expõem a tua maior falha de caráter (segundo o grupo).', 'caos', true, false, NULL, NULL),
   ('b0f84a87-7771-5908-8793-eb9b8fe46fbc', 'c6c052d9-c5a9-5575-8eec-842faa169ebd', 'Fica sério enquanto contam a última vez que ficaste mal na fita à frente deles.', 'caos', true, false, NULL, NULL),
-  ('08cb6f0b-8727-5989-8ce7-415f1cf49e4f', 'c6c052d9-c5a9-5575-8eec-842faa169ebd', 'Mantém a pose enquanto o grupo decide se és de confiança ou não.', 'caos', true, false, NULL, NULL)
+  ('08cb6f0b-8727-5989-8ce7-415f1cf49e4f', 'c6c052d9-c5a9-5575-8eec-842faa169ebd', 'Mantém a pose enquanto o grupo decide se és de confiança ou não.', 'caos', true, false, NULL, NULL),
+  ('1dfa5a00-e4a9-593b-82c8-e3ca4ca07975', 'c6c052d9-c5a9-5575-8eec-842faa169ebd', 'Aguenta sem reagir enquanto o grupo adivinha quantas pessoas já beijaste.', 'hardcore', true, false, NULL, NULL),
+  ('bb41204c-b347-5507-8c0d-5fdd89d3bbac', 'c6c052d9-c5a9-5575-8eec-842faa169ebd', 'Fica sério enquanto leem em voz alta os nomes das tuas últimas cinco conversas.', 'hardcore', true, false, NULL, NULL),
+  ('1476e643-60ab-5608-8905-7774f3835f8e', 'c6c052d9-c5a9-5575-8eec-842faa169ebd', 'Não podes falar enquanto o grupo decide qual foi a tua pior escolha amorosa.', 'hardcore', true, false, NULL, NULL),
+  ('76215929-9724-595e-8deb-f59d4dfd0b04', 'c6c052d9-c5a9-5575-8eec-842faa169ebd', 'Mantém a cara séria enquanto imitam a tua voz a paquerar alguém.', 'hardcore', true, false, NULL, NULL),
+  ('cd2eb1ab-a9e8-551f-891e-78d61ccc4582', 'c6c052d9-c5a9-5575-8eec-842faa169ebd', 'Fica calado enquanto dizem, à vez, o que fariam contigo num encontro.', 'hardcore', true, false, NULL, NULL),
+  ('07119069-7b3e-5e33-89e3-0ebff0a701ef', 'c6c052d9-c5a9-5575-8eec-842faa169ebd', 'Aguenta sem reagir enquanto apostam quanto durou a tua relação mais curta.', 'hardcore', true, false, NULL, NULL),
+  ('1f265120-6b6f-5495-8683-e7bf58a31085', 'c6c052d9-c5a9-5575-8eec-842faa169ebd', 'Fica calado enquanto o grupo diz o que nunca te disse na cara.', 'caos', true, false, NULL, NULL),
+  ('47339e02-31d3-5332-814f-3cbd1c39fabd', 'c6c052d9-c5a9-5575-8eec-842faa169ebd', 'Aguenta sem responder enquanto discutem se tinhas razão naquela discussão.', 'caos', true, false, NULL, NULL),
+  ('7ae151e6-f9fc-54a9-8bff-afa7b7863ae8', 'c6c052d9-c5a9-5575-8eec-842faa169ebd', 'Mantém a pose enquanto votam quem aqui te conhece mesmo — e quem só finge.', 'caos', true, false, NULL, NULL),
+  ('a3803f37-f799-562b-8652-5ac02a5c9eea', 'c6c052d9-c5a9-5575-8eec-842faa169ebd', 'Não podes falar enquanto contam a versão DELES da vossa última zanga.', 'caos', true, false, NULL, NULL),
+  ('920809e9-ad8d-589c-8d97-4c8f653830b4', 'c6c052d9-c5a9-5575-8eec-842faa169ebd', 'Fica sério enquanto dizem o que mudariam em ti se pudessem.', 'caos', true, false, NULL, NULL),
+  ('76208978-e85e-50b8-8280-ae5bb605d3ae', 'c6c052d9-c5a9-5575-8eec-842faa169ebd', 'Aguenta calado enquanto o grupo diz o que espera de ti e nunca pediu.', 'caos', true, false, NULL, NULL),
+  ('502342a1-037e-510d-894f-be3a123fccfd', 'c6c052d9-c5a9-5575-8eec-842faa169ebd', 'Fica sério enquanto o grupo tenta adivinhar em que estás a pensar.', 'leve', true, false, NULL, NULL),
+  ('fa7823ed-6270-5078-8728-b0b1090c4b3e', 'c6c052d9-c5a9-5575-8eec-842faa169ebd', 'Aguenta sem rir enquanto alguém conta a tua história mais contada de sempre.', 'picante', true, false, NULL, NULL)
 ON CONFLICT (game_type_id, text) DO UPDATE SET
   intensity = EXCLUDED.intensity, active = true, buddy = EXCLUDED.buddy,
   duration = EXCLUDED.duration, tag = EXCLUDED.tag;
 
--- Desafio (40)
+-- Desafio (52)
 INSERT INTO prompts (id, game_type_id, text, intensity, active, buddy, duration, tag) VALUES
   ('55bc5789-e0e8-5a15-8c98-59ced46e4f4f', 'b77b4756-e507-59c5-8a10-d327f455bedd', 'Faz a tua melhor imitação de outro jogador; se ninguém adivinhar, bebes.', 'leve', true, false, NULL, NULL),
   ('dc3c31c9-d88e-5cd1-87ea-6af402c109cb', 'b77b4756-e507-59c5-8a10-d327f455bedd', 'Fala com sotaque estrangeiro até à tua próxima vez.', 'leve', true, false, NULL, NULL),
@@ -117,12 +131,24 @@ INSERT INTO prompts (id, game_type_id, text, intensity, active, buddy, duration,
   ('113f2e85-ec00-5bf0-8199-42bc558b9b38', 'b77b4756-e507-59c5-8a10-d327f455bedd', 'Até às próximas 2 jogadas, tens de rimar sempre que falas — senão bebes.', 'leve', true, false, 2, NULL),
   ('73736c4d-98ef-5b42-8cc9-a04713ef8276', 'b77b4756-e507-59c5-8a10-d327f455bedd', 'Nas próximas 2 jogadas, só podes falar na terceira pessoa — senão bebes.', 'leve', true, false, 2, NULL),
   ('35119aca-a985-5c30-8a7e-0de10d805e17', 'b77b4756-e507-59c5-8a10-d327f455bedd', 'Nas próximas 3 jogadas, acaba cada frase com "meu capitão" — senão bebes.', 'leve', true, false, 3, NULL),
-  ('acb9f9c8-7413-5cbe-8586-e4ca39648a64', 'b77b4756-e507-59c5-8a10-d327f455bedd', 'Até às próximas 2 jogadas, não podes dizer "sim" nem "não" — senão bebes.', 'picante', true, false, 2, NULL)
+  ('acb9f9c8-7413-5cbe-8586-e4ca39648a64', 'b77b4756-e507-59c5-8a10-d327f455bedd', 'Até às próximas 2 jogadas, não podes dizer "sim" nem "não" — senão bebes.', 'picante', true, false, 2, NULL),
+  ('cfd95bc4-b547-5268-8cfc-9deb29aa9e1b', 'b77b4756-e507-59c5-8a10-d327f455bedd', 'Lê em voz alta a última mensagem que enviaste depois das 2 da manhã — ou bebes 4.', 'hardcore', true, false, NULL, NULL),
+  ('9a6d11eb-fec8-5508-8613-551bbefc3949', 'b77b4756-e507-59c5-8a10-d327f455bedd', 'Deixa o grupo escolher alguém das tuas conversas e manda-lhe "olá" agora.', 'hardcore', true, false, NULL, NULL),
+  ('7ca51964-8511-5f80-8e8d-54e35d48497b', 'b77b4756-e507-59c5-8a10-d327f455bedd', 'Diz em voz alta quantas pessoas já beijaste — ou bebes 4.', 'hardcore', true, false, NULL, NULL),
+  ('c5868b6b-7a54-5e9e-8a0d-05e197caf3b3', 'b77b4756-e507-59c5-8a10-d327f455bedd', 'Mostra ao grupo a foto de perfil do teu último crush — ou bebes 5.', 'hardcore', true, false, NULL, NULL),
+  ('617974cb-4828-574c-8cdf-0963170a9160', 'b77b4756-e507-59c5-8a10-d327f455bedd', 'Deixa quem está à tua esquerda escolher um emoji e envia-o à tua última conversa.', 'hardcore', true, false, NULL, NULL),
+  ('9416c7d7-2f9b-522d-82af-986bff8a601d', 'b77b4756-e507-59c5-8a10-d327f455bedd', 'Conta o teu maior arrependimento de uma noite de festa, sem cortes — ou bebes 4.', 'hardcore', true, false, NULL, NULL),
+  ('1e1c40eb-bc7a-56c2-89fd-9c63e31af8eb', 'b77b4756-e507-59c5-8a10-d327f455bedd', 'Diz qual das pessoas desta mesa te desiludiu mais — ou bebes 5.', 'caos', true, false, NULL, NULL),
+  ('2bec4e17-90a9-514c-8f9c-7062fa500bc0', 'b77b4756-e507-59c5-8a10-d327f455bedd', 'Conta algo que sabes sobre alguém aqui e que mais ninguém sabe — ou bebes 5.', 'caos', true, false, NULL, NULL),
+  ('a288be07-9cb1-55dc-8ee5-80b82e001296', 'b77b4756-e507-59c5-8a10-d327f455bedd', 'Escolhe com quem desta mesa viverias e com quem nunca — e explica porquê.', 'caos', true, false, NULL, NULL),
+  ('736e25ec-e706-596b-840b-23bad66af8f9', 'b77b4756-e507-59c5-8a10-d327f455bedd', 'Diz o que pensaste da primeira vez que viste cada pessoa à tua direita.', 'caos', true, false, NULL, NULL),
+  ('1645540c-bda1-5d1b-8f4b-2ae1ad407f9c', 'b77b4756-e507-59c5-8a10-d327f455bedd', 'Admite a última vez que mentiste a alguém desta mesa — ou bebes 4.', 'caos', true, false, NULL, NULL),
+  ('95d4ace0-a687-52df-8058-96885af555e3', 'b77b4756-e507-59c5-8a10-d327f455bedd', 'Diz quem aqui achas que te trocaria por outro grupo de amigos — ou bebes 4.', 'caos', true, false, NULL, NULL)
 ON CONFLICT (game_type_id, text) DO UPDATE SET
   intensity = EXCLUDED.intensity, active = true, buddy = EXCLUDED.buddy,
   duration = EXCLUDED.duration, tag = EXCLUDED.tag;
 
--- Isto ou Aquilo (13)
+-- Isto ou Aquilo (48)
 INSERT INTO prompts (id, game_type_id, text, intensity, active, buddy, duration, tag) VALUES
   ('b58c7334-0a4b-5d12-863e-5bd288c6930e', 'a0c572ec-62e9-5d27-8dff-d2531aad7d4d', 'Fazer o pino durante 10s||Imitar um animal até alguém adivinhar', 'leve', true, false, NULL, NULL),
   ('4f1fbc11-19f7-5ec3-8925-a9232289dc5b', 'a0c572ec-62e9-5d27-8dff-d2531aad7d4d', 'Cantar o refrão da tua música favorita||Dançar 15s sem música', 'leve', true, false, NULL, NULL),
@@ -136,12 +162,47 @@ INSERT INTO prompts (id, game_type_id, text, intensity, active, buddy, duration,
   ('db9f4e83-0dd3-51f9-8e0f-a552767a8990', 'a0c572ec-62e9-5d27-8dff-d2531aad7d4d', 'Revelar o teu crush do grupo||Beber 5 golos', 'hardcore', true, false, NULL, NULL),
   ('a6e9cbb4-ce7a-5836-8404-6b68b73affde', 'a0c572ec-62e9-5d27-8dff-d2531aad7d4d', 'Ligar a um ex e falar 10s||Beber 5 golos', 'hardcore', true, false, NULL, NULL),
   ('3c40267f-d6f2-51d5-8386-ee77f160e647', 'a0c572ec-62e9-5d27-8dff-d2531aad7d4d', 'Dizer o que achas mesmo de quem está à tua frente||Beber 5 golos', 'caos', true, false, NULL, NULL),
-  ('18bad67d-49db-52ed-8d13-ab4fb937296f', 'a0c572ec-62e9-5d27-8dff-d2531aad7d4d', 'Confessar a maior mentira que disseste a alguém da mesa||Beber 4 golos', 'caos', true, false, NULL, NULL)
+  ('18bad67d-49db-52ed-8d13-ab4fb937296f', 'a0c572ec-62e9-5d27-8dff-d2531aad7d4d', 'Confessar a maior mentira que disseste a alguém da mesa||Beber 4 golos', 'caos', true, false, NULL, NULL),
+  ('84012cd6-a711-53d9-8d7a-af6d8682021c', 'a0c572ec-62e9-5d27-8dff-d2531aad7d4d', 'Falar só a cantar durante uma ronda||Beber 2 golos', 'leve', true, false, NULL, NULL),
+  ('d64b320d-79b5-5e44-8ccb-241bca50825b', 'a0c572ec-62e9-5d27-8dff-d2531aad7d4d', 'Fazer 15 agachamentos||Deixar o grupo ver o teu ecrã principal', 'leve', true, false, NULL, NULL),
+  ('3a6c1b7e-65bd-567c-8772-cd0798fba445', 'a0c572ec-62e9-5d27-8dff-d2531aad7d4d', 'Imitar o anfitrião durante 30s||Beber 2 golos', 'leve', true, false, NULL, NULL),
+  ('3ca3aa60-b137-5686-80cc-ccbb547ddbdb', 'a0c572ec-62e9-5d27-8dff-d2531aad7d4d', 'Contar a tua pior desculpa de sempre||Fazer uma pose ridícula durante 30s', 'leve', true, false, NULL, NULL),
+  ('51909614-7bd2-5475-8651-bf4f9e115f39', 'a0c572ec-62e9-5d27-8dff-d2531aad7d4d', 'Trocar de lugar com quem está à tua frente||Beber 2 golos', 'leve', true, false, NULL, NULL),
+  ('1ccae0d9-58de-55d9-89ee-411cf8544081', 'a0c572ec-62e9-5d27-8dff-d2531aad7d4d', 'Falar em voz de desenho animado até à tua vez||Beber 3 golos', 'leve', true, false, NULL, NULL),
+  ('2faf4b2a-1b93-5f43-8e35-87a42fa8b93c', 'a0c572ec-62e9-5d27-8dff-d2531aad7d4d', 'Deixar alguém escolher o teu próximo copo||Fazer uma imitação à escolha do grupo', 'leve', true, false, NULL, NULL),
+  ('b249a44b-1ba7-58bb-83f9-878397aa405e', 'a0c572ec-62e9-5d27-8dff-d2531aad7d4d', 'Mostrar a tua última pesquisa no telemóvel||Beber 4 golos', 'picante', true, false, NULL, NULL),
+  ('85486533-c218-5663-8cf9-d94db4755a9b', 'a0c572ec-62e9-5d27-8dff-d2531aad7d4d', 'Dizer a maior diferença de idade que já houve num encontro teu||Beber 3 golos', 'picante', true, false, NULL, NULL),
+  ('c801f9ad-1666-5ee6-8bdb-2eec8b812c57', 'a0c572ec-62e9-5d27-8dff-d2531aad7d4d', 'Ler em voz alta a tua última mensagem recebida||Beber 4 golos', 'picante', true, false, NULL, NULL),
+  ('1c665b98-a8b3-58d9-8bd5-c05f3246c0dc', 'a0c572ec-62e9-5d27-8dff-d2531aad7d4d', 'Deixar o grupo ver as tuas capturas de ecrã||Beber 5 golos', 'picante', true, false, NULL, NULL),
+  ('9c047118-4b60-56a2-8fa9-bf4dddc097a0', 'a0c572ec-62e9-5d27-8dff-d2531aad7d4d', 'Contar o teu pior fora numa paquera||Beber 3 golos', 'picante', true, false, NULL, NULL),
+  ('da0b36a9-69c3-526e-8c31-4297e028e906', 'a0c572ec-62e9-5d27-8dff-d2531aad7d4d', 'Dizer quantas conversas apagaste este mês||Beber 3 golos', 'picante', true, false, NULL, NULL),
+  ('6f294b68-ec41-5596-8f49-1b5236b185a0', 'a0c572ec-62e9-5d27-8dff-d2531aad7d4d', 'Fazer uma cantada a quem está à tua direita||Beber 4 golos', 'picante', true, false, NULL, NULL),
+  ('7de1c977-46e6-5ce5-8aa3-337b5d61a2e1', 'a0c572ec-62e9-5d27-8dff-d2531aad7d4d', 'Dizer a última pessoa cujo perfil espreitaste||Beber 4 golos', 'picante', true, false, NULL, NULL),
+  ('276ad104-4240-58ef-8819-bacf44cb8f1e', 'a0c572ec-62e9-5d27-8dff-d2531aad7d4d', 'Contar o teu encontro mais desastroso||Deixar o grupo escrever-te um story', 'picante', true, false, NULL, NULL),
+  ('b16e7a8a-711f-5bbf-8365-f9fa2581cf42', 'a0c572ec-62e9-5d27-8dff-d2531aad7d4d', 'Ler a tua conversa mais recente em voz alta||Beber 5 golos', 'hardcore', true, false, NULL, NULL),
+  ('730300dc-4c7b-591f-817a-c41907ded5f7', 'a0c572ec-62e9-5d27-8dff-d2531aad7d4d', 'Dizer quem desta mesa acharias atraente||Beber 5 golos', 'hardcore', true, false, NULL, NULL),
+  ('53719712-0297-52df-859c-fbeeddd47be8', 'a0c572ec-62e9-5d27-8dff-d2531aad7d4d', 'Mostrar quem está no topo das tuas conversas||Beber 4 golos', 'hardcore', true, false, NULL, NULL),
+  ('216535f7-fba5-565c-8513-e44a57f18b86', 'a0c572ec-62e9-5d27-8dff-d2531aad7d4d', 'Contar o teu maior segredo de uma noite||Beber 5 golos', 'hardcore', true, false, NULL, NULL),
+  ('d6e3c59e-72b8-5fac-82ef-7b0630434f1c', 'a0c572ec-62e9-5d27-8dff-d2531aad7d4d', 'Ligar ao teu último crush e falar 15s||Beber 6 golos', 'hardcore', true, false, NULL, NULL),
+  ('d69adf28-5eff-580b-8f24-5a171c1a1e16', 'a0c572ec-62e9-5d27-8dff-d2531aad7d4d', 'Dizer em quantas relações já pensaste em desistir||Beber 4 golos', 'hardcore', true, false, NULL, NULL),
+  ('8109cdd1-eac1-5cbf-8ed8-10b046a075f5', 'a0c572ec-62e9-5d27-8dff-d2531aad7d4d', 'Mostrar a última foto que tiraste a ti próprio/a||Beber 4 golos', 'hardcore', true, false, NULL, NULL),
+  ('7346ccaa-fcf4-5ba5-81b8-9aa7e54c15ae', 'a0c572ec-62e9-5d27-8dff-d2531aad7d4d', 'Contar onde foste mais longe do que devias||Beber 5 golos', 'hardcore', true, false, NULL, NULL),
+  ('4ce7964d-ff67-560b-812c-1fdac1740ac4', 'a0c572ec-62e9-5d27-8dff-d2531aad7d4d', 'Deixar o grupo ver as tuas fotos favoritas||Beber 6 golos', 'hardcore', true, false, NULL, NULL),
+  ('9b55d8e8-25af-51c1-8b12-306c8c28c910', 'a0c572ec-62e9-5d27-8dff-d2531aad7d4d', 'Dizer quem aqui perdeu a tua confiança||Beber 5 golos', 'caos', true, false, NULL, NULL),
+  ('2b1e624c-b0b5-5f54-8361-654b714ab60c', 'a0c572ec-62e9-5d27-8dff-d2531aad7d4d', 'Contar o que já disseste de alguém desta mesa pelas costas||Beber 5 golos', 'caos', true, false, NULL, NULL),
+  ('9b25ef8d-9752-5528-85f4-d314eb02a27c', 'a0c572ec-62e9-5d27-8dff-d2531aad7d4d', 'Ordenar a mesa do amigo mais leal ao menos leal||Beber 6 golos', 'caos', true, false, NULL, NULL),
+  ('63881607-55d7-5f3e-8f64-55d9e406d2cb', 'a0c572ec-62e9-5d27-8dff-d2531aad7d4d', 'Dizer a quem desta mesa nunca emprestarias dinheiro||Beber 4 golos', 'caos', true, false, NULL, NULL),
+  ('d1f3a97e-b7d4-5748-831c-40dea22028f7', 'a0c572ec-62e9-5d27-8dff-d2531aad7d4d', 'Revelar uma discussão vossa que ainda não está resolvida||Beber 5 golos', 'caos', true, false, NULL, NULL),
+  ('0e8448ad-bb07-5545-848e-6b102da8e80a', 'a0c572ec-62e9-5d27-8dff-d2531aad7d4d', 'Dizer quem aqui te irrita mais quando estão em grupo||Beber 5 golos', 'caos', true, false, NULL, NULL),
+  ('a440d737-af42-5aaf-843b-d86c07673593', 'a0c572ec-62e9-5d27-8dff-d2531aad7d4d', 'Dizer o que pensas mesmo da última decisão de quem está à tua frente||Beber 5 golos', 'caos', true, false, NULL, NULL),
+  ('20da11a8-6162-576f-80b0-d2019b27a7a1', 'a0c572ec-62e9-5d27-8dff-d2531aad7d4d', 'Admitir se já duvidaste de uma amizade desta mesa||Beber 4 golos', 'caos', true, false, NULL, NULL),
+  ('26d5418d-4b00-56c6-872b-c213b09bc25e', 'a0c572ec-62e9-5d27-8dff-d2531aad7d4d', 'Dizer quem daqui convidarias para o teu casamento — e quem não||Beber 6 golos', 'caos', true, false, NULL, NULL),
+  ('ff4af0d8-17f4-52bc-8ae5-bcb860b7d98a', 'a0c572ec-62e9-5d27-8dff-d2531aad7d4d', 'Contar o que mais te custou perdoar a alguém aqui||Beber 5 golos', 'caos', true, false, NULL, NULL)
 ON CONFLICT (game_type_id, text) DO UPDATE SET
   intensity = EXCLUDED.intensity, active = true, buddy = EXCLUDED.buddy,
   duration = EXCLUDED.duration, tag = EXCLUDED.tag;
 
--- Intrigas (34)
+-- Intrigas (48)
 INSERT INTO prompts (id, game_type_id, text, intensity, active, buddy, duration, tag) VALUES
   ('344de5a0-ec54-5168-8bd1-2e42690e1987', '5df71400-28e5-50f0-805a-2df1591cf6df', 'Quem é mais capaz de adormecer numa festa? O grupo vota.', 'leve', true, false, NULL, NULL),
   ('404adb02-c70e-577b-87de-2f7f3c03ccfd', '5df71400-28e5-50f0-805a-2df1591cf6df', 'Quem chega sempre atrasado? Votem.', 'leve', true, false, NULL, NULL),
@@ -176,12 +237,26 @@ INSERT INTO prompts (id, game_type_id, text, intensity, active, buddy, duration,
   ('c37edf3e-6bad-52a6-8dc5-acf1b1ec1cd6', '5df71400-28e5-50f0-805a-2df1591cf6df', 'Em quem confias menos para guardar um segredo teu?', 'caos', true, false, NULL, NULL),
   ('7a1dc116-9d37-5ad2-8537-897aa5146c99', '5df71400-28e5-50f0-805a-2df1591cf6df', 'Quem é mais provável de andar a namoriscar alguém do grupo às escondidas?', 'caos', true, false, NULL, NULL),
   ('9eaf2517-f94a-5dda-823c-f76e924606b8', '5df71400-28e5-50f0-805a-2df1591cf6df', 'Quem seria o primeiro a trair o grupo por interesse próprio?', 'caos', true, false, NULL, NULL),
-  ('d4c9862f-8841-5255-8bb7-6b5b2259e098', '5df71400-28e5-50f0-805a-2df1591cf6df', 'Quem aqui já gostou de alguém do grupo e nunca admitiu?', 'caos', true, false, NULL, NULL)
+  ('d4c9862f-8841-5255-8bb7-6b5b2259e098', '5df71400-28e5-50f0-805a-2df1591cf6df', 'Quem aqui já gostou de alguém do grupo e nunca admitiu?', 'caos', true, false, NULL, NULL),
+  ('ca6966ba-04d2-5d05-80cd-23a4fffee6cd', '5df71400-28e5-50f0-805a-2df1591cf6df', 'Quem já ficou com mais gente numa só noite?', 'hardcore', true, false, NULL, NULL),
+  ('5bb025ab-1ddc-5c5a-8ce7-8e8832f990c6', '5df71400-28e5-50f0-805a-2df1591cf6df', 'Quem tem as conversas mais atrevidas guardadas no telemóvel?', 'hardcore', true, false, NULL, NULL),
+  ('befc2d3b-15fc-5758-8cd5-74c98bffb353', '5df71400-28e5-50f0-805a-2df1591cf6df', 'Quem é mais capaz de sair daqui com alguém que acabou de conhecer?', 'hardcore', true, false, NULL, NULL),
+  ('b8cacc38-5b40-587b-84e2-3d1732e50ff2', '5df71400-28e5-50f0-805a-2df1591cf6df', 'Quem já disse "não conto a ninguém" e contou na mesma?', 'hardcore', true, false, NULL, NULL),
+  ('084bd297-a3e7-53f0-8296-61268e4edd92', '5df71400-28e5-50f0-805a-2df1591cf6df', 'Quem tem a maior diferença entre o que mostra e o que faz?', 'hardcore', true, false, NULL, NULL),
+  ('6c1b577d-c986-552a-8c26-d7e51de7b622', '5df71400-28e5-50f0-805a-2df1591cf6df', 'Quem seria mais capaz de aceitar um convite duvidoso esta noite?', 'hardcore', true, false, NULL, NULL),
+  ('c2346f52-13e1-5ce6-894b-19d88680f5eb', '5df71400-28e5-50f0-805a-2df1591cf6df', 'Quem desta mesa desaparece mais quando alguém precisa?', 'caos', true, false, NULL, NULL),
+  ('5c82e569-7f3a-5640-8451-204cc01343dc', '5df71400-28e5-50f0-805a-2df1591cf6df', 'Quem já magoou mais alguém deste grupo sem nunca pedir desculpa?', 'caos', true, false, NULL, NULL),
+  ('7f4d1818-ebcf-5826-82e0-98290bb670c4', '5df71400-28e5-50f0-805a-2df1591cf6df', 'Quem tem mais dois pesos e duas medidas com os amigos?', 'caos', true, false, NULL, NULL),
+  ('c314a93a-9fe6-5acb-82d0-2b760de267eb', '5df71400-28e5-50f0-805a-2df1591cf6df', 'Quem seria o primeiro a contar um segredo vosso a alguém de fora?', 'caos', true, false, NULL, NULL),
+  ('13f9bb79-cf2c-516f-866e-081887e94e36', '5df71400-28e5-50f0-805a-2df1591cf6df', 'Quem é mais capaz de ficar calado a ver um amigo levar a culpa?', 'caos', true, false, NULL, NULL),
+  ('063906e8-9fda-5ba9-8e07-33c932ad55c5', '5df71400-28e5-50f0-805a-2df1591cf6df', 'Quem aqui julga mais os outros em silêncio?', 'caos', true, false, NULL, NULL),
+  ('ff5e1b47-06e7-5fae-80ef-419a89524f7d', '5df71400-28e5-50f0-805a-2df1591cf6df', 'Quem é mais capaz de se perder a caminho de um sítio conhecido?', 'leve', true, false, NULL, NULL),
+  ('66f86085-7d11-57c1-8e88-f35768038fc2', '5df71400-28e5-50f0-805a-2df1591cf6df', 'Quem é mais provável de deixar uma conversa a meio para ir falar com outra pessoa?', 'picante', true, false, NULL, NULL)
 ON CONFLICT (game_type_id, text) DO UPDATE SET
   intensity = EXCLUDED.intensity, active = true, buddy = EXCLUDED.buddy,
   duration = EXCLUDED.duration, tag = EXCLUDED.tag;
 
--- Segredos Anónimos (34)
+-- Segredos Anónimos (48)
 INSERT INTO prompts (id, game_type_id, text, intensity, active, buddy, duration, tag) VALUES
   ('535ebfb5-d7ce-53c4-857c-00b68d345544', '157382b6-9786-5855-854d-7729b00394e2', 'Submete um segredo sobre a tua infância. O grupo adivinha de quem é.', 'leve', true, false, NULL, NULL),
   ('4eb2ba5b-789a-564d-8049-a898873d66fd', '157382b6-9786-5855-854d-7729b00394e2', 'Confessa anonimamente um medo estranho que tenhas.', 'leve', true, false, NULL, NULL),
@@ -216,7 +291,21 @@ INSERT INTO prompts (id, game_type_id, text, intensity, active, buddy, duration,
   ('c321a67c-123e-5581-867f-17617f5ecdeb', '157382b6-9786-5855-854d-7729b00394e2', 'Confessa se já perdeste o respeito por alguém do grupo — sem dizer quem.', 'caos', true, false, NULL, NULL),
   ('1e302e11-8a86-5b02-85e9-8acf7f42c095', '157382b6-9786-5855-854d-7729b00394e2', 'Partilha a coisa mais dramática que já fizeste por causa de alguém desta mesa.', 'caos', true, false, NULL, NULL),
   ('c4c3d320-521b-5bbd-8159-b25d2dfeb7a0', '157382b6-9786-5855-854d-7729b00394e2', 'Escreve um arrependimento que tens com alguém presente.', 'caos', true, false, NULL, NULL),
-  ('dc2094f2-ab6e-5096-8d40-de0be9dc5fcf', '157382b6-9786-5855-854d-7729b00394e2', 'Confessa se alguma vez fingiste gostar de alguém do grupo.', 'caos', true, false, NULL, NULL)
+  ('dc2094f2-ab6e-5096-8d40-de0be9dc5fcf', '157382b6-9786-5855-854d-7729b00394e2', 'Confessa se alguma vez fingiste gostar de alguém do grupo.', 'caos', true, false, NULL, NULL),
+  ('7d509007-69b3-5481-8382-d768e29cf31b', '157382b6-9786-5855-854d-7729b00394e2', 'Escreve a coisa mais atrevida que já te pediram — e se aceitaste.', 'hardcore', true, false, NULL, NULL),
+  ('6ebde18a-6889-5286-815a-7707507ea755', '157382b6-9786-5855-854d-7729b00394e2', 'Confessa o pensamento que tiveste sobre alguém e nunca admitiste.', 'hardcore', true, false, NULL, NULL),
+  ('5c23875c-981b-5f4b-8e4d-99c9f5042f22', '157382b6-9786-5855-854d-7729b00394e2', 'Partilha a maior mentira que já contaste para safar uma noite.', 'hardcore', true, false, NULL, NULL),
+  ('786408b8-681c-5827-807f-35bf90313fbc', '157382b6-9786-5855-854d-7729b00394e2', 'Escreve o que farias se ninguém deste grupo viesse a saber.', 'hardcore', true, false, NULL, NULL),
+  ('483719e9-6130-5ca8-8e67-ab603c0636ad', '157382b6-9786-5855-854d-7729b00394e2', 'Confessa o que fizeste que mudaria a opinião do grupo sobre ti.', 'hardcore', true, false, NULL, NULL),
+  ('fc4e1ed9-1bdc-548b-832e-458738e3d300', '157382b6-9786-5855-854d-7729b00394e2', 'Partilha o momento em que estiveste mais perto de estragar tudo.', 'hardcore', true, false, NULL, NULL),
+  ('7d8b2158-4acf-5e42-83b9-2e12cf483485', '157382b6-9786-5855-854d-7729b00394e2', 'Escreve o que sentes mesmo por uma pessoa desta mesa — sem dizer quem.', 'caos', true, false, NULL, NULL),
+  ('37c38844-a4d1-5c27-8049-6e0c5402abcb', '157382b6-9786-5855-854d-7729b00394e2', 'Confessa uma vez em que ficaste aliviado/a com o azar de alguém aqui.', 'caos', true, false, NULL, NULL),
+  ('b2ea8d27-3227-5d86-80a1-b1e9cf9c32d8', '157382b6-9786-5855-854d-7729b00394e2', 'Partilha o que nunca perdoaste a alguém deste grupo.', 'caos', true, false, NULL, NULL),
+  ('509c758e-0617-5f79-8540-173ff4537ab4', '157382b6-9786-5855-854d-7729b00394e2', 'Escreve o que dirias a alguém desta mesa se não houvesse consequências.', 'caos', true, false, NULL, NULL),
+  ('ab049f3c-5868-5055-80ce-3bc271797090', '157382b6-9786-5855-854d-7729b00394e2', 'Confessa se alguma vez te afastaste do grupo de propósito.', 'caos', true, false, NULL, NULL),
+  ('a3bae2ed-85d5-5379-86a8-e3484bee634e', '157382b6-9786-5855-854d-7729b00394e2', 'Partilha a razão verdadeira por que faltaste àquela vez.', 'caos', true, false, NULL, NULL),
+  ('061533e5-2630-5a15-8154-22c97618f712', '157382b6-9786-5855-854d-7729b00394e2', 'Escreve o elogio que gostavas de ouvir e nunca ouves.', 'leve', true, false, NULL, NULL),
+  ('00cd1a48-afd1-5006-819f-8778204139dc', '157382b6-9786-5855-854d-7729b00394e2', 'Confessa a coisa mais atrevida que já escreveste e não enviaste.', 'picante', true, false, NULL, NULL)
 ON CONFLICT (game_type_id, text) DO UPDATE SET
   intensity = EXCLUDED.intensity, active = true, buddy = EXCLUDED.buddy,
   duration = EXCLUDED.duration, tag = EXCLUDED.tag;
@@ -225,7 +314,7 @@ ON CONFLICT (game_type_id, text) DO UPDATE SET
 
 -- Jogo do Vasco: sem prompts (mecânica pura — o conteúdo é gerado pelo motor).
 
--- Categoria Relâmpago (26)
+-- Categoria Relâmpago (48)
 INSERT INTO prompts (id, game_type_id, text, intensity, active, buddy, duration, tag) VALUES
   ('5c5e113d-813b-544c-8d28-71b0779878c4', '9cfe05ca-3ec5-528f-84ac-e9b6ce8ebd03', 'Marcas de cerveja', 'leve', true, false, NULL, NULL),
   ('079e93d2-03f3-579a-8b43-c62777b11603', '9cfe05ca-3ec5-528f-84ac-e9b6ce8ebd03', 'Equipas da Primeira Liga', 'leve', true, false, NULL, NULL),
@@ -252,12 +341,34 @@ INSERT INTO prompts (id, game_type_id, text, intensity, active, buddy, duration,
   ('9aef2dab-3c34-5c17-8cec-72989e647499', '9cfe05ca-3ec5-528f-84ac-e9b6ce8ebd03', 'Motivos para acabar uma relação', 'caos', true, false, NULL, NULL),
   ('86bdb50c-5931-5f7f-8d0c-df71b90e439a', '9cfe05ca-3ec5-528f-84ac-e9b6ce8ebd03', 'Defeitos que toda a gente tem', 'caos', true, false, NULL, NULL),
   ('79875a84-2176-557a-84e2-b6cae24f452c', '9cfe05ca-3ec5-528f-84ac-e9b6ce8ebd03', 'Coisas que se dizem quando se fala mal de alguém', 'caos', true, false, NULL, NULL),
-  ('1b4e9b55-4036-5c70-8e91-96eceda8974d', '9cfe05ca-3ec5-528f-84ac-e9b6ce8ebd03', 'Mentiras que já contaste a este grupo', 'caos', true, false, NULL, NULL)
+  ('1b4e9b55-4036-5c70-8e91-96eceda8974d', '9cfe05ca-3ec5-528f-84ac-e9b6ce8ebd03', 'Mentiras que já contaste a este grupo', 'caos', true, false, NULL, NULL),
+  ('9f981bf8-33c6-56c8-8b58-cb4565e16a90', '9cfe05ca-3ec5-528f-84ac-e9b6ce8ebd03', 'Sítios onde já dormiste que não são a tua cama', 'hardcore', true, false, NULL, NULL),
+  ('9047169e-9fd2-56e0-802b-8e139b267efa', '9cfe05ca-3ec5-528f-84ac-e9b6ce8ebd03', 'Coisas que já disseste para acabar uma discussão', 'hardcore', true, false, NULL, NULL),
+  ('5d1b0d3d-61c6-57f7-88c1-5742faa71ba6', '9cfe05ca-3ec5-528f-84ac-e9b6ce8ebd03', 'Desculpas para sair de casa de alguém de manhã', 'hardcore', true, false, NULL, NULL),
+  ('b1564b70-ddfb-561d-849a-310e1be05727', '9cfe05ca-3ec5-528f-84ac-e9b6ce8ebd03', 'Coisas que se encontram no quarto de alguém', 'hardcore', true, false, NULL, NULL),
+  ('28f31a40-bd6c-515c-8371-f296dfd7fbb0', '9cfe05ca-3ec5-528f-84ac-e9b6ce8ebd03', 'Motivos para bloquear uma pessoa', 'hardcore', true, false, NULL, NULL),
+  ('7d0b04a6-c8ae-522b-889e-d542da197495', '9cfe05ca-3ec5-528f-84ac-e9b6ce8ebd03', 'Coisas que nunca porias num perfil de encontros', 'hardcore', true, false, NULL, NULL),
+  ('27efc4ff-44ca-5086-8b55-8fdcf688ab3e', '9cfe05ca-3ec5-528f-84ac-e9b6ce8ebd03', 'Frases que só se dizem às 4 da manhã', 'hardcore', true, false, NULL, NULL),
+  ('79214dce-2e2d-579c-82b8-a736d023befe', '9cfe05ca-3ec5-528f-84ac-e9b6ce8ebd03', 'Coisas que já fizeste e não contaste a ninguém', 'hardcore', true, false, NULL, NULL),
+  ('0f5eb71d-83ce-5b1b-83fa-898d7914d1ab', '9cfe05ca-3ec5-528f-84ac-e9b6ce8ebd03', 'Razões para deixar de falar com um amigo', 'caos', true, false, NULL, NULL),
+  ('34989ae6-53d2-5b6d-8c51-55d1b3ebc660', '9cfe05ca-3ec5-528f-84ac-e9b6ce8ebd03', 'Coisas que se dizem numa discussão e não se pensam', 'caos', true, false, NULL, NULL),
+  ('beb4b41e-a8cc-509e-8053-1ac9bee8bb7c', '9cfe05ca-3ec5-528f-84ac-e9b6ce8ebd03', 'Segredos que um grupo de amigos costuma ter', 'caos', true, false, NULL, NULL),
+  ('47cc277b-e171-54fc-874d-cef934f2d5cf', '9cfe05ca-3ec5-528f-84ac-e9b6ce8ebd03', 'Motivos para sair de um grupo de WhatsApp', 'caos', true, false, NULL, NULL),
+  ('1ef18bb0-2563-5aaf-884e-d82eddf0c95e', '9cfe05ca-3ec5-528f-84ac-e9b6ce8ebd03', 'Coisas que se fazem por inveja', 'caos', true, false, NULL, NULL),
+  ('0ed5ca34-f61a-53fa-86c5-a8fd52d39765', '9cfe05ca-3ec5-528f-84ac-e9b6ce8ebd03', 'Desculpas que já não enganam ninguém', 'caos', true, false, NULL, NULL),
+  ('dc36c6a2-f48d-5fe0-8003-6d8dc2e961bb', '9cfe05ca-3ec5-528f-84ac-e9b6ce8ebd03', 'Sinais de que uma amizade acabou', 'caos', true, false, NULL, NULL),
+  ('31ef22a3-8725-5230-81cf-8de2310534f5', '9cfe05ca-3ec5-528f-84ac-e9b6ce8ebd03', 'Coisas que nunca dirias à frente de toda a gente', 'caos', true, false, NULL, NULL),
+  ('6b9d5a6d-14da-5a4a-85d1-1abdf99071c4', '9cfe05ca-3ec5-528f-84ac-e9b6ce8ebd03', 'Coisas que se dizem antes de uma asneira', 'picante', true, false, NULL, NULL),
+  ('58ed52ee-8ca2-5c82-8d43-a50f7cac92ff', '9cfe05ca-3ec5-528f-84ac-e9b6ce8ebd03', 'Desculpas para chegar tarde a casa', 'picante', true, false, NULL, NULL),
+  ('866cddad-a5b6-5ef7-8c09-398202fbd812', '9cfe05ca-3ec5-528f-84ac-e9b6ce8ebd03', 'Sítios para um primeiro encontro', 'picante', true, false, NULL, NULL),
+  ('532f011a-ac56-5e71-8eee-9d6ba60a6945', '9cfe05ca-3ec5-528f-84ac-e9b6ce8ebd03', 'Coisas que se fazem para impressionar alguém', 'picante', true, false, NULL, NULL),
+  ('dfd5f532-eaba-5059-8f77-f24a2cd4141a', '9cfe05ca-3ec5-528f-84ac-e9b6ce8ebd03', 'Frases típicas de quem já bebeu demais', 'picante', true, false, NULL, NULL),
+  ('5e34d199-d3cc-5a3c-8c75-4125bfde7785', '9cfe05ca-3ec5-528f-84ac-e9b6ce8ebd03', 'Razões para não responder a uma mensagem', 'picante', true, false, NULL, NULL)
 ON CONFLICT (game_type_id, text) DO UPDATE SET
   intensity = EXCLUDED.intensity, active = true, buddy = EXCLUDED.buddy,
   duration = EXCLUDED.duration, tag = EXCLUDED.tag;
 
--- Mímica (30)
+-- Mímica (50)
 INSERT INTO prompts (id, game_type_id, text, intensity, active, buddy, duration, tag) VALUES
   ('2ab84760-33ce-53dc-8d9b-df4c2a7b5e31', '4e111c07-99ef-5c19-8dd3-4f89849feb59', 'Ressaca', 'leve', true, false, NULL, NULL),
   ('0223354f-3a23-51c4-84ed-706b4a5e6f48', '4e111c07-99ef-5c19-8dd3-4f89849feb59', 'Karaoke', 'leve', true, false, NULL, NULL),
@@ -288,12 +399,32 @@ INSERT INTO prompts (id, game_type_id, text, intensity, active, buddy, duration,
   ('90561390-35dd-5b37-8474-0831a6c64ee5', '4e111c07-99ef-5c19-8dd3-4f89849feb59', 'Traição descoberta', 'caos', true, false, NULL, NULL),
   ('95f7201f-7a71-5956-81b6-cf510848eef2', '4e111c07-99ef-5c19-8dd3-4f89849feb59', 'Falar mal de alguém pelas costas', 'caos', true, false, NULL, NULL),
   ('509dba96-7101-5ec5-8bea-c55ef02eb935', '4e111c07-99ef-5c19-8dd3-4f89849feb59', 'Drama de grupo no WhatsApp', 'caos', true, false, NULL, NULL),
-  ('e6461da7-9b02-5555-8a9f-0cd3f498a345', '4e111c07-99ef-5c19-8dd3-4f89849feb59', 'Bloquear alguém nas redes', 'caos', true, false, NULL, NULL)
+  ('e6461da7-9b02-5555-8a9f-0cd3f498a345', '4e111c07-99ef-5c19-8dd3-4f89849feb59', 'Bloquear alguém nas redes', 'caos', true, false, NULL, NULL),
+  ('c66dd2f8-00c4-51af-8b1d-39d5477007e5', '4e111c07-99ef-5c19-8dd3-4f89849feb59', 'Sair às escondidas de manhã', 'hardcore', true, false, NULL, NULL),
+  ('a660a63d-5890-547f-848f-ff765bbd826e', '4e111c07-99ef-5c19-8dd3-4f89849feb59', 'Esconder o telemóvel à pressa', 'hardcore', true, false, NULL, NULL),
+  ('9645d514-f503-5736-853a-c6a02f0d1357', '4e111c07-99ef-5c19-8dd3-4f89849feb59', 'Apanhar o ex com outra pessoa', 'hardcore', true, false, NULL, NULL),
+  ('de4cef53-b36f-5c48-8e11-315e5da66d40', '4e111c07-99ef-5c19-8dd3-4f89849feb59', 'Ressaca no trabalho', 'hardcore', true, false, NULL, NULL),
+  ('dd475261-6772-5dd1-86cc-69b2d621cba0', '4e111c07-99ef-5c19-8dd3-4f89849feb59', 'Dançar em cima da mesa', 'hardcore', true, false, NULL, NULL),
+  ('8960345d-c716-5ee1-8cce-9fde1f1fa60c', '4e111c07-99ef-5c19-8dd3-4f89849feb59', 'Fingir que adora a prenda', 'hardcore', true, false, NULL, NULL),
+  ('2899e610-9239-55d3-8f6c-8522b098a6e1', '4e111c07-99ef-5c19-8dd3-4f89849feb59', 'Beijo às escuras', 'hardcore', true, false, NULL, NULL),
+  ('1ea6f80f-9db6-59c2-8249-82f1d366570c', '4e111c07-99ef-5c19-8dd3-4f89849feb59', 'Ser apanhado a mentir', 'hardcore', true, false, NULL, NULL),
+  ('427675ac-718b-5224-8243-531b7f671127', '4e111c07-99ef-5c19-8dd3-4f89849feb59', 'Discussão no grupo de amigos', 'caos', true, false, NULL, NULL),
+  ('5c08771c-f7e0-5b0a-8004-e0daee77cbfd', '4e111c07-99ef-5c19-8dd3-4f89849feb59', 'Espalhar um boato', 'caos', true, false, NULL, NULL),
+  ('fe9b33e1-ff45-5650-85ff-a1c86c76fcb1', '4e111c07-99ef-5c19-8dd3-4f89849feb59', 'Fingir que está tudo bem', 'caos', true, false, NULL, NULL),
+  ('0957e9a6-4439-500d-846a-ddd1868884ca', '4e111c07-99ef-5c19-8dd3-4f89849feb59', 'Apanhar alguém a falar de ti', 'caos', true, false, NULL, NULL),
+  ('19f77a78-8d60-5991-875f-6066d09da2d7', '4e111c07-99ef-5c19-8dd3-4f89849feb59', 'Pedir desculpa a contragosto', 'caos', true, false, NULL, NULL),
+  ('5203da1d-f834-57b3-8d0e-52d105b4bfcb', '4e111c07-99ef-5c19-8dd3-4f89849feb59', 'Amizade a acabar', 'caos', true, false, NULL, NULL),
+  ('3bd19c9c-8d93-5c86-8e59-399e9d7bfa67', '4e111c07-99ef-5c19-8dd3-4f89849feb59', 'Ler a mensagem e não responder', 'caos', true, false, NULL, NULL),
+  ('8ab3c723-b6e0-5dd4-8678-53e1154954aa', '4e111c07-99ef-5c19-8dd3-4f89849feb59', 'Escolher entre dois amigos', 'caos', true, false, NULL, NULL),
+  ('bf0829f9-f52f-5261-863c-9b3bcd878998', '4e111c07-99ef-5c19-8dd3-4f89849feb59', 'Selfie que não sai bem', 'picante', true, false, NULL, NULL),
+  ('eb76dcd4-b0c4-5307-84a1-99889306f24d', '4e111c07-99ef-5c19-8dd3-4f89849feb59', 'Encontro às cegas', 'picante', true, false, NULL, NULL),
+  ('3c65cb1d-5d36-5429-8437-f3848f4dae78', '4e111c07-99ef-5c19-8dd3-4f89849feb59', 'Mandar mensagem à pessoa errada', 'picante', true, false, NULL, NULL),
+  ('1ad9ffd3-6b70-5fd0-8412-169cdc72c45b', '4e111c07-99ef-5c19-8dd3-4f89849feb59', 'Fingir que não viu a pessoa na rua', 'picante', true, false, NULL, NULL)
 ON CONFLICT (game_type_id, text) DO UPDATE SET
   intensity = EXCLUDED.intensity, active = true, buddy = EXCLUDED.buddy,
   duration = EXCLUDED.duration, tag = EXCLUDED.tag;
 
--- Roleta Russa (26)
+-- Roleta Russa (48)
 INSERT INTO prompts (id, game_type_id, text, intensity, active, buddy, duration, tag) VALUES
   ('22fdaaf3-99dd-50dd-8736-b0f8b90291ff', '0d78a196-24c2-5924-83ea-9e6b76d6fb22', 'Qual foi a maior vergonha que já passaste em público?', 'leve', true, false, NULL, NULL),
   ('267e7974-8469-5cc1-85a3-cb5b43c0b017', '0d78a196-24c2-5924-83ea-9e6b76d6fb22', 'Qual é a coisa mais infantil que ainda fazes?', 'leve', true, false, NULL, NULL),
@@ -320,14 +451,36 @@ INSERT INTO prompts (id, game_type_id, text, intensity, active, buddy, duration,
   ('b0149f88-d26e-584e-86c2-af285aff51a2', '0d78a196-24c2-5924-83ea-9e6b76d6fb22', 'De quem desta mesa já falaste mal — e o que disseste?', 'caos', true, false, NULL, NULL),
   ('0ecee021-4b59-5008-80c2-a739d7ac311a', '0d78a196-24c2-5924-83ea-9e6b76d6fb22', 'Em quem aqui confias menos e porquê?', 'caos', true, false, NULL, NULL),
   ('3325740a-8a45-5748-8a53-4d539075f19d', '0d78a196-24c2-5924-83ea-9e6b76d6fb22', 'Já perdeste o respeito por alguém deste grupo? Porquê?', 'caos', true, false, NULL, NULL),
-  ('db978fb0-f7c7-53d9-8992-d97274d152a3', '0d78a196-24c2-5924-83ea-9e6b76d6fb22', 'Que pessoa desta mesa cortarias da tua vida sem pensar?', 'caos', true, false, NULL, NULL)
+  ('db978fb0-f7c7-53d9-8992-d97274d152a3', '0d78a196-24c2-5924-83ea-9e6b76d6fb22', 'Que pessoa desta mesa cortarias da tua vida sem pensar?', 'caos', true, false, NULL, NULL),
+  ('02e5318e-b1a7-50f2-8977-b5ae7b41f5b1', '0d78a196-24c2-5924-83ea-9e6b76d6fb22', 'Qual foi a coisa mais atrevida que já te pediram?', 'hardcore', true, false, NULL, NULL),
+  ('9f0afbf1-1e3d-5608-8277-76dcc159cab2', '0d78a196-24c2-5924-83ea-9e6b76d6fb22', 'Quantas pessoas já beijaste nesta cidade?', 'hardcore', true, false, NULL, NULL),
+  ('5ec2c60c-f978-5505-899a-0ad8b51a6ad8', '0d78a196-24c2-5924-83ea-9e6b76d6fb22', 'Qual foi a maior loucura que fizeste por atração?', 'hardcore', true, false, NULL, NULL),
+  ('387ede0d-1b34-5e56-87ba-12b9c4b86005', '0d78a196-24c2-5924-83ea-9e6b76d6fb22', 'Já fingiste sentir algo que não sentias? Quando?', 'hardcore', true, false, NULL, NULL),
+  ('030970be-650a-58ba-8366-657959e5e675', '0d78a196-24c2-5924-83ea-9e6b76d6fb22', 'Qual é o teu maior segredo de uma noite de festa?', 'hardcore', true, false, NULL, NULL),
+  ('86af2554-3b1f-5e79-8b68-7bdf6bc67d5e', '0d78a196-24c2-5924-83ea-9e6b76d6fb22', 'Já saíste com alguém só por vaidade? Conta.', 'hardcore', true, false, NULL, NULL),
+  ('4b3e110d-8e60-5552-83d3-b1cd136bfd0a', '0d78a196-24c2-5924-83ea-9e6b76d6fb22', 'O que tens no telemóvel agora que não querias que ninguém visse?', 'hardcore', true, false, NULL, NULL),
+  ('ec1eb128-0fd2-5b26-8f5f-f6bfec410f1e', '0d78a196-24c2-5924-83ea-9e6b76d6fb22', 'Qual foi a última vez que magoaste alguém desta mesa?', 'caos', true, false, NULL, NULL),
+  ('dae83475-d95a-5739-8e25-5498bdbc6602', '0d78a196-24c2-5924-83ea-9e6b76d6fb22', 'Que amizade aqui já esteve quase a acabar por tua causa?', 'caos', true, false, NULL, NULL),
+  ('e841a4b3-7c6d-5393-8099-33746e60f611', '0d78a196-24c2-5924-83ea-9e6b76d6fb22', 'O que é que nunca perdoaste a alguém deste grupo?', 'caos', true, false, NULL, NULL),
+  ('884c29f1-3511-5e75-8993-3fec7861c9e6', '0d78a196-24c2-5924-83ea-9e6b76d6fb22', 'Se pudesses apagar uma noite com esta gente, qual era?', 'caos', true, false, NULL, NULL),
+  ('04a0fbb6-f858-5abc-8bc7-1d58cfadb31d', '0d78a196-24c2-5924-83ea-9e6b76d6fb22', 'Que verdade sobre ti é que este grupo não aguentaria?', 'caos', true, false, NULL, NULL),
+  ('6fbab84a-f071-50b2-8420-7ed45cb6e405', '0d78a196-24c2-5924-83ea-9e6b76d6fb22', 'Já ficaste calado/a a ver alguém aqui ser injusto? Quando?', 'caos', true, false, NULL, NULL),
+  ('d5daf061-5757-506c-8593-4cfb62998033', '0d78a196-24c2-5924-83ea-9e6b76d6fb22', 'Que pessoa desta mesa te desiludiu mais este ano?', 'caos', true, false, NULL, NULL),
+  ('5bdb01fe-197e-525d-8803-af329e6a9466', '0d78a196-24c2-5924-83ea-9e6b76d6fb22', 'Qual é a coisa mais parva por que já discutiste?', 'leve', true, false, NULL, NULL),
+  ('2696e482-7d8e-57b4-8a7c-aface83ee316', '0d78a196-24c2-5924-83ea-9e6b76d6fb22', 'Qual é o teu maior talento inútil?', 'leve', true, false, NULL, NULL),
+  ('92a9b0c4-d6d8-54bd-871d-56451fd564e1', '0d78a196-24c2-5924-83ea-9e6b76d6fb22', 'Qual foi a última vez que te fizeste de parvo/a de propósito?', 'leve', true, false, NULL, NULL),
+  ('ceb1ab89-8e8c-5a46-8ce0-01e797684895', '0d78a196-24c2-5924-83ea-9e6b76d6fb22', 'O que é que ninguém aqui adivinharia sobre ti?', 'leve', true, false, NULL, NULL),
+  ('6f3efed7-dbeb-5258-8bec-8aa04fa784a2', '0d78a196-24c2-5924-83ea-9e6b76d6fb22', 'Qual foi a mensagem mais embaraçosa que já enviaste sem querer?', 'picante', true, false, NULL, NULL),
+  ('a9445935-09b1-550e-8390-1f8c8c8faab4', '0d78a196-24c2-5924-83ea-9e6b76d6fb22', 'O que farias num encontro se soubesses que não havia segundo?', 'picante', true, false, NULL, NULL),
+  ('fbcaf0f0-35d2-5692-8e68-d7591be2a50e', '0d78a196-24c2-5924-83ea-9e6b76d6fb22', 'Qual é a desculpa que mais usas para não sair de casa?', 'picante', true, false, NULL, NULL),
+  ('a7e2bef6-f9d2-568a-8821-9eea4a57365e', '0d78a196-24c2-5924-83ea-9e6b76d6fb22', 'Já mudaste de opinião sobre alguém depois de uma noite? Conta.', 'picante', true, false, NULL, NULL)
 ON CONFLICT (game_type_id, text) DO UPDATE SET
   intensity = EXCLUDED.intensity, active = true, buddy = EXCLUDED.buddy,
   duration = EXCLUDED.duration, tag = EXCLUDED.tag;
 
 -- Duelo 1v1: sem prompts (mecânica pura — o conteúdo é gerado pelo motor).
 
--- Eu Nunca (37)
+-- Eu Nunca (50)
 INSERT INTO prompts (id, game_type_id, text, intensity, active, buddy, duration, tag) VALUES
   ('3ee6e8bb-7881-5b19-87c2-6038efa1344f', '006d3b95-6cd2-5db6-8141-04faccbfc899', 'fui apanhado/a a mentir por uma pessoa desta mesa.', 'leve', true, false, NULL, NULL),
   ('641cdb24-614f-5f0a-8cd2-731a6754b6b0', '006d3b95-6cd2-5db6-8141-04faccbfc899', 'cantei no karaoke completamente sóbrio/a.', 'leve', true, false, NULL, NULL),
@@ -365,12 +518,25 @@ INSERT INTO prompts (id, game_type_id, text, intensity, active, buddy, duration,
   ('287fd1ef-a881-5a43-89c6-bc592b6974c7', '006d3b95-6cd2-5db6-8141-04faccbfc899', 'fiz asneira numa despedida de solteiro/a.', 'picante', true, false, NULL, 'despedida'),
   ('888568e1-ec0a-55eb-8fe4-13cedaa1d287', '006d3b95-6cd2-5db6-8141-04faccbfc899', 'perdi alguém de vista numa despedida e só apareceu de manhã.', 'picante', true, false, NULL, 'despedida'),
   ('4e9c931f-c69e-5c79-8edb-06bb34a370ce', '006d3b95-6cd2-5db6-8141-04faccbfc899', 'deixei de falar com alguém deste grupo durante meses.', 'picante', true, false, NULL, 'reencontro'),
-  ('21ff2e79-5e64-5a14-8fdc-45b0ce930366', '006d3b95-6cd2-5db6-8141-04faccbfc899', 'mudei completamente de vida sem contar a ninguém aqui.', 'leve', true, false, NULL, 'reencontro')
+  ('21ff2e79-5e64-5a14-8fdc-45b0ce930366', '006d3b95-6cd2-5db6-8141-04faccbfc899', 'mudei completamente de vida sem contar a ninguém aqui.', 'leve', true, false, NULL, 'reencontro'),
+  ('817c7425-9ee4-5956-8bd2-4f5cd34b30a8', '006d3b95-6cd2-5db6-8141-04faccbfc899', 'saí de manhã de casa de alguém sem dizer nada.', 'hardcore', true, false, NULL, NULL),
+  ('f0b8afd4-a39b-540a-81c5-d48f471741ce', '006d3b95-6cd2-5db6-8141-04faccbfc899', 'menti sobre com quem estava naquela noite.', 'hardcore', true, false, NULL, NULL),
+  ('cb86fc99-8223-518e-86ac-605cf91102c7', '006d3b95-6cd2-5db6-8141-04faccbfc899', 'fiquei com alguém que já tinha ficado com um amigo meu.', 'hardcore', true, false, NULL, NULL),
+  ('9c5d491a-5db9-5e95-8119-3ea6324f0f8f', '006d3b95-6cd2-5db6-8141-04faccbfc899', 'apaguei mensagens antes de alguém pegar no meu telemóvel.', 'hardcore', true, false, NULL, NULL),
+  ('215f30c5-aa58-5178-8e0e-9ff34566a629', '006d3b95-6cd2-5db6-8141-04faccbfc899', 'inventei uma história inteira para impressionar alguém.', 'hardcore', true, false, NULL, NULL),
+  ('10c3c0e1-4c1e-57ce-808e-23d17333d27e', '006d3b95-6cd2-5db6-8141-04faccbfc899', 'fiz algo numa festa de que nunca falei com ninguém.', 'hardcore', true, false, NULL, NULL),
+  ('15802fe8-b231-54c4-8cbc-651c91954945', '006d3b95-6cd2-5db6-8141-04faccbfc899', 'contei um segredo de alguém desta mesa a outra pessoa.', 'caos', true, false, NULL, NULL),
+  ('fa16d38a-275c-584f-88cd-703324cc4ce6', '006d3b95-6cd2-5db6-8141-04faccbfc899', 'fingi apoiar alguém aqui a pensar exatamente o contrário.', 'caos', true, false, NULL, NULL),
+  ('24520fc9-e8b5-57f8-889f-eabf6ab8cba5', '006d3b95-6cd2-5db6-8141-04faccbfc899', 'fiquei aliviado/a quando um plano de alguém deste grupo correu mal.', 'caos', true, false, NULL, NULL),
+  ('f2dacbe7-819c-5e37-866f-a74f5e0641b5', '006d3b95-6cd2-5db6-8141-04faccbfc899', 'evitei uma pessoa desta mesa de propósito durante semanas.', 'caos', true, false, NULL, NULL),
+  ('91dcc8ff-c94d-5940-8149-48212b77ff41', '006d3b95-6cd2-5db6-8141-04faccbfc899', 'julguei alguém deste grupo por uma escolha que fez.', 'caos', true, false, NULL, NULL),
+  ('c0b1a3b2-13ac-584a-8e78-b9d899bce09b', '006d3b95-6cd2-5db6-8141-04faccbfc899', 'guardei ressentimento de alguém aqui durante mais de um ano.', 'caos', true, false, NULL, NULL),
+  ('218aedfc-fe26-5f96-86ba-6aef4d3eecec', '006d3b95-6cd2-5db6-8141-04faccbfc899', 'deixei alguém deste grupo levar a culpa por uma coisa minha.', 'caos', true, false, NULL, NULL)
 ON CONFLICT (game_type_id, text) DO UPDATE SET
   intensity = EXCLUDED.intensity, active = true, buddy = EXCLUDED.buddy,
   duration = EXCLUDED.duration, tag = EXCLUDED.tag;
 
--- Mais Provável (31)
+-- Mais Provável (49)
 INSERT INTO prompts (id, game_type_id, text, intensity, active, buddy, duration, tag) VALUES
   ('11397610-d767-5bb6-80ae-5246f8ffbc36', '2ae99c3f-dd93-5855-8289-65bdf7f5778f', 'adormecer primeiro esta noite', 'leve', true, false, NULL, NULL),
   ('3970c325-6cea-5d83-8bd6-8ebc6112de37', '2ae99c3f-dd93-5855-8289-65bdf7f5778f', 'perder o telemóvel esta semana', 'leve', true, false, NULL, NULL),
@@ -402,12 +568,30 @@ INSERT INTO prompts (id, game_type_id, text, intensity, active, buddy, duration,
   ('d2111c09-6065-538e-82ac-ebc808461d3a', '2ae99c3f-dd93-5855-8289-65bdf7f5778f', 'ser o motivo do próximo drama do grupo', 'caos', true, false, NULL, NULL),
   ('8e370fe1-e877-59a3-8abe-d063db372130', '2ae99c3f-dd93-5855-8289-65bdf7f5778f', 'fazer o discurso mais embaraçoso da festa', 'leve', true, false, NULL, 'aniversario'),
   ('605fef92-9084-5fb6-84a7-675aae1396bf', '2ae99c3f-dd93-5855-8289-65bdf7f5778f', 'acabar de fato de banho na despedida', 'picante', true, false, NULL, 'despedida'),
-  ('45c165b1-cf0e-5a22-80ea-d2f9e7f57515', '2ae99c3f-dd93-5855-8289-65bdf7f5778f', 'ser o primeiro a chorar no reencontro', 'leve', true, false, NULL, 'reencontro')
+  ('45c165b1-cf0e-5a22-80ea-d2f9e7f57515', '2ae99c3f-dd93-5855-8289-65bdf7f5778f', 'ser o primeiro a chorar no reencontro', 'leve', true, false, NULL, 'reencontro'),
+  ('dfedb6e8-48dd-5623-8364-0837b394020d', '2ae99c3f-dd93-5855-8289-65bdf7f5778f', 'sair de uma festa com alguém que acabou de conhecer', 'hardcore', true, false, NULL, NULL),
+  ('af8d5136-3fa2-5a29-86e1-c7f1b086e8bc', '2ae99c3f-dd93-5855-8289-65bdf7f5778f', 'ter uma conversa apagada por apagar', 'hardcore', true, false, NULL, NULL),
+  ('eea997a0-fb10-5ada-8b5f-986b50d1d5c9', '2ae99c3f-dd93-5855-8289-65bdf7f5778f', 'esconder uma relação do grupo', 'hardcore', true, false, NULL, NULL),
+  ('0d61e0df-7047-527d-8036-37d3cfe34b02', '2ae99c3f-dd93-5855-8289-65bdf7f5778f', 'fazer esta noite algo de que se arrepende amanhã', 'hardcore', true, false, NULL, NULL),
+  ('47869c39-2abe-5936-8be1-e2a657aaae0e', '2ae99c3f-dd93-5855-8289-65bdf7f5778f', 'ter muito mais histórias do que já contou', 'hardcore', true, false, NULL, NULL),
+  ('c8eaa7c7-59bb-5ef1-85aa-38c8c4ddbe46', '2ae99c3f-dd93-5855-8289-65bdf7f5778f', 'dizer que sim a um convite duvidoso', 'hardcore', true, false, NULL, NULL),
+  ('5d6d7da9-a055-5a66-861f-ae6dac718d35', '2ae99c3f-dd93-5855-8289-65bdf7f5778f', 'acordar sem saber onde deixou o casaco', 'hardcore', true, false, NULL, NULL),
+  ('0adad146-f28d-54d6-867a-771229c04440', '2ae99c3f-dd93-5855-8289-65bdf7f5778f', 'contar um segredo do grupo a alguém de fora', 'caos', true, false, NULL, NULL),
+  ('cc068747-ae17-5adc-8bfb-8b385f5ebba2', '2ae99c3f-dd93-5855-8289-65bdf7f5778f', 'desaparecer quando alguém precisa mesmo', 'caos', true, false, NULL, NULL),
+  ('7047fcb0-43db-5045-82cf-e380ae4c0081', '2ae99c3f-dd93-5855-8289-65bdf7f5778f', 'começar um boato sem querer', 'caos', true, false, NULL, NULL),
+  ('0a190844-7d3a-5747-89b0-78a9e18aea4f', '2ae99c3f-dd93-5855-8289-65bdf7f5778f', 'ficar calado perante uma injustiça', 'caos', true, false, NULL, NULL),
+  ('7c9a4bc8-5c4f-5c20-8150-f5d0ba411fe5', '2ae99c3f-dd93-5855-8289-65bdf7f5778f', 'guardar rancor por uma coisa pequena', 'caos', true, false, NULL, NULL),
+  ('82cae382-7b0f-5df0-84e5-06ab1ea41d29', '2ae99c3f-dd93-5855-8289-65bdf7f5778f', 'escolher outro grupo de amigos se pudesse', 'caos', true, false, NULL, NULL),
+  ('f5dc74a5-b766-55cb-8334-4bd42f79a474', '2ae99c3f-dd93-5855-8289-65bdf7f5778f', 'ser o motivo do próximo mal-entendido', 'caos', true, false, NULL, NULL),
+  ('a494e750-12c8-51ce-82c8-2a49e0cfcf50', '2ae99c3f-dd93-5855-8289-65bdf7f5778f', 'deixar a conversa em visto durante três dias', 'picante', true, false, NULL, NULL),
+  ('e686fc8b-0a59-5d32-8bcf-834dd6ff937d', '2ae99c3f-dd93-5855-8289-65bdf7f5778f', 'aceitar um plano só para não ficar mal', 'picante', true, false, NULL, NULL),
+  ('e0c8c7cf-600a-536e-80d8-e26090fd9073', '2ae99c3f-dd93-5855-8289-65bdf7f5778f', 'contar a mesma história a toda a gente da festa', 'picante', true, false, NULL, NULL),
+  ('f7ed24a2-4512-517e-88de-4bdc233b762c', '2ae99c3f-dd93-5855-8289-65bdf7f5778f', 'acabar a noite a fazer planos que nunca vai cumprir', 'picante', true, false, NULL, NULL)
 ON CONFLICT (game_type_id, text) DO UPDATE SET
   intensity = EXCLUDED.intensity, active = true, buddy = EXCLUDED.buddy,
   duration = EXCLUDED.duration, tag = EXCLUDED.tag;
 
--- Termómetro (25)
+-- Termómetro (48)
 INSERT INTO prompts (id, game_type_id, text, intensity, active, buddy, duration, tag) VALUES
   ('17e92320-7fc6-5c08-8765-ebf68b3c3258', '15a6c9e2-8ef7-51b9-8937-2997667586bb', 'Quão bêbado/a estás agora? (0 = sóbrio, 10 = não sabes o teu nome)', 'leve', true, false, NULL, NULL),
   ('105f3bbc-25b1-5dda-8e01-1416ca72e8b4', '15a6c9e2-8ef7-51b9-8937-2997667586bb', 'Quão bom/boa és a cantar? (0 = terrível, 10 = profissional)', 'leve', true, false, NULL, NULL),
@@ -433,12 +617,35 @@ INSERT INTO prompts (id, game_type_id, text, intensity, active, buddy, duration,
   ('4feca26e-9306-5239-854d-ae5c883957f6', '15a6c9e2-8ef7-51b9-8937-2997667586bb', 'Quão fiável és quando alguém precisa mesmo de ti?', 'caos', true, false, NULL, NULL),
   ('af8cf13b-88d9-585c-810f-486962af220c', '15a6c9e2-8ef7-51b9-8937-2997667586bb', 'Quão memorável tem sido esta festa até agora?', 'leve', true, false, NULL, 'aniversario'),
   ('50923210-fe93-52d9-854e-2d8ac272ad2a', '15a6c9e2-8ef7-51b9-8937-2997667586bb', 'Quão descontrolada vai acabar esta despedida?', 'picante', true, false, NULL, 'despedida'),
-  ('59bb7f78-0428-5488-8d01-9f2f33998db3', '15a6c9e2-8ef7-51b9-8937-2997667586bb', 'Quão diferente estás desde a última vez que se viram?', 'leve', true, false, NULL, 'reencontro')
+  ('59bb7f78-0428-5488-8d01-9f2f33998db3', '15a6c9e2-8ef7-51b9-8937-2997667586bb', 'Quão diferente estás desde a última vez que se viram?', 'leve', true, false, NULL, 'reencontro'),
+  ('cd2e172b-f388-5fbb-8bbb-ac04483e25b5', '15a6c9e2-8ef7-51b9-8937-2997667586bb', 'Quão longe irias por alguém que acabaste de conhecer?', 'hardcore', true, false, NULL, NULL),
+  ('cb0e9446-c644-5a83-895e-4a46846071a1', '15a6c9e2-8ef7-51b9-8937-2997667586bb', 'Quão escandalosas são as conversas que já apagaste?', 'hardcore', true, false, NULL, NULL),
+  ('2e2f0dda-fa81-5852-8f70-cb72279da010', '15a6c9e2-8ef7-51b9-8937-2997667586bb', 'Quão perto estás de fazer uma loucura esta noite?', 'hardcore', true, false, NULL, NULL),
+  ('ae389cfa-4c6d-575c-881d-eb7d123ba2b9', '15a6c9e2-8ef7-51b9-8937-2997667586bb', 'Quão diferente és quando ninguém deste grupo está a ver?', 'hardcore', true, false, NULL, NULL),
+  ('b7737ad9-5f48-5062-81be-8d7f53901c5f', '15a6c9e2-8ef7-51b9-8937-2997667586bb', 'Quão bem esconderias um segredo grande?', 'hardcore', true, false, NULL, NULL),
+  ('32e9039b-ac73-5387-85c3-44950905beb9', '15a6c9e2-8ef7-51b9-8937-2997667586bb', 'Quão à vontade estarias a passar o telemóvel desbloqueado?', 'hardcore', true, false, NULL, NULL),
+  ('05a8943b-1143-5ab3-82ea-52af89bf2ec1', '15a6c9e2-8ef7-51b9-8937-2997667586bb', 'Quão arrependido/a estás da tua última decisão amorosa?', 'hardcore', true, false, NULL, NULL),
+  ('0e7edeb4-a39f-51d9-873b-b695137db0f2', '15a6c9e2-8ef7-51b9-8937-2997667586bb', 'Quão impulsivo/a ficas depois da meia-noite?', 'hardcore', true, false, NULL, NULL),
+  ('d94e49af-53e5-54b7-8ff7-0ccb01b24cf0', '15a6c9e2-8ef7-51b9-8937-2997667586bb', 'Quão sincero/a foste com este grupo este ano?', 'caos', true, false, NULL, NULL),
+  ('1655a670-6288-5eae-8565-77495412d6f4', '15a6c9e2-8ef7-51b9-8937-2997667586bb', 'Quão perto estiveste de cortar com alguém desta mesa?', 'caos', true, false, NULL, NULL),
+  ('46000adc-4e80-5c85-85f1-64703a08c90f', '15a6c9e2-8ef7-51b9-8937-2997667586bb', 'Quão justo/a achas que este grupo é contigo?', 'caos', true, false, NULL, NULL),
+  ('e200dd1b-e353-5317-84d9-946970a9c313', '15a6c9e2-8ef7-51b9-8937-2997667586bb', 'Quão substituível te sentes neste grupo?', 'caos', true, false, NULL, NULL),
+  ('51d03928-2e22-597e-8623-f375c64db357', '15a6c9e2-8ef7-51b9-8937-2997667586bb', 'Quão bem achas que te conhecem aqui?', 'caos', true, false, NULL, NULL),
+  ('b4665bfa-e6b1-56da-8c9b-1e54fa96344c', '15a6c9e2-8ef7-51b9-8937-2997667586bb', 'Quão difícil te seria pedir desculpa a alguém desta mesa?', 'caos', true, false, NULL, NULL),
+  ('86590e57-a3c8-5779-8d9c-8723e2f0e221', '15a6c9e2-8ef7-51b9-8937-2997667586bb', 'Quão magoado/a ainda estás com uma coisa antiga?', 'caos', true, false, NULL, NULL),
+  ('52fff4a4-8494-540d-8f6e-0584742c72b8', '15a6c9e2-8ef7-51b9-8937-2997667586bb', 'Quão dependente és da opinião desta mesa?', 'caos', true, false, NULL, NULL),
+  ('ef9ea781-de16-5f74-84bb-e46339e688e5', '15a6c9e2-8ef7-51b9-8937-2997667586bb', 'Quão bem guardas uma surpresa?', 'leve', true, false, NULL, NULL),
+  ('1b68b0cc-b5f4-5030-8ffe-72673b242cf0', '15a6c9e2-8ef7-51b9-8937-2997667586bb', 'Quão teimoso/a és quando tens razão?', 'leve', true, false, NULL, NULL),
+  ('abbb82ef-6ea2-5a95-8498-e3feaa4a3341', '15a6c9e2-8ef7-51b9-8937-2997667586bb', 'Quão à vontade ficas a dançar em público?', 'picante', true, false, NULL, NULL),
+  ('364c395d-5feb-5ed0-817b-455465ed7989', '15a6c9e2-8ef7-51b9-8937-2997667586bb', 'Quão rápido perdoas uma pessoa de quem gostas?', 'picante', true, false, NULL, NULL),
+  ('e50463e6-39d0-528a-8443-9185d9d660eb', '15a6c9e2-8ef7-51b9-8937-2997667586bb', 'Quão sincero/a costumas ser num primeiro encontro?', 'picante', true, false, NULL, NULL),
+  ('87750623-95bd-59f2-8c2d-6c11b88931c3', '15a6c9e2-8ef7-51b9-8937-2997667586bb', 'Quão saudoso/a ficas de relações antigas?', 'picante', true, false, NULL, NULL),
+  ('4d1e6b0f-5516-51fe-8bb3-e490d5786326', '15a6c9e2-8ef7-51b9-8937-2997667586bb', 'Quão fácil é convencer-te a ficar mais uma hora?', 'picante', true, false, NULL, NULL)
 ON CONFLICT (game_type_id, text) DO UPDATE SET
   intensity = EXCLUDED.intensity, active = true, buddy = EXCLUDED.buddy,
   duration = EXCLUDED.duration, tag = EXCLUDED.tag;
 
--- Desenha (30)
+-- Desenha (50)
 INSERT INTO prompts (id, game_type_id, text, intensity, active, buddy, duration, tag) VALUES
   ('84ef50e1-b271-59b8-84b2-1fcdc987f43c', '1534967b-23af-55ec-8f81-b16cbfc4c026', 'Ressaca', 'leve', true, false, NULL, NULL),
   ('e26a8ed2-9040-598a-82c2-eee0cc52c094', '1534967b-23af-55ec-8f81-b16cbfc4c026', 'Pastel de nata', 'leve', true, false, NULL, NULL),
@@ -469,7 +676,27 @@ INSERT INTO prompts (id, game_type_id, text, intensity, active, buddy, duration,
   ('d54991fd-fb14-5ca5-82ff-68912293dedb', '1534967b-23af-55ec-8f81-b16cbfc4c026', 'Traição descoberta', 'caos', true, false, NULL, NULL),
   ('fef9d6d0-8c87-5862-864f-616d2b11653b', '1534967b-23af-55ec-8f81-b16cbfc4c026', 'Grupo de WhatsApp em chamas', 'caos', true, false, NULL, NULL),
   ('0eedbf02-eb16-5210-838f-e21103128319', '1534967b-23af-55ec-8f81-b16cbfc4c026', 'Bloquear alguém nas redes', 'caos', true, false, NULL, NULL),
-  ('17ec96d9-6493-574f-82b8-22f79974f5c9', '1534967b-23af-55ec-8f81-b16cbfc4c026', 'Amizade desfeita', 'caos', true, false, NULL, NULL)
+  ('17ec96d9-6493-574f-82b8-22f79974f5c9', '1534967b-23af-55ec-8f81-b16cbfc4c026', 'Amizade desfeita', 'caos', true, false, NULL, NULL),
+  ('81e8990d-f7b2-5c9c-84e5-45cbc9f4b060', '1534967b-23af-55ec-8f81-b16cbfc4c026', 'Sair às escondidas', 'hardcore', true, false, NULL, NULL),
+  ('9d7f2d4e-5a90-553a-8789-35b3f84f1cad', '1534967b-23af-55ec-8f81-b16cbfc4c026', 'Telemóvel a tocar às 3 da manhã', 'hardcore', true, false, NULL, NULL),
+  ('c0d3bb8d-0231-5365-815f-90e99046ce3c', '1534967b-23af-55ec-8f81-b16cbfc4c026', 'Encontro às escuras', 'hardcore', true, false, NULL, NULL),
+  ('d0590a68-8a89-5e50-822b-9a09b668c545', '1534967b-23af-55ec-8f81-b16cbfc4c026', 'Roupa no chão do quarto', 'hardcore', true, false, NULL, NULL),
+  ('1f8d2de4-04b3-5fe3-8016-f21280acaccc', '1534967b-23af-55ec-8f81-b16cbfc4c026', 'Fuga pela janela', 'hardcore', true, false, NULL, NULL),
+  ('0bb77b0a-d68a-5a33-8554-5191ad6971cf', '1534967b-23af-55ec-8f81-b16cbfc4c026', 'Ressaca no trabalho', 'hardcore', true, false, NULL, NULL),
+  ('7a7265b6-0457-5e7f-89e3-1122454a73ce', '1534967b-23af-55ec-8f81-b16cbfc4c026', 'Dançar em cima do balcão', 'hardcore', true, false, NULL, NULL),
+  ('46a1ee84-edf4-5293-809c-536c246a1c98', '1534967b-23af-55ec-8f81-b16cbfc4c026', 'Beijo apanhado numa foto', 'hardcore', true, false, NULL, NULL),
+  ('18e0cd44-afcf-5e75-8363-5d48395a09ca', '1534967b-23af-55ec-8f81-b16cbfc4c026', 'Grupo a discutir', 'caos', true, false, NULL, NULL),
+  ('93f14e49-96d4-5977-8f7c-7d18ebd0223f', '1534967b-23af-55ec-8f81-b16cbfc4c026', 'Mensagem lida sem resposta', 'caos', true, false, NULL, NULL),
+  ('f9bc4714-7a62-50d1-8cbe-c4f465df79cb', '1534967b-23af-55ec-8f81-b16cbfc4c026', 'Boato a espalhar-se', 'caos', true, false, NULL, NULL),
+  ('4f4b0771-100e-5c70-8628-52faa6a0b075', '1534967b-23af-55ec-8f81-b16cbfc4c026', 'Amigo a virar as costas', 'caos', true, false, NULL, NULL),
+  ('a6951319-ea88-50be-82ac-f12914d704d9', '1534967b-23af-55ec-8f81-b16cbfc4c026', 'Pedido de desculpa mal dado', 'caos', true, false, NULL, NULL),
+  ('2b2951d5-132b-574d-8577-641f06eb358f', '1534967b-23af-55ec-8f81-b16cbfc4c026', 'Segredo a escapar', 'caos', true, false, NULL, NULL),
+  ('67c28061-db76-5d7d-8789-8556331ac2e8', '1534967b-23af-55ec-8f81-b16cbfc4c026', 'Escolher entre dois amigos', 'caos', true, false, NULL, NULL),
+  ('d483d27e-fd4a-5bb0-8741-c4fd8214cdae', '1534967b-23af-55ec-8f81-b16cbfc4c026', 'Festa que acabou mal', 'caos', true, false, NULL, NULL),
+  ('28636134-6100-5152-8d8a-e9a85b4521fc', '1534967b-23af-55ec-8f81-b16cbfc4c026', 'Corrida para apanhar o metro', 'picante', true, false, NULL, NULL),
+  ('026e99ac-a2ca-5ea4-8fa6-def8047c3c04', '1534967b-23af-55ec-8f81-b16cbfc4c026', 'Selfie que corre mal', 'picante', true, false, NULL, NULL),
+  ('96c2098f-71f7-5210-84bf-bd31f45b4fa5', '1534967b-23af-55ec-8f81-b16cbfc4c026', 'Jantar entre dois que não se falam', 'picante', true, false, NULL, NULL),
+  ('e7a398c5-af0f-592c-803c-9557394c2c17', '1534967b-23af-55ec-8f81-b16cbfc4c026', 'Telemóvel sem bateria', 'picante', true, false, NULL, NULL)
 ON CONFLICT (game_type_id, text) DO UPDATE SET
   intensity = EXCLUDED.intensity, active = true, buddy = EXCLUDED.buddy,
   duration = EXCLUDED.duration, tag = EXCLUDED.tag;
@@ -482,6 +709,6 @@ ON CONFLICT (game_type_id, text) DO UPDATE SET
 
 COMMIT;
 
--- Conferência rápida (deve dar 18 e 360):
+-- Conferência rápida (deve dar 18 e 587):
 --   SELECT count(*) FROM game_types;
 --   SELECT count(*) FROM prompts;

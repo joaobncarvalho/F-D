@@ -14,6 +14,7 @@ import Display from './pages/Display.jsx';
 import Settings from './components/Settings.jsx';
 import Rules from './components/Rules.jsx';
 import { keepScreenAwake, loadA11y, applyA11y, registerServiceWorker, rememberRoom } from './device.js';
+import { aplicaHumor, humorDaSala } from './mood.js';
 import { setPaused } from './clock.js';
 
 const SESSION_KEY = 'fd_session';
@@ -110,12 +111,25 @@ export default function App() {
     setPaused(!!room?.paused);
   }, [room?.paused]);
 
+  // O humor da noite. A intensidade em vigor já vem no estado da sala (a curva
+  // é calculada no servidor); daqui vai para o <html> e o CSS muda a app toda —
+  // fundo, velocidade, vinheta, halo das cartas. Um sítio só, três modos
+  // servidos. Ao sair da sala volta ao princípio: o ecrã inicial é sempre calmo.
+  const humor = room ? humorDaSala(room) : 'leve';
   useEffect(() => {
-    function onRoomJoined({ room, you }) {
+    aplicaHumor(humor);
+  }, [humor]);
+
+  useEffect(() => {
+    function onRoomJoined({ room, you, token }) {
       setRoom(room);
       setYouId(you);
       setError(null);
-      saveSession({ code: room.code, playerId: you });
+      // O token é a prova de identidade para religar (o playerId sozinho não
+      // chega: esse vai no estado da sala, à vista de todos). Guarda-se o que
+      // veio agora; num religar o servidor não o reenvia, por isso mantém-se o
+      // que já lá estava.
+      saveSession({ code: room.code, playerId: you, token: token || sessionRef.current?.token });
       rememberRoom(room.code); // "voltar a jogar" no ecrã inicial
       // Religar a meio: cada modo tem o seu ecrã (senão o Tabuleiro/Torneio caíam no da Roda).
       const playingScreen = room.mode === 'board' ? 'board' : room.mode === 'tournament' ? 'tournament' : 'game';
@@ -225,6 +239,7 @@ export default function App() {
         socket.emit('rejoin_room', {
           code: sessionRef.current.code,
           playerId: sessionRef.current.playerId,
+          token: sessionRef.current.token,
         });
       }
     }

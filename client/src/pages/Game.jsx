@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Wheel from '../components/Wheel.jsx';
+import Beat from '../components/Beat.jsx';
 import BrokenScreen from '../components/BrokenScreen.jsx';
 import { TYPES } from './games/shared.jsx';
 import { PromptCard, ChoiceCard, IntrigasCard } from './games/cards.jsx';
@@ -85,7 +86,7 @@ export default function Game(props) {
     function onResult({ effect }) {
       setFlash({ ...effect, nonce: Math.random() });
       clearTimeout(flashTimer.current);
-      flashTimer.current = setTimeout(() => setFlash(null), 1500);
+      flashTimer.current = setTimeout(() => setFlash(null), 1250);
       if (effect.type === 'vida_perdida') {
         sfx.drink();
         haptic([40, 30]);
@@ -94,7 +95,7 @@ export default function Game(props) {
         haptic([60, 40, 60]);
       } else if (effect.type === 'vida_extra') {
         sfx.win();
-        confetti({ count: 60, power: 12 });
+        confetti({ count: 70, power: 13 });
         haptic([30, 40, 30]);
       } else if (effect.type === 'eliminated') {
         sfx.shot();
@@ -110,12 +111,13 @@ export default function Game(props) {
     };
   }, []);
 
-  // Som ao girar a roda (para todos).
+  // O som e a vibração da roda passaram a viver DENTRO da Wheel: os tiques têm
+  // de estar sincronizados com a rotação real, e o arranque tem de soar depois
+  // do recuo, não quando a ronda chega do servidor. Aqui só se marca a ronda
+  // como já anunciada, para o efeito não disparar duas vezes.
   useEffect(() => {
     if (round && SPIN_PHASES.includes(g?.phase) && spunRef.current !== round.id) {
       spunRef.current = round.id;
-      sfx.spin();
-      haptic(20);
     }
   }, [round?.id, g?.phase]);
 
@@ -438,7 +440,7 @@ export default function Game(props) {
         </div>
       )}
 
-      <AnimatePresence>{flash && <FlashOverlay key={flash.nonce} effect={flash} />}</AnimatePresence>
+      <AnimatePresence>{flash && <Beat key={flash.nonce} effect={flash} />}</AnimatePresence>
       {you?.eliminated && <BrokenScreen />}
     </motion.div>
   );
@@ -624,33 +626,6 @@ function PlayersStrip({ room, youId, currentId }) {
         </div>
       ))}
     </div>
-  );
-}
-
-function FlashOverlay({ effect }) {
-  const map = {
-    accepted: { text: '🎉 Passou!', color: 'text-emerald-300' },
-    vida_perdida: { text: '🍺 -1 vida!', color: 'text-rose-300' },
-    shot: { text: '🥃 SHOT!', color: 'text-amber-300' },
-    vida_extra: { text: '💚 +1 vida!', color: 'text-emerald-300' },
-    eliminated: { text: '💀 Sem vidas!', color: 'text-rose-400' },
-  };
-  const f = map[effect.type] || { text: '', color: '' };
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: -20, scale: 0.7 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      exit={{ opacity: 0, y: -14, scale: 0.9 }}
-      transition={{ type: 'spring', stiffness: 300, damping: 20 }}
-      className="fixed inset-x-0 top-[12vh] flex justify-center pointer-events-none z-50 px-4"
-    >
-      <span
-        className={`fd-title text-4xl sm:text-5xl font-extrabold ${f.color} drop-shadow-lg text-center`}
-        style={{ textShadow: '0 2px 18px rgba(0,0,0,0.7)' }}
-      >
-        {f.text}
-      </span>
-    </motion.div>
   );
 }
 

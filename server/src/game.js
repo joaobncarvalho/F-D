@@ -122,20 +122,77 @@ function pickQuestion(game, targetId) {
   return { text: q.text };
 }
 
-// Piramide (Desconfia): o motor vive em ./game/piramide.js. Aqui fica só a
-// fração-alvo da roda (é um mini-jogo longo → sai menos vezes).
+/**
+ * Perfil de cada tipo na roda. Duas colunas, duas razões diferentes:
+ *
+ *   min  — nº MÍNIMO de jogadores ativos para o tipo fazer sentido. O Vasco com
+ *          3 pessoas é uma acusação a dois; o Duelo com 3 deixa um a olhar. Um
+ *          tipo abaixo do mínimo nem entra no sorteio.
+ *   peso — RITMO da noite. Nem todos os tipos custam o mesmo tempo: a Pirâmide,
+ *          o Vasco e o Desenha são de 5+ minutos e cansam se saírem seguidos;
+ *          os curtos (desafio, eu nunca) aguentam sair muitas vezes. Peso alto
+ *          = sai mais vezes. É aqui — e só aqui — que se afina a cadência.
+ *
+ * Um tipo que não esteja nesta tabela (conteúdo novo vindo da BD) entra com o
+ * perfil neutro DEFAULT_PROFILE: nunca fica de fora por esquecimento.
+ */
+const TYPE_PROFILE = {
+  desafio: { min: 2, peso: 12 },
+  boca_calada: { min: 2, peso: 10 },
+  eu_nunca: { min: 2, peso: 10 },
+  isto_ou_aquilo: { min: 2, peso: 8 },
+  termometro: { min: 2, peso: 7 },
+  mais_provavel: { min: 3, peso: 8 },
+  reacao: { min: 3, peso: 8 },
+  quem_disse: { min: 3, peso: 7 },
+  cascata: { min: 3, peso: 6 },
+  intrigas: { min: 3, peso: 6 },
+  segredos: { min: 3, peso: 6 },
+  roleta_russa: { min: 2, peso: 6 },
+  categoria_relampago: { min: 2, peso: 6 },
+  mimica: { min: 3, peso: 5 },
+  duelo: { min: 3, peso: 5 },
+  desenho: { min: 3, peso: 4 },
+  vasco: { min: 4, peso: 3 },
+  piramide: { min: 3, peso: 3 },
+};
+const DEFAULT_PROFILE = { min: 2, peso: 6 };
+// Quantos tipos recentes se evitam. Com sorteio uniforme entre 18 tipos, o mesmo
+// saía outra vez dentro de 3 voltas em ~1 de cada 6 rondas — e a mesa nota.
+const EVITAR_RECENTES = 2;
 
-// A Piramide é um mini-jogo longo → sai menos vezes. Fica com uma fração-alvo
-// fixa da roda; o resto (90%) é distribuído POR IGUAL pelos outros tipos, seja
-// qual for o número deles. Afina-se só aqui.
-const PIRAMIDE_SHARE = 0.1; // ≈ 10% das voltas
+const perfil = (key) => TYPE_PROFILE[key] || DEFAULT_PROFILE;
 
-export function pickWeightedType(types) {
-  const piramide = types.find((t) => t.key === 'piramide');
-  const others = types.filter((t) => t.key !== 'piramide');
-  if (!others.length) return piramide || types[0];
-  if (piramide && Math.random() < PIRAMIDE_SHARE) return piramide;
-  return others[Math.floor(Math.random() * others.length)];
+/**
+ * Escolhe o tipo da próxima volta.
+ *
+ * @param types    tipos disponíveis (repo.getGameTypes)
+ * @param opts.jogadores  nº de jogadores ATIVOS (ligados e não eliminados)
+ * @param opts.recentes   chaves das últimas voltas (mais recente primeiro)
+ *
+ * A ordem dos filtros importa: primeiro corta-se o que não SERVE (poucos
+ * jogadores), depois o que ABORRECE (acabou de sair). O segundo filtro é
+ * dispensável — se ao evitar os recentes ficasse quase nada, prefere-se repetir
+ * um tipo a estreitar a roda a duas opções.
+ */
+export function pickWeightedType(types, { jogadores = 99, recentes = [] } = {}) {
+  if (!types?.length) return null;
+
+  const cabem = types.filter((t) => jogadores >= perfil(t.key).min);
+  // Mesa muito pequena (2 pessoas): fica o que houver, nem que seja tudo.
+  let pool = cabem.length ? cabem : types;
+
+  const evitar = new Set(recentes.slice(0, EVITAR_RECENTES));
+  const frescos = pool.filter((t) => !evitar.has(t.key));
+  if (frescos.length >= 3) pool = frescos;
+
+  const total = pool.reduce((soma, t) => soma + perfil(t.key).peso, 0);
+  let bilhete = Math.random() * total;
+  for (const t of pool) {
+    bilhete -= perfil(t.key).peso;
+    if (bilhete <= 0) return t;
+  }
+  return pool[pool.length - 1];
 }
 
 /**
@@ -175,6 +232,7 @@ export function initGame(room, { lives = DEFAULT_LIVES, intensity = 'leve', curv
     secrets: [], // { id, authorPlayerId, text, used }
     round: null,
     roundCount: 0,
+    recentTypes: [], // últimos tipos que saíram na roda (anti-repetição)
     currentPlayerId: null,
     stats: {},
     activeRules: [], // regras com duração: { id, playerId, playerName, text, remaining }
@@ -229,7 +287,12 @@ export async function spinWheel(room, playerId) {
 
   const player = room.players.get(playerId);
   const types = await repo.getGameTypes();
-  const gt = pickWeightedType(types);
+  const gt = pickWeightedType(types, {
+    jogadores: connectedOrder(room).length,
+    recentes: g.recentTypes || [],
+  });
+  if (!gt) throw new AppError('Não há tipos de jogo disponíveis.');
+  g.recentTypes = [gt.key, ...(g.recentTypes || [])].slice(0, 4);
   const inten = effectiveIntensity(g); // curva: leve no aquecimento, sobe até ao teto votado
 
   const round = {
@@ -514,6 +577,26 @@ export function endGame(room, playerId) {
   room.game.finalStats = stats;
   room.status = 'ended';
   return stats;
+}
+
+/**
+ * Alguém entrou com o jogo a decorrer (ver rooms.joinRoom).
+ *
+ * A Roda não precisa de lugar marcado: a vez roda por `connectedOrder`, e quem
+ * chega já lá está. Só há duas coisas a acertar — as vidas, que têm de ser as
+ * MESMAS com que a mesa começou (senão quem chega tarde joga com outra regra), e
+ * o aviso no feed, para ninguém levar um susto com um nome novo no ecrã.
+ *
+ * As perguntas dirigidas (Boca Calada) não existem para quem chegou tarde —
+ * `pickQuestion` já cai para o banco de prompts nesse caso.
+ */
+export function addLatecomer(room, player) {
+  const g = room.game;
+  if (!g) return;
+  player.lives = g.startingLives ?? DEFAULT_LIVES;
+  player.eliminated = false;
+  pushFeed(room, '👋', `${player.name} entrou a meio do jogo`);
+  if (!g.currentPlayerId) advanceTurn(room); // mesa estava vazia → é a vez dele
 }
 
 export function resetToLobby(room, playerId) {

@@ -8,6 +8,7 @@ import Coin from '../../components/Coin.jsx';
 import { sfx } from '../../sfx.js';
 import Timer from '../../components/Timer.jsx';
 import { CardShell } from './shared.jsx';
+import { MOLA } from '../../motion.js';
 
 function ContinueButton({ show, onContinue }) {
   if (!show) return null;
@@ -31,7 +32,7 @@ export function RelampagoCard({ round, youId, canControl, onStart, onResolve, on
       <motion.p
         initial={{ scale: 0.85, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
-        transition={{ type: 'spring', stiffness: 260, damping: 16 }}
+        transition={MOLA.salto}
         className="text-2xl font-extrabold leading-tight text-amber-300"
       >
         ⚡ {round.category}

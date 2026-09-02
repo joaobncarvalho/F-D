@@ -1,10 +1,14 @@
 // F&D — Showroom de mini-jogos/eventos. Renderiza os COMPONENTES REAIS (Board e os
 // cartões da roda) com dados fictícios, para confirmar o aspeto sem começar um jogo.
 // Acede-se via ?demo na app; embebido na dashboard /admin.
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { AnimatePresence } from 'framer-motion';
 import Board from './Board.jsx';
 import { PromptCard, ChoiceCard, IntrigasCard } from './games/cards.jsx';
 import { RelampagoCard, MimicaCard, RoletaCard, DueloCard } from './games/quickCards.jsx';
+import Beat from '../components/Beat.jsx';
+import { aplicaHumor, humorAtual, NIVEIS } from '../mood.js';
+import { confetti } from '../confetti.js';
 
 const PAWNS = ['🦊', '🐸', '🐵', '🦄', '🐙', '🐝', '🦁', '🐨', '🐼', '🐷', '🐧', '🐢', '🐔', '🦖'];
 const CARD_META = {
@@ -167,9 +171,94 @@ const SCENARIOS = [
   },
 ];
 
+/**
+ * Palco do ambiente: humor da noite + batidas de reveal.
+ *
+ * Estas duas coisas são as únicas da app que NÃO se conseguem ver a pedido — o
+ * humor só sobe ao fim de meia hora de jogo e uma batida obriga a perder uma
+ * vida a sério. Sem isto, afinar as cores do Caos significava jogar meia hora de
+ * cada vez que se mexia num valor. Aqui vê-se tudo em dois toques.
+ *
+ * Ao sair volta a pôr o humor onde estava: o showroom não pode deixar a app
+ * pintada de Caos.
+ */
+function PalcoAmbiente({ onBack }) {
+  const [humor, setHumor] = useState(humorAtual());
+  const [batida, setBatida] = useState(null);
+
+  useEffect(() => {
+    const anterior = humorAtual();
+    return () => aplicaHumor(anterior);
+  }, []);
+
+  function mudaHumor(nivel) {
+    aplicaHumor(nivel);
+    setHumor(nivel);
+  }
+
+  function dispara(type, name) {
+    setBatida({ type, name, nonce: Math.random() });
+    if (type === 'vida_extra') confetti({ count: 70, power: 13 });
+    setTimeout(() => setBatida(null), 1250);
+  }
+
+  const BATIDAS = [
+    ['accepted', '✅ Passou'],
+    ['vida_perdida', '💔 -1 vida'],
+    ['shot', '🥃 Shot'],
+    ['vida_extra', '❤️ +1 vida'],
+    ['eliminated', '💀 Eliminado'],
+  ];
+  const ROTULOS = { leve: '🍃 Leve', picante: '🌶️ Picante', hardcore: '🔥 Hardcore', caos: '💥 Caos' };
+
+  return (
+    <div className="min-h-full mx-auto max-w-md px-5 py-6 flex flex-col gap-4">
+      <button onClick={onBack} className="text-sm text-white/50 self-start">← voltar aos demos</button>
+
+      <div className="fd-card p-4 flex flex-col gap-3">
+        <p className="text-sm font-bold">🌡️ Humor da noite</p>
+        <p className="text-xs text-white/50">
+          Muda o fundo, a velocidade dos halos, a vinheta e o brilho das cartas. Em jogo é
+          automático (sobe com a curva de intensidade).
+        </p>
+        <div className="grid grid-cols-2 gap-2">
+          {NIVEIS.map((n) => (
+            <button
+              key={n}
+              onClick={() => mudaHumor(n)}
+              className={`fd-chip ${humor === n ? 'fd-chip-on' : ''}`}
+            >
+              {ROTULOS[n]}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="fd-card p-4 flex flex-col gap-3">
+        <p className="text-sm font-bold">💥 Batidas</p>
+        <p className="text-xs text-white/50">
+          O abanão do ecrã só existe do Hardcore para cima — experimenta a mesma batida em
+          Leve e em Caos.
+        </p>
+        <div className="grid grid-cols-2 gap-2">
+          {BATIDAS.map(([type, rotulo]) => (
+            <button key={type} onClick={() => dispara(type, 'Bea')} className="fd-chip">
+              {rotulo}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <AnimatePresence>{batida && <Beat key={batida.nonce} effect={batida} />}</AnimatePresence>
+    </div>
+  );
+}
+
 export default function Demo() {
   const [sel, setSel] = useState(null);
   const back = () => setSel(null);
+
+  if (sel?.kind === 'ambiente') return <PalcoAmbiente onBack={back} />;
 
   if (sel?.kind === 'board') {
     return <div className="min-h-full mx-auto max-w-md px-5 py-6 flex flex-col relative">{sel.render(back)}</div>;
@@ -185,12 +274,19 @@ export default function Demo() {
   }
 
   const groups = [...new Set(SCENARIOS.map((s) => s.group))];
+  const ambiente = { id: 'ambiente', kind: 'ambiente', label: '🌡️ Humor da noite + batidas' };
   return (
     <div className="min-h-full mx-auto max-w-md px-5 py-6 flex flex-col gap-5">
       <header className="text-center">
         <h1 className="fd-title fd-neon text-2xl font-extrabold">🎮 F&D · Demos</h1>
         <p className="text-xs text-white/45 mt-1">Pré-visualização dos mini-jogos e eventos (dados fictícios).</p>
       </header>
+      <div className="flex flex-col gap-2">
+        <p className="text-[11px] uppercase tracking-widest text-white/40 px-1">✨ Ambiente</p>
+        <button onClick={() => setSel(ambiente)} className="fd-card text-left px-4 py-3 text-sm">
+          {ambiente.label}
+        </button>
+      </div>
       {groups.map((g) => (
         <div key={g} className="flex flex-col gap-2">
           <p className="text-[11px] uppercase tracking-widest text-white/40 px-1">{g === 'Roda' ? '🎡 Roda' : '🎲 Tabuleiro'}</p>

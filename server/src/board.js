@@ -14,7 +14,7 @@
 // PRIVADAS: o broadcast só leva a contagem; a mão vai por canal privado.
 import * as repo from './repo.js';
 import { pickPrompt, resetBags } from './content/bag.js';
-import { clearFeed } from './feed.js';
+import { clearFeed, pushFeed } from './feed.js';
 import { AppError } from './errors.js';
 import { randomUUID } from 'node:crypto';
 import {
@@ -154,6 +154,35 @@ export async function initBoard(room, { intensity = 'leve' } = {}) {
     winnerId: null,
   };
   return room.board;
+}
+
+/**
+ * Alguém entrou com o Tabuleiro a decorrer (ver rooms.joinRoom).
+ *
+ * Onde é que o peão entra? Não na partida (com a corrida a meio ficava a jogar
+ * sozinho no início da noite) nem à frente (não se compra lugar chegando tarde):
+ * entra na casa de quem vai em ÚLTIMO. Fica com companhia, e quem lá já estava
+ * não perde nada.
+ */
+export function addLatecomer(room, player) {
+  const b = room.board;
+  if (!b || b.players[player.id]) return;
+  const posicoes = Object.values(b.players).filter((p) => !p.finished).map((p) => p.pos);
+  const usados = new Set(Object.values(b.players).map((p) => p.pawn).filter(Boolean));
+  const herdado = PAWNS.includes(player.emoji) && !usados.has(player.emoji) ? player.emoji : null;
+  b.players[player.id] = {
+    pawn: herdado || PAWNS.find((p) => !usados.has(p)) || null,
+    pos: posicoes.length ? Math.min(...posicoes) : 0,
+    golos: 0, slowStreak: 0, fastStreak: 0, skipTurns: 0,
+    finished: false, cards: [], shield: false,
+    allianceWith: null, allianceTurnsLeft: 0,
+    mirrorOf: null,
+    prisonCount: 0, cardsPlayed: 0,
+  };
+  // Joga a seguir a toda a gente: entrar na ordem à frente de quem já esperava
+  // a sua vez seria roubar-lhe a vez.
+  if (!b.order.includes(player.id)) b.order.push(player.id);
+  pushFeed(room, '👋', `${player.name} entrou a meio da corrida`);
 }
 
 export function pickPawn(room, playerId, pawn) {

@@ -29,3 +29,27 @@ export function throttled(socket, key, ms) {
   socket.data.throttle[key] = now;
   return false;
 }
+
+/**
+ * Limite por JANELA: deixa passar até `max` ações em cada `windowMs`, gastas à
+ * velocidade que o cliente quiser. Devolve `true` quando a ação deve ser
+ * ignorada.
+ *
+ * Porquê outro limitador: o `throttled` impõe um ESPAÇAMENTO mínimo, e há canais
+ * em que isso corta o que é legítimo. Os traços do desenho são o caso — o cliente
+ * já os junta em lotes de 12 pontos, e o lote final de um traço curto sai logo a
+ * seguir ao anterior. Com espaçamento mínimo esse lote desaparecia e o traço
+ * ficava truncado no ecrã dos outros. Aqui uma rajada passa inteira; só um fluxo
+ * sustentado (que já não é uma pessoa a desenhar) é travado.
+ */
+export function rateLimited(socket, key, max, windowMs) {
+  const now = Date.now();
+  socket.data.rates ||= {};
+  const bucket = (socket.data.rates[key] ||= { inicio: now, contagem: 0 });
+  if (now - bucket.inicio >= windowMs) {
+    bucket.inicio = now;
+    bucket.contagem = 0;
+  }
+  bucket.contagem += 1;
+  return bucket.contagem > max;
+}

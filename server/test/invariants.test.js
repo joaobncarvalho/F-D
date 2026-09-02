@@ -103,7 +103,9 @@ test('Piramide: as mãos dos jogadores nunca vão no broadcast', async () => {
 // ----- ANONIMATO: Jogo do Vasco (palavra e impostores privados) -------------
 
 test('Vasco: a palavra secreta e a identidade dos Vascos não vão no broadcast', async () => {
-  const { room, players } = makeRoom(['Ana', 'Rui', 'Zé']);
+  // Quatro jogadores porque o Vasco exige mesa (TYPE_PROFILE.vasco.min = 4): com
+  // três, a acusação é entre duas pessoas e o jogo não funciona.
+  const { room, players } = makeRoom(['Ana', 'Rui', 'Zé', 'Nel']);
   const [ana] = players;
   game.initGame(room, { lives: 3 });
   game.beginPlay(room, ana.id);

@@ -1,7 +1,7 @@
 import { RoomManager, serializeRoom, AppError } from './rooms.js';
 import * as game from './game.js';
 import * as board from './board.js';
-import { sanitizeText, throttled } from './util.js';
+import { sanitizeText, throttled, rateLimited } from './util.js';
 import { log } from './log.js';
 import * as bots from './bots.js';
 import * as tournament from './tournament.js';
@@ -65,11 +65,13 @@ export function registerSocketHandlers(io) {
 
     socket.on('create_room', ({ name } = {}, ack) => {
       try {
+        leavePreviousRoom(io, socket); // criar outra sala não pode deixar a anterior com um fantasma
         const { room, player } = rooms.createRoom(name);
         bindSocketToRoom(socket, room.code, player.id);
         respond(ack, socket, 'room_joined', {
           room: serializeRoom(room),
           you: player.id,
+          token: player.token, // prova de identidade para o rejoin — só para este socket
         });
         broadcastState(io, room.code);
       } catch (err) {
@@ -79,11 +81,20 @@ export function registerSocketHandlers(io) {
 
     socket.on('join_room', ({ code, name } = {}, ack) => {
       try {
-        const { room, player } = rooms.joinRoom(code, name);
+        leavePreviousRoom(io, socket);
+        const { room, player, latecomer } = rooms.joinRoom(code, name);
+        // Entrou com o jogo a decorrer → o modo dá-lhe lugar (vidas, peão, feed).
+        // O Torneio não entra aqui de propósito: o quadro já está sorteado, por
+        // isso quem chega assiste e APOSTA (que é o que mantém a mesa dentro).
+        if (latecomer) {
+          if (room.mode === 'board') board.addLatecomer(room, player);
+          else if (room.mode === 'wheel') game.addLatecomer(room, player);
+        }
         bindSocketToRoom(socket, room.code, player.id);
         respond(ack, socket, 'room_joined', {
           room: serializeRoom(room),
           you: player.id,
+          token: player.token,
         });
         broadcastState(io, room.code);
       } catch (err) {
@@ -100,6 +111,7 @@ export function registerSocketHandlers(io) {
       try {
         const room = rooms.getRoom(code);
         if (!room) throw new AppError('Sala não encontrada.');
+        leavePreviousRoom(io, socket); // estava a jogar e passou a ecrã? larga o lugar
         socket.data.code = room.code;
         socket.data.playerId = null; // espectador: não é jogador
         socket.data.spectator = true;
@@ -112,9 +124,9 @@ export function registerSocketHandlers(io) {
       }
     });
 
-    socket.on('rejoin_room', ({ code, playerId } = {}, ack) => {
+    socket.on('rejoin_room', ({ code, playerId, token } = {}, ack) => {
       try {
-        const { room, player } = rooms.reconnect(code, playerId);
+        const { room, player } = rooms.reconnect(code, playerId, token);
         bindSocketToRoom(socket, room.code, player.id);
         if (room.mode === 'board' && room.board) board.boardOnReconnect(room); // devolve o turno se ficou sem dono
         respond(ack, socket, 'room_joined', {
@@ -248,7 +260,9 @@ export function registerSocketHandlers(io) {
         } else if (room.mode === 'tournament') {
           tournament.initTournament(room, { intensity: intensityResult.intensity }); // modo Torneio
         } else {
-          game.initGame(room, { lives, intensity: intensityResult.intensity }); // modo Roda
+          // `curve` vem do lobby (rooms.setCurve). Sem isto o motor ficava com o
+          // seu valor por omissão (ligada) e o interruptor do host não fazia nada.
+          game.initGame(room, { lives, intensity: intensityResult.intensity, curve: room.curve }); // modo Roda
         }
         io.to(code).emit('game_started', { mode: room.mode, intensityResult });
         broadcastState(io, code);
@@ -675,6 +689,14 @@ export function registerSocketHandlers(io) {
     // Traços do desenho: canal PRÓPRIO (dezenas de pontos por segundo não têm
     // nada que fazer no room_state). Só quem está a desenhar pode emitir.
     socket.on('draw_stroke', (stroke = {}) => {
+      // Único canal sem limite de frequência. O corte a 200 pontos limita o
+      // TAMANHO de cada lote, não o ritmo — sem isto um cliente manipulado (ou um
+      // telemóvel a 120 Hz) enchia a sala de pacotes. Limite por janela e não por
+      // espaçamento, de propósito: o cliente já junta os pontos em lotes de 12 e o
+      // último lote de um traço curto sai colado ao anterior — travá-lo cortava o
+      // desenho a meio. A desenhar a sério fazem-se ~5 lotes por segundo; 60 dá
+      // uma folga de dez vezes e continua a travar um fluxo absurdo.
+      if (rateLimited(socket, 'stroke', 60, 1000)) return;
       const room = rooms.getRoom(socket.data.code);
       const r = room?.game?.round;
       if (!r || r.gameTypeKey !== 'desenho' || r.substate !== 'drawing') return;
@@ -795,6 +817,35 @@ function requireRoom(socket) {
   const room = rooms.getRoom(socket.data.code);
   if (!room) throw new AppError('Sala não encontrada.');
   return room;
+}
+
+/**
+ * Larga a sala anterior antes de entrar noutra.
+ *
+ * Sem isto, um socket que criasse/entrasse numa segunda sala deixava na primeira
+ * um jogador eternamente `connected` — a sala nunca ficava "vazia", nunca era
+ * limpa (fica em memória para sempre) e a rotação de vezes continuava a contar
+ * com alguém que já lá não está. O `disconnect` só limpa a ÚLTIMA sala, porque é
+ * a única que o socket ainda conhece.
+ */
+function leavePreviousRoom(io, socket) {
+  const { code, playerId } = socket.data;
+  if (!code || !playerId) return;
+  try {
+    rooms.handleDisconnect(code, playerId);
+    const anterior = rooms.getRoom(code);
+    if (anterior) {
+      if (anterior.mode === 'board' && anterior.board) board.boardOnDisconnect(anterior, playerId);
+      if (anterior.tournament) tournament.tournamentOnDisconnect(anterior, playerId);
+      broadcastState(io, code);
+    }
+    socket.leave(code);
+    socket.leave(playerId);
+  } catch (err) {
+    log.error('erro ao largar a sala anterior', { code, playerId, message: err?.message });
+  }
+  socket.data.code = null;
+  socket.data.playerId = null;
 }
 
 function bindSocketToRoom(socket, code, playerId) {

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { sfx } from '../sfx.js';
 import { haptic } from '../confetti.js';
+import { MOLA, DUR } from '../motion.js';
 
 export default function Countdown({ onDone }) {
   const steps = ['3', '2', '1', 'BORA! 🍻'];
@@ -38,7 +39,7 @@ export default function Countdown({ onDone }) {
           initial={{ scale: 0.3, opacity: 0, rotate: -15 }}
           animate={{ scale: 1, opacity: 1, rotate: 0 }}
           exit={{ scale: 1.8, opacity: 0 }}
-          transition={{ type: 'spring', stiffness: 260, damping: 16, opacity: { duration: 0.35 } }}
+          transition={{ ...MOLA.salto, opacity: { duration: DUR.media } }}
           className="absolute inset-0 flex items-center justify-center fd-title fd-neon text-7xl font-extrabold text-pink-400 text-center"
         >
           {steps[Math.min(i, steps.length - 1)]}

@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import Wheel from './Wheel.jsx';
 import { sfx } from '../sfx.js';
 import { confetti, haptic } from '../confetti.js';
+import { MOLA } from '../motion.js';
 
 // Roleta que revela a intensidade decidida pela votação (empate → "randomizer").
 const SEGMENTS = [
@@ -22,14 +23,12 @@ export default function IntensityReveal({ result, onDone }) {
       const t = setTimeout(() => onDone?.(), 80);
       return () => clearTimeout(t);
     }
-    sfx.spin();
-    haptic(20);
+    // O som do arranque é da roda (toca depois do recuo) — aqui não se duplica.
   }, []);
 
   useEffect(() => {
     if (!landed) return;
-    sfx.reveal();
-    confetti({ count: 90, power: 14 });
+    confetti({ count: 110, power: 15 });
     haptic([30, 40, 30]);
     const t = setTimeout(() => onDone?.(), 1600);
     return () => clearTimeout(t);
@@ -53,7 +52,7 @@ export default function IntensityReveal({ result, onDone }) {
         <motion.p
           initial={{ scale: 0.5, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
-          transition={{ type: 'spring', stiffness: 300, damping: 16 }}
+          transition={MOLA.pop}
           className="fd-title fd-neon text-3xl font-extrabold text-center"
         >
           {LABELS[result.intensity] || result.intensity}!

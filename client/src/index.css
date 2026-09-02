@@ -7,6 +7,53 @@
   --fd-amber: #ffb020;
   --fd-teal: #1fd3b6;
   --fd-bg: #0b0b12;
+
+  /* --- Humor da noite (mood.js escreve data-fd-mood no <html>) -------------
+     Estas quatro variáveis são tudo o que separa as dez da noite das três da
+     manhã: as duas cores do fundo, a velocidade a que ele se mexe, o quanto
+     brilha e o aperto da vinheta. Quem quiser afinar o ambiente afina AQUI —
+     nenhum componente sabe que os humores existem. */
+  --fd-mood-a: var(--fd-teal);
+  --fd-mood-b: #3aa6ff;
+  --fd-mood-c: var(--fd-purple);
+  --fd-mood-d: #4ade80;
+  --fd-mood-tempo: 26s;
+  --fd-mood-brilho: 0.42;
+  --fd-mood-vinheta: 0;
+  --fd-mood-realce: var(--fd-teal);
+}
+
+:root[data-fd-mood='picante'] {
+  --fd-mood-a: var(--fd-amber);
+  --fd-mood-b: #ff7a00;
+  --fd-mood-c: var(--fd-pink);
+  --fd-mood-d: #ffd166;
+  --fd-mood-tempo: 19s;
+  --fd-mood-brilho: 0.5;
+  --fd-mood-vinheta: 0.12;
+  --fd-mood-realce: var(--fd-amber);
+}
+
+:root[data-fd-mood='hardcore'] {
+  --fd-mood-a: #ff4d6d;
+  --fd-mood-b: #ff3d8b;
+  --fd-mood-c: #ff8c42;
+  --fd-mood-d: #d61f5c;
+  --fd-mood-tempo: 13s;
+  --fd-mood-brilho: 0.6;
+  --fd-mood-vinheta: 0.26;
+  --fd-mood-realce: #ff4d6d;
+}
+
+:root[data-fd-mood='caos'] {
+  --fd-mood-a: #c04cff;
+  --fd-mood-b: var(--fd-pink);
+  --fd-mood-c: #7c3aed;
+  --fd-mood-d: #ff3d8b;
+  --fd-mood-tempo: 9s;
+  --fd-mood-brilho: 0.7;
+  --fd-mood-vinheta: 0.38;
+  --fd-mood-realce: #c04cff;
 }
 
 html,
@@ -40,22 +87,66 @@ body::after {
   height: 80vh;
   z-index: -2;
   filter: blur(90px);
-  opacity: 0.55;
+  opacity: var(--fd-mood-brilho);
   pointer-events: none;
+  /* A cor muda devagar: a noite aquece sem ninguém dar por uma "mudança de
+     ecrã". A velocidade (animation-duration) muda de repente, mas isso não se
+     nota — o que se nota é o resultado. */
+  transition: opacity 2.5s linear, background 2.5s linear;
 }
 body::before {
   background:
-    radial-gradient(40% 50% at 20% 20%, var(--fd-pink) 0%, transparent 70%),
-    radial-gradient(45% 55% at 80% 10%, var(--fd-purple) 0%, transparent 70%);
-  animation: fd-float1 18s ease-in-out infinite alternate;
+    radial-gradient(40% 50% at 20% 20%, var(--fd-mood-b) 0%, transparent 70%),
+    radial-gradient(45% 55% at 80% 10%, var(--fd-mood-c) 0%, transparent 70%);
+  animation: fd-float1 var(--fd-mood-tempo) ease-in-out infinite alternate;
 }
 body::after {
   top: auto;
   bottom: -20%;
   background:
-    radial-gradient(45% 55% at 75% 85%, var(--fd-amber) 0%, transparent 70%),
-    radial-gradient(40% 50% at 15% 90%, var(--fd-teal) 0%, transparent 70%);
-  animation: fd-float2 22s ease-in-out infinite alternate;
+    radial-gradient(45% 55% at 75% 85%, var(--fd-mood-a) 0%, transparent 70%),
+    radial-gradient(40% 50% at 15% 90%, var(--fd-mood-d) 0%, transparent 70%);
+  animation: fd-float2 calc(var(--fd-mood-tempo) * 1.22) ease-in-out infinite alternate;
+}
+
+/* Vinheta: o ecrã fecha-se nas bordas à medida que a noite sobe. Em Caos
+   respira, o que dá a sensação de a sala inteira estar a pulsar. Está no <body>
+   e não num componente para nunca haver um ecrã que se esqueça dela. */
+#root::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  pointer-events: none;
+  opacity: var(--fd-mood-vinheta);
+  background: radial-gradient(120% 90% at 50% 50%, transparent 45%, #000 100%);
+  transition: opacity 2.5s linear;
+}
+:root[data-fd-mood='caos'] #root::after {
+  animation: fd-respira 3.4s ease-in-out infinite;
+}
+
+@keyframes fd-respira {
+  0%, 100% { opacity: calc(var(--fd-mood-vinheta) * 0.72); }
+  50% { opacity: var(--fd-mood-vinheta); }
+}
+
+/* Abanão do ecrã (mood.abana) — só do Hardcore para cima. Aplica-se ao <html>
+   para apanhar tudo, overlays incluídos. */
+.fd-abana { animation: fd-abana 0.42s cubic-bezier(0.36, 0.07, 0.19, 0.97); }
+.fd-abana-forte { animation: fd-abana-forte 0.6s cubic-bezier(0.36, 0.07, 0.19, 0.97); }
+
+@keyframes fd-abana {
+  10%, 90% { transform: translate3d(-2px, 0, 0); }
+  20%, 80% { transform: translate3d(3px, -1px, 0); }
+  30%, 50%, 70% { transform: translate3d(-4px, 1px, 0); }
+  40%, 60% { transform: translate3d(4px, -1px, 0); }
+}
+@keyframes fd-abana-forte {
+  10%, 90% { transform: translate3d(-5px, 2px, 0) rotate(-0.25deg); }
+  20%, 80% { transform: translate3d(7px, -3px, 0) rotate(0.3deg); }
+  30%, 50%, 70% { transform: translate3d(-9px, 3px, 0) rotate(-0.4deg); }
+  40%, 60% { transform: translate3d(9px, -2px, 0) rotate(0.4deg); }
 }
 
 @keyframes fd-float1 {
@@ -90,6 +181,16 @@ h1, h2, h3 {
   border-radius: 1.25rem;
   backdrop-filter: blur(12px);
   box-shadow: 0 10px 30px -12px rgba(0, 0, 0, 0.6);
+  transition: box-shadow 1.5s linear, border-color 1.5s linear;
+}
+/* Do Hardcore para cima a carta ganha um halo da cor da noite: é subtil de mais
+   para se reparar sozinho e forte o suficiente para o ecrã parecer outro. */
+:root[data-fd-mood='hardcore'] .fd-card,
+:root[data-fd-mood='caos'] .fd-card {
+  border-color: color-mix(in srgb, var(--fd-mood-realce) 34%, transparent);
+  box-shadow:
+    0 10px 30px -12px rgba(0, 0, 0, 0.7),
+    0 0 34px -14px var(--fd-mood-realce);
 }
 
 .fd-btn {
@@ -194,12 +295,30 @@ html.fd-contrast .text-white\/60 {
   color: rgba(255, 255, 255, 0.88) !important;
 }
 
-/* Menos animação para quem a pediu no sistema (e menos enjoo ao 5.º copo). */
+/* Menos animação para quem a pediu no sistema (e menos enjoo ao 5.º copo).
+   As cores do humor FICAM (são informação: dizem em que ponto vai a noite); o
+   que desaparece é o movimento. */
 @media (prefers-reduced-motion: reduce) {
   body::before,
   body::after {
     animation: none;
   }
+  :root[data-fd-mood='caos'] #root::after {
+    animation: none;
+  }
+  .fd-abana,
+  .fd-abana-forte {
+    animation: none;
+  }
+}
+
+/* Alto contraste: a vinheta come contraste nas bordas, e é justamente aí que
+   ficam os botões. Quem ligou o alto contraste não a quer. */
+html.fd-contrast #root::after {
+  opacity: 0;
+}
+html.fd-contrast .fd-card {
+  box-shadow: none;
 }
 
 /* --- Modo TV / espectador (pages/Display.jsx) -----------------------------

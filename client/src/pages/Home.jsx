@@ -1,13 +1,18 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { sfx } from '../sfx.js';
+import { MOLA } from '../motion.js';
 import { loadProfile, saveProfile } from '../device.js';
 
 // Traduz o erro do servidor num painel amigável (emoji + dica de o que fazer).
 function friendlyError(msg) {
   const m = (msg || '').toLowerCase();
-  if (m.includes('já começou'))
-    return { emoji: '🎮', title: 'O jogo já está a decorrer', hint: 'Pede ao anfitrião para terminar a ronda e voltarem ao lobby — depois entra com o mesmo código.' };
+  if (m.includes('cheia'))
+    return { emoji: '🚪', title: 'A sala está cheia', hint: 'Podem abrir o jogo num ecrã grande (modo TV) e acompanhar daí.' };
+  if (m.includes('terminou'))
+    return { emoji: '🏁', title: 'O jogo terminou', hint: 'Peçam ao anfitrião para voltar ao lobby — depois entras com o mesmo código.' };
+  if (m.includes('sessão inválida'))
+    return { emoji: '🔑', title: 'Sessão expirada', hint: 'Entra outra vez com o código da sala e o teu nome.' };
   if (m.includes('nome'))
     return { emoji: '🙋', title: 'Esse nome já está ocupado', hint: 'Escolhe outro nome para esta sala.' };
   if (m.includes('não encontrada') || m.includes('não existe'))
@@ -53,7 +58,7 @@ export default function Home({ error, onCreate, onJoin }) {
       <motion.header
         initial={{ scale: 0.85, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
-        transition={{ type: 'spring', stiffness: 200, damping: 14 }}
+        transition={MOLA.salto}
         className="text-center"
       >
         <div className="text-7xl mb-1">🍻</div>

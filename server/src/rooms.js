@@ -24,6 +24,10 @@ export { AppError }; // re-exportado para compatibilidade (socket.js importa daq
 const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const CODE_LENGTH = 4;
 const DEFAULT_LIVES = 3;
+// Teto de jogadores por sala. Não é anti-abuso: é jogabilidade. Com 30 pessoas
+// esperava-se 30 rondas pela própria vez, a pirâmide não tem cartas para todos e
+// os nomes deixam de caber no ecrã. Quem não couber vê pelo modo TV (/?tv=CODIGO).
+const MAX_PLAYERS = Math.max(2, Number(process.env.MAX_PLAYERS) || 12);
 // Tempo que uma sala VAZIA (ninguém ligado) sobrevive antes de ser apagada.
 // Cobre o caso comum: criar sala → sair da app para partilhar o código → voltar.
 const EMPTY_ROOM_GRACE_MS = Number(process.env.EMPTY_ROOM_GRACE_MS) || 120_000;
@@ -82,7 +86,12 @@ export class RoomManager {
   joinRoom(code, playerName) {
     const room = this.getRoom(code);
     if (!room) throw new AppError('Sala não encontrada.');
-    if (room.status !== 'lobby') throw new AppError('O jogo já começou.');
+    // Numa festa TODA a gente chega tarde. Fechar a sala ao arrancar obrigava o
+    // host a terminar a ronda por cada atrasado — por isso 'playing' também
+    // aceita: o jogador entra e o modo integra-o (joinInProgress no socket.js).
+    // Só um jogo TERMINADO recusa: aí o caminho é o host voltar ao lobby.
+    if (room.status === 'ended')
+      throw new AppError('O jogo terminou. Peçam ao anfitrião para voltar ao lobby.');
 
     const name = normalizeName(playerName);
     if (!name) throw new AppError('Nome inválido.');
@@ -92,9 +101,23 @@ export class RoomManager {
     );
     if (taken) throw new AppError('Esse nome já está a ser usado nesta sala.');
 
+    if (room.players.size >= MAX_PLAYERS)
+      throw new AppError(`A sala está cheia (máximo ${MAX_PLAYERS}). Vejam num ecrã grande com o modo TV.`);
+
     this.#cancelCleanup(room); // alguém entrou → cancela remoção pendente
     const player = this.#addPlayer(room, name, /* isHost */ false);
-    return { room, player };
+
+    // Sala sem host LIGADO (o anfitrião saiu e ainda corre o período de graça):
+    // quem entra assume. Sem isto a sala ficava viva mas morta — ninguém podia
+    // começar o jogo, escolher o modo ou terminá-lo.
+    const temHost = [...room.players.values()].some((p) => p.isHost && p.connected);
+    if (!temHost) {
+      for (const p of room.players.values()) p.isHost = false;
+      player.isHost = true;
+      room.hostPlayerId = player.id;
+    }
+
+    return { room, player, latecomer: room.status === 'playing' };
   }
 
   getRoom(code) {
@@ -245,12 +268,23 @@ export class RoomManager {
     return room;
   }
 
-  /** Religa um jogador existente após queda de ligação. */
-  reconnect(code, playerId) {
+  /**
+   * Religa um jogador existente após queda de ligação.
+   *
+   * O `token` é a PROVA de que este telemóvel é mesmo daquele jogador. Sem ele
+   * bastava ler um `playerId` do `room_state` (vão lá todos — o cliente precisa
+   * deles para desenhar a mesa) para assumir a identidade de outra pessoa: e com
+   * ela a mão da Pirâmide, o papel do Vasco, o aviso de autor do Segredo e os
+   * poderes de host. O token NUNCA vai no broadcast — só no `room_joined` do
+   * próprio jogador.
+   */
+  reconnect(code, playerId, token) {
     const room = this.getRoom(code);
     if (!room) throw new AppError('A sala já não existe.');
     const player = room.players.get(playerId);
     if (!player) throw new AppError('Já não fazes parte desta sala.');
+    if (!player.token || player.token !== token)
+      throw new AppError('Sessão inválida — volta a entrar com o código da sala.');
     this.#cancelCleanup(room); // o jogador voltou → cancela remoção pendente
     player.connected = true;
     return { room, player };
@@ -261,6 +295,8 @@ export class RoomManager {
     const ident = defaultIdentity(room.players.size);
     const player = {
       id: randomUUID(),
+      // Segredo partilhado só com este telemóvel (ver reconnect). Fora do broadcast.
+      token: randomUUID(),
       roomId: room.id,
       name,
       emoji: ident.emoji,
@@ -281,6 +317,7 @@ export class RoomManager {
     const room = this.getRoom(code);
     if (!room) throw new AppError('Sala não encontrada.');
     if (room.status !== 'lobby') throw new AppError('Só dá para adicionar bots no lobby.');
+    if (room.players.size >= MAX_PLAYERS) throw new AppError('A sala está cheia.');
     let n = 1;
     let name;
     const taken = (nm) => [...room.players.values()].some((p) => p.name.toLowerCase() === nm.toLowerCase());
