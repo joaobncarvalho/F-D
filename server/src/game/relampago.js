@@ -7,6 +7,7 @@
 
 import { AppError } from '../errors.js';
 import { drink } from './helpers.js';
+import * as palpites from './palpites.js';
 
 const SECONDS = 8; // janela curta o suficiente para dar pânico e não arrastar a mesa
 const TRAVOU_GOLOS = 2;
@@ -44,6 +45,7 @@ export function relampagoResolve(room, playerId, survived) {
   if (!ok) drink(room.game, r.currentPlayerId, TRAVOU_GOLOS);
   r.substate = 'result';
   r.status = 'resolved';
+  palpites.resolve(room, ok ? 'aguenta' : 'trava'); // fecha a aposta da plateia
   r.result = { survived: ok, golos: ok ? 0 : TRAVOU_GOLOS };
   return r;
 }

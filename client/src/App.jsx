@@ -289,6 +289,7 @@ export default function App() {
   const setIdentity = useCallback((ident) => socket.emit('set_identity', ident), []);
   const setPack = useCallback((pack) => socket.emit('set_pack', { pack }), []);
   const setCurve = useCallback((on) => socket.emit('set_curve', { on }), []);
+  const setNightLength = useCallback((minutos) => socket.emit('set_night_length', { minutos }), []);
   const pauseGame = useCallback((paused) => socket.emit('pause_game', { paused }), []);
   const grupoAnswer = useCallback((value) => socket.emit('grupo_answer', { value }), []);
   const grupoReveal = useCallback(() => socket.emit('grupo_reveal'), []);
@@ -366,6 +367,7 @@ export default function App() {
   const dueloResult = useCallback((winnerId) => socket.emit('duelo_result', { winnerId }), []);
   const dueloCall = useCallback((call) => socket.emit('duelo_call', { call }), []);
   const skipTurn = useCallback(() => socket.emit('skip_turn'), []);
+  const darPalpite = useCallback((escolha) => socket.emit('dar_palpite', { escolha }), []);
   const endGame = useCallback(() => socket.emit('end_game'), []);
   const resetGame = useCallback(() => socket.emit('reset_game'), []);
 
@@ -480,6 +482,7 @@ export default function App() {
             onSetIdentity={setIdentity}
             onSetPack={setPack}
             onSetCurve={setCurve}
+            onSetNightLength={setNightLength}
             onAddBots={addBots}
             onLeave={leaveRoom}
           />
@@ -588,6 +591,7 @@ export default function App() {
             onDueloResult={dueloResult}
             onDueloCall={dueloCall}
             onSkip={skipTurn}
+            onPalpite={darPalpite}
             onEnd={endGame}
             onReset={resetGame}
             onLeave={leaveRoom}

@@ -8,6 +8,7 @@ import * as tournament from './tournament.js';
 import { registerBoardHandlers } from './socket/boardHandlers.js';
 import { registerTournamentHandlers } from './socket/tournamentHandlers.js';
 import * as autoresolve from './autoresolve.js';
+import * as director from './game/director.js';
 import * as snapshot from './snapshot.js';
 
 const rooms = new RoomManager();
@@ -60,6 +61,11 @@ export function registerSocketHandlers(io) {
         socket.emit('error_msg', { message: '⏸️ O jogo está em pausa.' });
         return; // pacote descartado de propósito (não chama next)
       }
+      // O Diretor precisa de saber quem anda VIVO — e o sítio certo para isso é
+      // aqui, não em cinquenta handlers. Qualquer toque que chegue do telemóvel
+      // conta como presença; o que interessa é a diferença entre quem está a
+      // jogar e quem já não pega no telemóvel há um quarto de hora.
+      if (room && socket.data.playerId) director.registaAcao(room, socket.data.playerId);
       next();
     });
 
@@ -200,6 +206,17 @@ export function registerSocketHandlers(io) {
       }
     });
 
+    socket.on('set_night_length', ({ minutos } = {}, ack) => {
+      try {
+        const { code, playerId } = socket.data;
+        rooms.setNightLength(code, playerId, minutos);
+        broadcastState(io, code);
+        if (typeof ack === 'function') ack({ ok: true });
+      } catch (err) {
+        handleError(socket, ack, err);
+      }
+    });
+
     socket.on('set_curve', ({ on } = {}, ack) => {
       try {
         const { code, playerId } = socket.data;
@@ -262,7 +279,12 @@ export function registerSocketHandlers(io) {
         } else {
           // `curve` vem do lobby (rooms.setCurve). Sem isto o motor ficava com o
           // seu valor por omissão (ligada) e o interruptor do host não fazia nada.
-          game.initGame(room, { lives, intensity: intensityResult.intensity, curve: room.curve }); // modo Roda
+          game.initGame(room, {
+            lives,
+            intensity: intensityResult.intensity,
+            curve: room.curve,
+            duracaoMin: room.duracaoMin, // plano da noite → o Diretor monta o final
+          }); // modo Roda
         }
         io.to(code).emit('game_started', { mode: room.mode, intensityResult });
         broadcastState(io, code);
@@ -330,6 +352,21 @@ export function registerSocketHandlers(io) {
         const { effect, gameOver } = game.resolveAction(room, socket.data.playerId, action);
         io.to(room.code).emit('action_result', { effect });
         if (gameOver) io.to(room.code).emit('game_over', { stats: gameOver }); // último de pé
+        broadcastState(io, room.code);
+        if (typeof ack === 'function') ack({ ok: true });
+      } catch (err) {
+        handleError(socket, ack, err);
+      }
+    });
+
+    // Palpite da plateia: enquanto um joga, os outros apostam no que vai
+    // acontecer (game/palpites.js). É o que tira sete pessoas de espectadoras
+    // numa mesa de oito.
+    socket.on('dar_palpite', ({ escolha } = {}, ack) => {
+      try {
+        if (throttled(socket, 'submit', 150)) return void (typeof ack === 'function' && ack({ ok: true }));
+        const room = requireRoom(socket);
+        game.darPalpite(room, socket.data.playerId, escolha);
         broadcastState(io, room.code);
         if (typeof ack === 'function') ack({ ok: true });
       } catch (err) {

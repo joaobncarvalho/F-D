@@ -7,6 +7,7 @@ import Board from './Board.jsx';
 import { PromptCard, ChoiceCard, IntrigasCard } from './games/cards.jsx';
 import { RelampagoCard, MimicaCard, RoletaCard, DueloCard } from './games/quickCards.jsx';
 import Beat from '../components/Beat.jsx';
+import PalpiteBand from './games/PalpiteBand.jsx';
 import { aplicaHumor, humorAtual, NIVEIS } from '../mood.js';
 import { confetti } from '../confetti.js';
 
@@ -182,6 +183,61 @@ const SCENARIOS = [
  * Ao sair volta a pôr o humor onde estava: o showroom não pode deixar a app
  * pintada de Caos.
  */
+/**
+ * Palco dos palpites — os quatro estados da faixa, lado a lado.
+ *
+ * Numa noite a sério cada estado dura segundos e depende de ser a vez de outra
+ * pessoa; a apanhá-los ao vivo perdia-se mais tempo do que a afiná-los. Aqui
+ * vêem-se os quatro de uma vez.
+ */
+function PalcoPalpites({ onBack }) {
+  // Mesa fictícia com toda a gente ligada — o showroom serve para ver a faixa,
+  // não para simular quedas de rede.
+  const room = { players: mkPlayers().map((p) => ({ ...p, eliminated: false, connected: true })) };
+  const base = {
+    pergunta: 'Aceita ou bebe?',
+    opcoes: [
+      { key: 'aceita', rotulo: '💪 Aceita', emoji: '💪' },
+      { key: 'bebe', rotulo: '🍺 Bebe', emoji: '🍺' },
+    ],
+    excluidos: ['p2'],
+    golos: 2,
+  };
+  const estados = [
+    ['Por apostar (és plateia)', { ...base, jaApostaram: ['p3'], resolvido: false }, 'me'],
+    ['Já apostaste', { ...base, jaApostaram: ['me', 'p3'], resolvido: false }, 'me'],
+    ['És tu que estás a jogar', { ...base, jaApostaram: ['me', 'p3'], resolvido: false }, 'p2'],
+    [
+      'Resolvido',
+      {
+        ...base,
+        jaApostaram: ['me', 'p3'],
+        resolvido: true,
+        resultado: 'bebe',
+        certos: [{ id: 'me', name: 'Tu' }],
+        errados: [{ id: 'p3', name: 'Rui' }],
+      },
+      'me',
+    ],
+  ];
+
+  return (
+    <div className="min-h-full mx-auto max-w-md px-5 py-6 flex flex-col gap-4">
+      <button onClick={onBack} className="text-sm text-white/50 self-start">← voltar aos demos</button>
+      <p className="text-xs text-white/45">
+        A segunda camada de cada ronda: enquanto um joga, a mesa aposta. Aparece só nos tipos em
+        que a plateia não tem mais nada que fazer.
+      </p>
+      {estados.map(([rotulo, palpite, youId]) => (
+        <div key={rotulo} className="flex flex-col gap-1">
+          <p className="text-[11px] uppercase tracking-widest text-white/35 px-1">{rotulo}</p>
+          <PalpiteBand palpite={palpite} room={room} youId={youId} onPalpite={noop} />
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function PalcoAmbiente({ onBack }) {
   const [humor, setHumor] = useState(humorAtual());
   const [batida, setBatida] = useState(null);
@@ -259,6 +315,7 @@ export default function Demo() {
   const back = () => setSel(null);
 
   if (sel?.kind === 'ambiente') return <PalcoAmbiente onBack={back} />;
+  if (sel?.kind === 'palpites') return <PalcoPalpites onBack={back} />;
 
   if (sel?.kind === 'board') {
     return <div className="min-h-full mx-auto max-w-md px-5 py-6 flex flex-col relative">{sel.render(back)}</div>;
@@ -275,6 +332,7 @@ export default function Demo() {
 
   const groups = [...new Set(SCENARIOS.map((s) => s.group))];
   const ambiente = { id: 'ambiente', kind: 'ambiente', label: '🌡️ Humor da noite + batidas' };
+  const palpitesDemo = { id: 'palpites', kind: 'palpites', label: '🎲 Palpites da mesa' };
   return (
     <div className="min-h-full mx-auto max-w-md px-5 py-6 flex flex-col gap-5">
       <header className="text-center">
@@ -285,6 +343,9 @@ export default function Demo() {
         <p className="text-[11px] uppercase tracking-widest text-white/40 px-1">✨ Ambiente</p>
         <button onClick={() => setSel(ambiente)} className="fd-card text-left px-4 py-3 text-sm">
           {ambiente.label}
+        </button>
+        <button onClick={() => setSel(palpitesDemo)} className="fd-card text-left px-4 py-3 text-sm">
+          {palpitesDemo.label}
         </button>
       </div>
       {groups.map((g) => (

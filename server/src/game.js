@@ -18,6 +18,8 @@ import { GRUPO_KEYS, setupGrupo, serializeGrupo } from './game/grupo.js';
 import { setupCascata, serializeCascata } from './game/cascata.js';
 import { setupDesenho, serializeDesenho } from './game/desenho.js';
 import { setupReacaoRoda, serializeReacaoRoda } from './game/reacao.js';
+import * as director from './game/director.js';
+import * as palpites from './game/palpites.js';
 // Ações dos mini-jogos chamadas diretamente pelo socket.js — re-exportadas daqui.
 export {
   piramideReady,
@@ -36,6 +38,7 @@ export {
   vascoRedeem,
 } from './game/vasco.js';
 export { chooseTarget, submitRps } from './game/intrigas.js';
+export { aposta as darPalpite } from './game/palpites.js';
 export { castGuess } from './game/segredos.js';
 export { relampagoStart, relampagoResolve } from './game/relampago.js';
 export { mimicaWord, mimicaStart, mimicaResolve } from './game/mimica.js';
@@ -106,7 +109,52 @@ function advanceTurn(room) {
     const cur = order.findIndex((p) => p.id === g.currentPlayerId);
     idx = cur === -1 ? 0 : (cur + 1) % order.length;
   }
-  g.currentPlayerId = order[idx].id;
+  const proximo = order[idx].id;
+
+  // A rotação continua a mandar. O Diretor só se intromete quando alguém anda
+  // MESMO esquecido — e mesmo aí com um travão (ver director.escolheFoco).
+  const foco = director.escolheFoco(room, director.leitura(room), proximo);
+  g.currentPlayerId = foco?.id || proximo;
+  if (foco?.saltou) {
+    g.ultimoSaltoRonda = g.roundCount || 0;
+    pushFeed(room, '🎬', `A vez saltou: ${foco.razao}.`);
+  }
+}
+
+/**
+ * Fecha a ronda e devolve a mesa à roda.
+ *
+ * Existe para haver UM sítio por onde todas as rondas acabam — antes eram sete
+ * cópias de `advanceTurn + round = null + phase = 'wheel'`, e qualquer coisa que
+ * tivesse de acontecer no fim de uma ronda tinha de ser escrita sete vezes (e
+ * esquecida numa). É por aqui que o Diretor monta o final da noite.
+ */
+function fecharRonda(room, { limpaRonda = true } = {}) {
+  const g = room.game;
+  advanceTurn(room);
+  if (limpaRonda) g.round = null;
+
+  // O final já foi jogado → a noite acaba aqui, com as estatísticas, em vez de
+  // ficar à espera que alguém se lembre de carregar em "terminar".
+  if (g.finale) {
+    g.finale = false;
+    g.finaleFeito = true;
+    g.phase = 'gameover';
+    g.finalStats = buildStats(room);
+    room.status = 'ended';
+    pushFeed(room, '🏁', 'E é assim que acaba a noite.');
+    return g;
+  }
+
+  g.phase = 'wheel';
+
+  // Chegou a hora do final? Anuncia-se ANTES de girar, para a mesa saber que o
+  // que vem a seguir é o último momento — metade da graça é o aviso.
+  if (director.horaDoFinal(room)) {
+    g.finale = true;
+    pushFeed(room, '🎬', 'Última ronda da noite. Façam com que conte.');
+  }
+  return g;
 }
 
 function pickQuestion(game, targetId) {
@@ -169,13 +217,17 @@ const perfil = (key) => TYPE_PROFILE[key] || DEFAULT_PROFILE;
  * @param types    tipos disponíveis (repo.getGameTypes)
  * @param opts.jogadores  nº de jogadores ATIVOS (ligados e não eliminados)
  * @param opts.recentes   chaves das últimas voltas (mais recente primeiro)
+ * @param opts.pesos      multiplicadores por tipo vindos do Diretor (1 = como está).
+ *                        Ficam DEPOIS dos filtros de propósito: o Diretor afina a
+ *                        probabilidade, mas nunca faz sair um tipo que a mesa não
+ *                        tem gente para jogar.
  *
  * A ordem dos filtros importa: primeiro corta-se o que não SERVE (poucos
  * jogadores), depois o que ABORRECE (acabou de sair). O segundo filtro é
  * dispensável — se ao evitar os recentes ficasse quase nada, prefere-se repetir
  * um tipo a estreitar a roda a duas opções.
  */
-export function pickWeightedType(types, { jogadores = 99, recentes = [] } = {}) {
+export function pickWeightedType(types, { jogadores = 99, recentes = [], pesos = null } = {}) {
   if (!types?.length) return null;
 
   const cabem = types.filter((t) => jogadores >= perfil(t.key).min);
@@ -186,10 +238,11 @@ export function pickWeightedType(types, { jogadores = 99, recentes = [] } = {}) 
   const frescos = pool.filter((t) => !evitar.has(t.key));
   if (frescos.length >= 3) pool = frescos;
 
-  const total = pool.reduce((soma, t) => soma + perfil(t.key).peso, 0);
+  const pesoDe = (t) => Math.max(0.01, perfil(t.key).peso * (pesos?.[t.key] ?? 1));
+  const total = pool.reduce((soma, t) => soma + pesoDe(t), 0);
   let bilhete = Math.random() * total;
   for (const t of pool) {
-    bilhete -= perfil(t.key).peso;
+    bilhete -= pesoDe(t);
     if (bilhete <= 0) return t;
   }
   return pool[pool.length - 1];
@@ -212,7 +265,7 @@ export function tallyIntensity(room) {
   return { intensity, randomized, candidates, counts };
 }
 
-export function initGame(room, { lives = DEFAULT_LIVES, intensity = 'leve', curve = true } = {}) {
+export function initGame(room, { lives = DEFAULT_LIVES, intensity = 'leve', curve = true, duracaoMin = null } = {}) {
   const n = Math.max(MIN_LIVES, Math.min(MAX_LIVES, Number(lives) || DEFAULT_LIVES));
   for (const p of room.players.values()) {
     p.lives = n;
@@ -235,6 +288,12 @@ export function initGame(room, { lives = DEFAULT_LIVES, intensity = 'leve', curv
     recentTypes: [], // últimos tipos que saíram na roda (anti-repetição)
     currentPlayerId: null,
     stats: {},
+    // --- Diretor da noite (game/director.js) ---
+    plano: { duracaoMin: duracaoMin || null }, // null = noite sem fim previsto
+    sinais: {}, // playerId -> { agiuEm, focoEm }: quem anda vivo e quem anda calado
+    finale: false, // a próxima ronda é a última
+    finaleFeito: false, // já houve final (não se monta outro)
+    ultimoSaltoRonda: -99, // trava saltos de rotação seguidos
     activeRules: [], // regras com duração: { id, playerId, playerName, text, remaining }
     finalStats: null,
   };
@@ -287,12 +346,20 @@ export async function spinWheel(room, playerId) {
 
   const player = room.players.get(playerId);
   const types = await repo.getGameTypes();
+
+  // O DIRETOR (game/director.js). A roda continua a girar no ecrã — o que muda é
+  // o que está por trás dela: quem anda calado, quem já está a levar com tudo,
+  // se a mesa acabou de aguentar três jogos longos, e em que ponto vai a noite.
+  const l = director.leitura(room);
+  const fase = director.faseDaNoite(room);
   const gt = pickWeightedType(types, {
-    jogadores: connectedOrder(room).length,
+    jogadores: l.jogadores,
     recentes: g.recentTypes || [],
+    pesos: director.pesosDe(l, fase),
   });
   if (!gt) throw new AppError('Não há tipos de jogo disponíveis.');
   g.recentTypes = [gt.key, ...(g.recentTypes || [])].slice(0, 4);
+  director.registaFoco(room, playerId);
   const inten = effectiveIntensity(g); // curva: leve no aquecimento, sobe até ao teto votado
 
   const round = {
@@ -387,6 +454,11 @@ export async function spinWheel(room, playerId) {
     else await fallbackDesafio(room, round, inten);
   }
 
+  // A segunda camada abre-se DEPOIS de a ronda estar montada — o Isto ou Aquilo
+  // precisa das opções já sorteadas para as poder oferecer como aposta. Quem
+  // está a jogar a ronda fica de fora: não se aposta em si próprio.
+  palpites.abre(round, [round.currentPlayerId, round.buddyId, round.opponentId]);
+
   g.round = round;
   g.roundCount += 1;
   pushFeed(room, '🎡', `${player.name} girou a roda → ${round.gameTypeLabel}`);
@@ -433,16 +505,20 @@ export function resolveAction(room, playerId, action) {
     g.round.status = 'resolved';
   }
 
+  // A plateia apostou em aceitar/beber (game/palpites.js) — fecha-se com o que
+  // aconteceu de facto, sem uma segunda fonte de verdade sobre a ronda.
+  palpites.resolve(room, action === 'refuse' ? 'bebe' : 'aceita');
+
   // Aceitar um desafio com duração → passa a regra ativa (N jogadas).
   const dur = action !== 'refuse' ? g.round.ruleDuration : null;
   const ruleText = g.round.prompt?.text;
-  advanceTurn(room); // decrementa regras existentes... (já salta o eliminado)
+  fecharRonda(room, { limpaRonda: false }); // decrementa regras existentes... (já salta o eliminado)
   if (dur && ruleText) addRule(room, playerId, ruleText, dur); // ...e adiciona a nova com duração cheia
-  g.phase = 'wheel';
 
+  // O final da noite (Diretor) já pode ter fechado o jogo dentro do fecharRonda.
+  let gameOver = g.phase === 'gameover' ? g.finalStats : null;
   // Auto-fim: se sobrar ≤1 jogador ativo, o último de pé vence.
-  let gameOver = null;
-  if (player.eliminated && connectedOrder(room).length <= 1) {
+  if (!gameOver && player.eliminated && connectedOrder(room).length <= 1) {
     gameOver = buildStats(room);
     g.finalStats = gameOver;
     g.phase = 'gameover';
@@ -477,6 +553,7 @@ export function chooseOption(room, playerId, index) {
   if (i !== 0 && i !== 1) throw new AppError('Escolha inválida.');
   r.chosen = i;
   r.status = 'resolved';
+  palpites.resolve(room, String(i));
   return r;
 }
 
@@ -510,18 +587,14 @@ export function continueRound(room, playerId) {
       const winner = room.players.get(w.id);
       if (winner) winner.lives += 1;
     }
-    advanceTurn(room);
-    g.round = null;
-    g.phase = 'wheel';
+    fecharRonda(room);
     return { game: g, rewarded: winners };
   }
 
   // Jogo do Vasco: fecha-se no resultado (prémio +1 vida já aplicado no reveal).
   if (g.phase === 'vasco') {
     if (g.round?.substate !== 'result') throw new AppError('O Jogo do Vasco ainda não terminou.');
-    advanceTurn(room);
-    g.round = null;
-    g.phase = 'wheel';
+    fecharRonda(room);
     return { game: g, rewarded: [] };
   }
 
@@ -529,16 +602,12 @@ export function continueRound(room, playerId) {
   // só avançam depois de a ronda estar resolvida.
   if (['choice', 'relampago', 'mimica', 'roleta', 'duelo', 'grupo', 'cascata', 'desenho', 'reacao'].includes(g.phase)) {
     if (g.round?.status !== 'resolved') throw new AppError('Esta ronda ainda não terminou.');
-    advanceTurn(room);
-    g.round = null;
-    g.phase = 'wheel';
+    fecharRonda(room);
     return { game: g, rewarded: [] };
   }
 
   if (!['intrigas', 'guessing'].includes(g.phase)) throw new AppError('Nada a continuar.');
-  advanceTurn(room);
-  g.round = null;
-  g.phase = 'wheel';
+  fecharRonda(room);
   return { game: g, rewarded: [] };
 }
 
@@ -550,9 +619,7 @@ export function continueRound(room, playerId) {
 export function abandonRound(room) {
   const g = room.game;
   if (!g || ['prep', 'gameover'].includes(g.phase)) return g;
-  advanceTurn(room);
-  g.round = null;
-  g.phase = 'wheel';
+  fecharRonda(room);
   return g;
 }
 
@@ -562,9 +629,7 @@ export function skipTurn(room, playerId) {
   const g = room.game;
   if (!g || g.phase === 'prep' || g.phase === 'gameover')
     throw new AppError('Não há vez para saltar.');
-  advanceTurn(room);
-  g.round = null;
-  g.phase = 'wheel';
+  fecharRonda(room);
   return g;
 }
 
@@ -648,6 +713,8 @@ function serializeRound(g) {
     needsBuddy: !!r.needsBuddy,
     buddyId: r.buddyId || null,
     buddyName: r.buddyName || null,
+    // Segunda camada: enquanto um joga, a mesa aposta (game/palpites.js).
+    palpite: palpites.serialize(r),
   };
   if (r.gameTypeKey === 'isto_ou_aquilo') {
     base.options = r.options || [];
@@ -677,6 +744,10 @@ export function serializeGame(room) {
     intensity: effectiveIntensity(g), // a que está em vigor AGORA (curva)
     intensityCeiling: g.intensity, // a votada no lobby (teto da noite)
     curve: !!g.curve,
+    // --- Diretor: o arco da noite, para o cliente poder anunciá-lo ---
+    faseNoite: director.faseDaNoite(room), // aquecimento | meio | final
+    finale: !!g.finale, // a PRÓXIMA ronda é a última
+    duracaoMin: g.plano?.duracaoMin || null,
     startingLives: g.startingLives,
     roundCount: g.roundCount,
     currentPlayerId: g.currentPlayerId,

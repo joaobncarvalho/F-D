@@ -9,6 +9,7 @@ import { AppError } from '../errors.js';
 import { pickPrompt } from '../content/bag.js';
 import * as repo from '../repo.js';
 import { drink } from './helpers.js';
+import * as palpites from './palpites.js';
 
 const MAX_PASSES = 3;
 
@@ -33,6 +34,8 @@ function finish(room, r, outcome) {
   if (r.tab > 0) drink(room.game, r.currentPlayerId, r.tab);
   r.substate = 'result';
   r.status = 'resolved';
+  // A plateia apostou em responder/passar (game/palpites.js).
+  palpites.resolve(room, outcome === 'respondeu' ? 'aceita' : 'passa');
   r.result = { outcome, golos: r.tab, passes: r.passes, question: r.question };
   return r;
 }

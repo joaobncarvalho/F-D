@@ -69,6 +69,7 @@ export class RoomManager {
       mode: 'wheel', // 'wheel' (roda) | 'board' (tabuleiro) | 'tournament' (torneio)
       pack: null, // pack temático: null | 'aniversario' | 'despedida' | 'reencontro'
       curve: true, // curva de intensidade (leve → teto votado ao longo da noite)
+    duracaoMin: null, // duração planeada da noite (min) — null = sem fim previsto
       paused: false, // pausa do host: congela ações e cronómetros
       feed: [], // feed de eventos da sala (feed.js)
     };
@@ -243,6 +244,30 @@ export class RoomManager {
     return room;
   }
 
+  /**
+   * Duração planeada da noite, em minutos (só host, só no lobby).
+   *
+   * É o que dá um FIM ao jogo. Sem isto a noite acaba quando alguém se lembra de
+   * carregar em "terminar" — sempre a meio de qualquer coisa. Com uma duração, o
+   * Diretor sabe quanto falta e monta a última ronda (ver game/director.js).
+   * `null` mantém o comportamento antigo: joga-se até o host mandar parar.
+   */
+  setNightLength(code, playerId, minutos) {
+    const room = this.getRoom(code);
+    if (!room) throw new AppError('Sala não encontrada.');
+    const player = room.players.get(playerId);
+    if (!player || !player.isHost) throw new AppError('Só o host escolhe a duração.');
+    if (room.status !== 'lobby') throw new AppError('O jogo já começou.');
+    if (minutos === null || minutos === undefined || minutos === 0) {
+      room.duracaoMin = null;
+      return room;
+    }
+    const n = Number(minutos);
+    if (!Number.isFinite(n) || n < 15 || n > 300) throw new AppError('Duração inválida.');
+    room.duracaoMin = Math.round(n);
+    return room;
+  }
+
   /** Liga/desliga a curva de intensidade (só host, só no lobby). */
   setCurve(code, playerId, on) {
     const room = this.getRoom(code);
@@ -355,6 +380,7 @@ export function serializeRoom(room) {
     mode: room.mode || 'wheel',
     pack: room.pack || null,
     curve: room.curve !== false,
+    duracaoMin: room.duracaoMin || null,
     paused: !!room.paused,
     feed: serializeFeed(room),
     // Estado de jogo (null enquanto no lobby). Serialização/anonimização em game.js/board.js.

@@ -2,6 +2,8 @@ import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Wheel from '../components/Wheel.jsx';
 import Beat from '../components/Beat.jsx';
+import PalpiteBand from './games/PalpiteBand.jsx';
+import { MOLA, PULSA } from '../motion.js';
 import BrokenScreen from '../components/BrokenScreen.jsx';
 import { TYPES } from './games/shared.jsx';
 import { PromptCard, ChoiceCard, IntrigasCard } from './games/cards.jsx';
@@ -177,8 +179,40 @@ export default function Game(props) {
     >
       <PlayersStrip room={room} youId={youId} currentId={highlightId} />
 
+      {/* A ÚLTIMA RONDA.
+          O anúncio é metade da coisa: uma noite que acaba sem aviso acaba em
+          anticlímax, e o jogo passa a ter fim em vez de simplesmente parar. */}
+      <AnimatePresence>
+        {g.finale && (
+          <motion.div
+            initial={{ opacity: 0, y: -14, scale: 0.94 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -10 }}
+            transition={MOLA.pop}
+            className="fd-card px-4 py-3 text-center"
+            style={{
+              borderColor: 'rgba(255,176,32,0.55)',
+              boxShadow: '0 0 34px -10px rgba(255,176,32,0.75)',
+            }}
+          >
+            <motion.p {...PULSA} className="fd-title text-lg font-extrabold text-amber-300">
+              🎬 Última ronda da noite
+            </motion.p>
+            <p className="text-xs text-white/55 mt-0.5">Façam com que conte — a seguir são as contas.</p>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <div className="flex items-center justify-between text-xs text-white/40">
-        <span>Ronda {g.roundCount || 0}</span>
+        <span>
+          Ronda {g.roundCount || 0}
+          {g.duracaoMin && !g.finale && (
+            <span className="text-white/25">
+              {' '}
+              · {{ aquecimento: 'aquecimento', meio: '', final: 'reta final' }[g.faseNoite] || ''}
+            </span>
+          )}
+        </span>
         <button onClick={props.onShowRules} className="text-white/40 underline decoration-dotted">
           📖 regras
         </button>
@@ -422,6 +456,21 @@ export default function Game(props) {
             onResult={props.onDueloResult}
             onCall={props.onDueloCall}
             onContinue={props.onContinue}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* A segunda camada da ronda: enquanto um joga, a mesa aposta. Vive por
+          BAIXO da carta de propósito — quem está a jogar continua a ver o seu
+          desafio em grande, e a plateia ganha o que fazer no tempo de espera. */}
+      <AnimatePresence>
+        {revealed && round?.palpite && (
+          <PalpiteBand
+            key={`palpite-${round.id}`}
+            palpite={round.palpite}
+            room={room}
+            youId={youId}
+            onPalpite={props.onPalpite}
           />
         )}
       </AnimatePresence>

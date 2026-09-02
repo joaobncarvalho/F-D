@@ -5,6 +5,89 @@
 
 ---
 
+## 2026-09-02 (c) — Reestruturações grandes #1 e #2: o Diretor e o fim do espetador
+
+Primeiras duas das cinco reestruturações. Ambas ADITIVAS — entram sem mexer no
+que já corria, o que era o requisito para poderem ir ao playtest de 11 set.
+
+### 🎬 #1 — O Diretor (`server/src/game/director.js`)
+Cada ronda era um sorteio independente: nada sabia que o Zé não fala há um
+quarto de hora, que a Ana bebeu o dobro da mesa, ou que tinham saído três jogos
+longos seguidos. O único arco era a curva de intensidade — uma função do relógio.
+
+O módulo está partido em quatro peças de propósito, para se poder testar cada uma
+sem simular uma noite: `leitura` (o estado em números, sem opiniões), `pesosDe`
+(traduz a leitura em multiplicadores por tipo), `escolheFoco` (a rotação continua
+a mandar; o Diretor só salta quando alguém anda mesmo esquecido, e no máximo de 4
+em 4 rondas) e `faseDaNoite`.
+
+O `pickWeightedType` ganhou um parâmetro `pesos` e nada mais: os filtros de
+`min` continuam antes, por isso o Diretor afina a probabilidade mas NUNCA faz
+sair um tipo que a mesa não tem gente para jogar.
+
+**E o que só isto desbloqueia: um fim.** O host escolhe a duração no lobby (1h /
+1h30 / 2h / sem fim). Perto do fim o Diretor anuncia a última ronda, escolhe um
+tipo que aguente ser o último momento, e a seguir o jogo TERMINA sozinho com as
+estatísticas — em vez de acabar quando alguém se lembra de carregar em terminar,
+sempre a meio de qualquer coisa.
+
+Efeito colateral bom: as sete cópias de `advanceTurn + round=null + phase='wheel'`
+passaram a uma função, `fecharRonda`. Era por isso que qualquer coisa a fazer no
+fim de uma ronda tinha de ser escrita sete vezes.
+
+### 🎲 #2 — Acabar com o espetador (`server/src/game/palpites.js`)
+A descoberta do 1.º playtest (apostas no Torneio, porque "três saem na 1.ª ronda
+e ficam a olhar") nunca tinha sido generalizada. Numa mesa de oito, sete pessoas
+eram plateia em cada Boca Calada, Desafio, Roleta Russa, Relâmpago.
+
+Não é um tipo novo: é um campo na ronda que os motores abrem ou ignoram. Ligar um
+tipo custa duas linhas — `abre()` no início e `resolve()` onde o motor já decide o
+resultado (sem segunda fonte de verdade sobre o que aconteceu). Ligados:
+boca_calada, desafio, isto_ou_aquilo, roleta_russa, categoria_relampago.
+
+**A Mímica e o Desenha ficaram de fora por decisão, não por esquecimento:** neles
+a mesa já está a adivinhar em voz alta, e a aposta ganhava sempre porque é a que
+tem botão. A regra da camada é uma só — entra onde a plateia não tem MESMO nada
+que fazer.
+
+Errar custa 2 golos, o mesmo que no Torneio: a mesa já aprendeu esse preço e não
+se ganha nada em ter duas moedas na mesma noite.
+
+### 🐛 Um defeito de contador apanhado no showroom
+A faixa mostrava "2 de 1 na mesa": o denominador contava só quem está ligado
+AGORA, por isso quem apostasse e caísse (telemóvel a bloquear, wifi de festa)
+saía do denominador sem sair do numerador. A plateia passou a ser quem pode
+apostar **mais** quem já apostou.
+
+### Verificação
+- `npm test`: **96 testes, 0 falhas** (eram 73). Dois ficheiros novos:
+  · `director.test.js` (16) — fixa COMPORTAMENTO DE MESA, não implementação:
+    "depois de três jogos longos a mesa recebe um curto", "o aquecimento não é
+    sítio para o Vasco", "no final só sobra o que aguenta ser o fim", "os saltos
+    de rotação têm travão". Mais o final ponta a ponta: anuncia-se, joga-se, o
+    jogo acaba sozinho com estatísticas.
+  · `palpites.test.js` (7) — o invariante do segredo na sua forma forte: TROCAR
+    os palpites de toda a gente não pode mudar uma vírgula do payload. (A
+    primeira versão do teste procurava a string "aceita" no estado e falhava à
+    toa: as CHAVES das opções têm de lá estar, senão não havia em que carregar.)
+- Cliente: build limpo, e verificado no browser a sério — a duração da noite no
+  lobby, o "Ronda 0 · aquecimento" no cabeçalho, e a intensidade a subir de LEVE
+  a CAOS ao longo de 9 rondas com o fundo a acompanhar.
+- Os quatro estados da faixa de palpites vistos no showroom (`?demo=1` →
+  🎲 Palpites da mesa), que é onde se apanhou o defeito do contador. Ao vivo com
+  bots a janela de aposta dura ~1s, por isso o palco é o único sítio onde se
+  consegue mesmo olhar para ela.
+
+### O que NÃO foi feito, e porquê
+#3 (fundir os três modos) fica para DEPOIS do playtest. É o refactor que toca em
+~1900 linhas de três motores que hoje funcionam, e não há como o validar sem um
+grupo à mesa; fazê-lo esta semana era chegar a 11 de setembro com o jogo instável
+e sem saber o que partiu. #4 (memória entre noites) precisa de schema novo e de
+combinar com o colega. #5 (mão de cartas transversal) assenta melhor depois do #2
+estar visto ao vivo — é a mesma ideia de dar agência à plateia.
+
+---
+
 ## 2026-09-02 (b) — Step up visual: humor da noite, a roda e as batidas
 
 Segunda parte do dia, agora do lado do design. O terreno já era bom (fundo

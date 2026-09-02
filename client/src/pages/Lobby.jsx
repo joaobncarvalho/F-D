@@ -31,7 +31,7 @@ const DEV_MODE =
 
 export default function Lobby({
   room, youId, messages, error, onSendMessage, onStart, onVoteIntensity,
-  onSetMode, onSetIdentity, onSetPack, onSetCurve, onAddBots, onLeave,
+  onSetMode, onSetIdentity, onSetPack, onSetCurve, onSetNightLength, onAddBots, onLeave,
 }) {
   const [draft, setDraft] = useState('');
   const [showQR, setShowQR] = useState(false);
@@ -360,6 +360,36 @@ export default function Lobby({
           </button>
           <p className="text-xs text-white/40">
             Com a curva, a intensidade votada é o <b>teto</b>: começa leve e sobe ao longo da noite.
+          </p>
+
+          {/* Duração da noite — é isto que dá um FIM ao jogo. Sem ela a noite
+              acaba quando alguém se lembra de carregar em "terminar", sempre a
+              meio de qualquer coisa; com ela o jogo monta a última ronda,
+              avisa a mesa e fecha com as contas feitas. */}
+          <p className="text-sm font-bold mt-2">⏳ Duração da noite</p>
+          <div className="grid grid-cols-4 gap-2">
+            {[
+              [null, 'Sem fim'],
+              [60, '1h'],
+              [90, '1h30'],
+              [120, '2h'],
+            ].map(([min, rotulo]) => (
+              <button
+                key={rotulo}
+                onClick={() => {
+                  sfx.click();
+                  onSetNightLength(min);
+                }}
+                className={`fd-chip text-center ${(room.duracaoMin || null) === min ? 'fd-chip-on' : ''}`}
+              >
+                {rotulo}
+              </button>
+            ))}
+          </div>
+          <p className="text-xs text-white/40">
+            {room.duracaoMin
+              ? 'Perto do fim o jogo anuncia a última ronda, escolhe um jogo à altura e fecha com as estatísticas.'
+              : 'Sem duração, joga-se até o anfitrião terminar (como até aqui).'}
           </p>
 
           <a

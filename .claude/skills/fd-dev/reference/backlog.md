@@ -93,6 +93,33 @@ pós-MVP / v2 · **💡** = ideia nova a validar.
 - [x] Torneio "fazível" com 6 pessoas: apostas + final à melhor de 3
 - [x] Casa ?? com banco 3× maior e probabilidades afinadas
 
+## 🏗️ Reestruturações grandes (2026-09-02)
+
+As cinco que mexem na FORMA do jogo, por ordem de retorno. #1 e #2 feitas.
+
+- [x] **#1 O Diretor** — a roda passa a encenação: lê a mesa (quem anda calado,
+      quem está a levar com tudo, que carga saiu nas últimas rondas, em que ponto
+      vai a noite) e escolhe o momento. Desbloqueia um FIM: com duração planeada,
+      anuncia a última ronda e fecha sozinho. `server/src/game/director.js`.
+- [x] **#2 Acabar com o espetador** — segunda camada em cada ronda: enquanto um
+      joga, a mesa aposta; quem erra bebe 2. Ligada aos 5 tipos em que a plateia
+      não tinha nada que fazer. `server/src/game/palpites.js`.
+- [ ] **#3 Fundir os três modos** — o Tabuleiro como casca (progressão), a Roda
+      como motor de conteúdo, o Torneio como fase final. Mata a duplicação de
+      ordem-de-vez / stats / intensidade / feed / fim-de-jogo nos três motores
+      (~1900 linhas). **Depois do playtest de 11 set** — é o único desta lista
+      que desestabiliza o que já funciona, e precisa de validação à mesa.
+- [ ] **#4 O grupo como entidade** — memória entre noites (os mesmos jogadores,
+      as noites anteriores, as respostas antigas) para o conteúdo se virar para
+      dentro: callbacks ao que aquelas pessoas fizeram no mês passado. Pouco
+      schema, retorno desproporcional. Precisa de combinar com o colega (BD).
+- [ ] **#5 Estado privado como mecânica central** — generalizar a mão de cartas
+      privadas do Tabuleiro a todos os modos (imunidade, obrigar a beber, trocar
+      destino). Assenta melhor depois de o #2 ser visto ao vivo: é a mesma ideia
+      de dar agência à plateia.
+
+---
+
 ## 💡 Ideias novas (a validar)
 
 Estas vão além do FD — candidatas a diferenciar o jogo. Discutir prioridade.
