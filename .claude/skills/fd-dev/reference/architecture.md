@@ -199,6 +199,54 @@ Objetivo: a app nunca fala Prisma diretamente nos handlers. Introduzir um
 createdAt, intensityVotes, players: [{ id, name, lives, isHost, connected,
 eliminated }] }` (players ordenados por `joinedAt`).
 
+### Camadas "hardcore" (2026-09-03)
+
+> ⚠️ As secções acima descrevem o núcleo e não foram todas reescritas: contagens
+> de tipos e de prompts nelas estão desatualizadas. Esta secção está em dia.
+
+Três camadas transversais e um modo, todos por cima do MESMO motor da Roda. A
+regra de desenho que os une, e que tem testes dedicados: **nada disto manda beber
+mais** — mexe em vidas, em vez, em exposição e em risco de saída.
+
+**Modificadores** (`game/modificadores.js`) — seis interruptores de REGRAS, que o
+host liga no lobby (`set_modifiers`) e que são ortogonais à intensidade (essa só
+mexe no conteúdo). Chegam a todos em `room.modifiers = { ativos, catalogo }` e
+ficam em `game.modifiers` a partir do `start_game`. Pontos de leitura:
+`custoRecusa` e `morteSubita` no `resolveAction`, `podeDobrar` na serialização,
+`revelaRazao` no handler do `submit_rps`. O **Alvo Marcado** é registado dentro do
+`helpers.perdeVida` (e não no `resolveAction`) porque há cinco caminhos que tiram
+vidas; o travão de repetições vive lá com ele.
+
+**A Conta** (`game/divida.js`, modificador `divida`) — `game.dividas` (playerId →
+goles) mais `game.heranca`. Ações: `player_action:'adiar'`, `divida_transfere`,
+`heranca_escolhe`. **Fecha** no `buildStats` e no evento do Cobrador; sem esses
+dois pontos, adiar seria uma forma gratuita de nunca beber.
+
+**Tipos novos** — a roda tem **24** tipos. Os seis de 2026-09-03 e o que cada um
+esconde do broadcast (é sempre aí que está o risco):
+
+| fase | módulo | privado (server-side) | substates |
+|---|---|---|---|
+| `bomba` | `game/bomba.js` | `pavioMs`, `acesaEm` | `a_arder → rebentou` |
+| `leilao` | `game/leilao.js` | `licitacoes` (só `jaLicitaram`) | `licitar → result` |
+| `sincronia` | `game/sincronia.js` | `respostas` (só `jaResponderam`) | `responder → result` |
+| `detetor` | `game/detetor.js` | `verdade`, `votos` | `responder → votar → result` |
+| `julgamento` | `game/julgamento.js` | votos (via `veredito.js`) | `defesa → votar → result` |
+| `contrato` | `game/contrato.js` | assinaturas (só `jaAssinaram`) | `escolher → assinar → result` |
+
+O Julgamento reutiliza o `veredito.js` (agora com `rotulos` configuráveis) e o
+Contrato as `activeRules` — não há sistemas paralelos de votação nem de regras.
+
+**Modo da Morte** (`game/morte.js`, `room.mode = 'morte'`) — **camada, não motor**.
+Corre o `game.js` inteiro; só muda a resolução. Estado em `game.morte`. Três
+regras: recusar elimina (no `resolveAction`), quem sai vira fantasma com mão
+privada + testamento (em `morte.varre`, chamado do `fecharRonda` — um só sítio,
+porque há uma dúzia de caminhos que eliminam alguém), e o relógio da ronda
+encurta (o `autoresolve.timeoutFor` lê `morte.segundosRonda`). Eventos:
+`fantasma_carta`, `testamento`; canal privado `fantasma_mao` (o broadcast leva só
+**quantas** cartas cada fantasma tem, nunca quais). Restando dois, o `spinWheel`
+força o `duelo`; restando um, o `fecharRonda` termina a noite.
+
 **Eliminação:** ao ficar com 0 vidas (recusa fatal em Boca Calada/Desafio) o
 jogador fica `eliminated` — sai da rotação e das votações (`connectedOrder` só
 conta ativos) e o cliente mostra um **overlay de telemóvel partido**

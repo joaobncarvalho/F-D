@@ -120,14 +120,42 @@ As cinco que mexem na FORMA do jogo, por ordem de retorno. #1 e #2 feitas.
 
 ---
 
+## 💀 Camadas "hardcore" (2026-09-03) — feitas
+
+O pedido foi "mais jogos e intensidades mais hardcore, incluindo um modo da
+morte". A decisão de desenho que sustenta as quatro camadas: **hardcore não é
+mais álcool** (satura em duas rondas e é o único vetor perigoso) — é risco
+social e risco de estado. **Nada disto manda beber mais do que o jogo normal**;
+tudo mexe em vidas, em vez, em exposição e em risco de saída. Ver
+`progress-log.md` de 2026-09-03 e os cabeçalhos dos módulos.
+
+- [x] **Modificadores da noite** (`game/modificadores.js`) — ⛓️ Sem Escape ·
+      🎯 Alvo Marcado · 🔁 Dobro ou Nada · 🔒 Sem Anonimato · 📿 A Conta ·
+      💀 Morte Súbita. Ortogonais à intensidade, ligam-se à unidade no lobby.
+- [x] **A Conta** (`game/divida.js`) — adiar (com juro), transferir (quem assume
+      ganha uma vida) e herdar. Fecha no fim da noite e no evento do Cobrador.
+- [x] **Seis tipos novos** — 💣 Bomba-Relógio · 🔨 Leilão · 🔗 Sincronia ·
+      🕵️‍♂️ Detetor · ⚖️ Julgamento · 🤝 Contrato (~110 prompts).
+- [x] **Modo da Morte** (`game/morte.js`) — CAMADA sobre a Roda, não um quarto
+      motor. Não há recusar · quem sai vira fantasma (cartas + testamento) ·
+      o relógio encurta · acaba num duelo entre os dois últimos.
+
+**Por testar à mesa** (playtest de 11 set): poucos modificadores de cada vez, e
+o Modo da Morte com 5+ pessoas — é aí que os fantasmas ganham massa crítica.
+Perguntas em aberto para o playtest: o pavio da Bomba (18–62 s) está bem
+calibrado? Duas vidas no Modo da Morte é curto de mais? O teto de 10 goles da
+Conta chega para haver negociação a sério?
+
+---
+
 ## 💡 Ideias novas (a validar)
 
 Estas vão além do FD — candidatas a diferenciar o jogo. Discutir prioridade.
 
 - 💡 **Modo "história"/rondas temáticas** — sequência curada de prompts com arco
   (aquecimento → picante), em vez de puramente aleatório.
-- 💡 **Cartas de sorte/azar** — eventos que mexem com as vidas: "troca de vidas
-  com o jogador à tua direita", "todos bebem", "imunidade na próxima ronda".
+- ~~💡 **Cartas de sorte/azar**~~ — feito em duas frentes: o Evento da Noite
+  (2026-09-02) e as cartas de fantasma do Modo da Morte (2026-09-03).
 - 💡 **Alvos direcionados** — em certos prompts, o jogador da vez escolhe **a
   quem** dirige o desafio (mais interação de grupo).
 - 💡 **Votação "MVP da ronda"** — no fim de cada ronda o grupo vota no melhor

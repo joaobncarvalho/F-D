@@ -5,6 +5,116 @@
 
 ---
 
+## 2026-09-03 — As quatro camadas "hardcore": modificadores, A Conta, seis tipos novos e o Modo da Morte
+
+O pedido era "mais jogos e níveis de intensidade mais hardcore, incluindo um modo
+da morte". A primeira conclusão foi de desenho, e é a que sustenta tudo o resto:
+
+> **Hardcore não é mais álcool.** Mais álcool satura em duas rondas, estraga a
+> noite e é o único vetor perigoso. O hardcore que aguenta uma noite inteira é
+> risco **social** e risco de **estado**: quem decide, quanto custa decidir mal,
+> e o que sobra depois de a ronda acabar.
+
+Daí a regra que atravessa as quatro camadas e tem testes dedicados em duas delas:
+**nada disto manda beber mais do que o jogo normal.** Tudo mexe em vidas, em vez,
+em exposição e em risco de saída. É também o que torna possível ter um modo de
+eliminação sem que o castigo de perder recaia em quem já bebeu de mais.
+
+### Camada 1 — Modificadores (`game/modificadores.js`)
+Seis interruptores que o host liga no lobby e que mudam as REGRAS da noite,
+ortogonais à intensidade (que só mexia no conteúdo):
+
+| | |
+|---|---|
+| ⛓️ Sem Escape | recusar custa duas vidas |
+| 🎯 Alvo Marcado | quem perde vida fica na mira (máx. 2 seguidas) |
+| 🔁 Dobro ou Nada | aceitar e dobrar: a mesa julga, +1 vida ou −1 |
+| 🔒 Sem Anonimato | a razão das Intrigas é sempre revelada no fim |
+| 📿 A Conta | ver camada 2 |
+| 💀 Morte Súbita | no último terço, recusar elimina |
+
+Porque não é um sexto nível a seguir ao `caos`: escolher um nível é escolher
+tudo; escolher interruptores é escolher o que ESTE grupo acha divertido — e são
+testáveis e desligáveis à unidade.
+
+O `helpers.perdeVida` passou a marcar o Alvo Marcado (e não o `resolveAction`):
+há cinco caminhos que tiram vidas, e escrito em cada um era regra esquecida em três.
+
+### Camada 2 — A Conta (`game/divida.js`)
+Tudo no F&D se resolvia dentro da ronda; não havia nada que se carregasse pela
+noite fora, logo não havia dívidas nem favores. Agora um gole pode adiar-se:
+**adiar** (não bebes, ficas a dever com juro — a vida custa o mesmo que recusar),
+**transferir** (alguém assume a conta e ganha uma vida por isso: vida contra
+goles, uma troca real que se negoceia em voz alta) e **herdar** (quem é eliminado
+escolhe a quem deixa a conta — o último ato de quem sai).
+
+A conta **fecha** no fim da noite e no evento do Cobrador. Sem isso, adiar era uma
+forma gratuita de nunca beber e o sistema era decoração; há um teste por cada um
+desses dois sítios.
+
+### Camada 3 — Seis tipos novos
+Nenhum repete um contrato do catálogo:
+**💣 Bomba-Relógio** (o único tipo físico e barulhento; o pavio é secreto e é a
+regra inteira do jogo) · **🔨 Leilão** (licita-se em segredo para NÃO fazer o
+desafio; quem licitar menos, fá-lo e não bebe — inverte a leitura da mesa toda) ·
+**🔗 Sincronia** (o único cooperativo) · **🕵️‍♂️ Detetor** (o primeiro tipo em que
+mentir é jogada legítima e premiada) · **⚖️ Julgamento** (três papéis em
+simultâneo; condenar tem custo, senão votava-se sempre culpado) · **🤝 Contrato**
+(o Buddy com o que lhe faltava: dura e é preciso os dois quererem).
+
+~110 prompts novos com curva de leve a caos. Reaproveitou-se em vez de duplicar:
+o Julgamento usa o `veredito.js` (com rótulos configuráveis) e o Contrato usa as
+`activeRules` que já existiam.
+
+### Camada 4 — Modo da Morte, "Última Ronda" (`game/morte.js`)
+**Não é um quarto motor.** É uma camada sobre a Roda — mesmas rondas, mesmos 24
+tipos, mesmo Diretor. ~290 linhas contra as ~1900 que um motor novo duplicaria
+(exatamente a dívida que a reestruturação #3 existe para pagar). Três regras:
+
+1. **Não há recusar** — ou fazes, ou sais.
+2. **Quem sai ganha poder** — é a inversão que faz o modo funcionar. Num jogo de
+   eliminação normal, sair é ficar a ver os outros divertirem-se, o pior castigo
+   possível numa festa. Aqui voltas como **fantasma**: mão de cartas privadas
+   (marcar, condenar, ressuscitar, trocar vidas — uma por ronda no total, para a
+   ronda dos vivos não desaparecer debaixo dos mortos) e um **testamento**, uma
+   regra tua que vale até ao fim.
+3. **O relógio encurta** a cada eliminação (60 s → 15 s).
+
+E acaba sozinho: restando dois, duelo; restando um, é o vencedor.
+
+### Ficheiros
+**server** — novos: `game/{modificadores,divida,morte,bomba,leilao,sincronia,detetor,julgamento,contrato}.js`.
+Tocados: `game.js`, `rooms.js`, `socket.js`, `autoresolve.js`, `bots.js`,
+`game/{helpers,veredito,eventos}.js`, `content/prompts.data.js`, `db/02_seed.sql`.
+**client** — novos: `games/{DividaBand,MorteBand,hardcoreCards}.jsx`.
+Tocados: `App.jsx`, `Game.jsx`, `Lobby.jsx`, `Display.jsx`, `Rules.jsx`,
+`games/{shared,cards}.jsx`.
+**testes** — `modificadores` (13), `divida` (11), `hardcore-tipos` (19), `morte` (16),
+mais três casos novos no `socket-e2e` e os seis tipos no `bots-e2e`.
+
+### Como foi verificado
+`npm test` **167/167** (eram 108), em **25 corridas seguidas** da suite completa
+sem uma única falha. `npm run build` limpo. Servidor arranca e responde no
+`/health`. O e2e de rede exercita mesmo os canais privados novos.
+
+### Bugs apanhados pelo caminho
+- **Bomba (código de produção):** o pavio era um float e `acesaEm` derivava de
+  `Date.now()` (~1e12), por isso a subtração perdia os bits de baixo e o "já
+  rebentou?" falhava por milésimos — num tique de bots, voltas infinitas.
+- **Três flakes latentes nos testes**, todos agravados por a roda ter passado de
+  18 para 24 tipos e nenhum deles bug do jogo: uma promessa pendurada no
+  `giraAte` do socket-e2e (rejeitava fora do teste e derrubava a corrida), o
+  `rondaDesafio` que não repunha o `roundCount` (a mesa "envelhecia" centenas de
+  rondas a procurar um tipo e ligava sozinha a Morte Súbita), e o
+  `palpites.test.js` que nunca tratou dos prompts com buddy.
+
+### Em aberto
+Nada disto foi à mesa. O playtest de 11 set deve escolher **poucos**
+modificadores de cada vez (o próprio lobby avisa disso) e correr o Modo da Morte
+com 5+ pessoas, que é onde os fantasmas ganham massa crítica.
+
+---
+
 ## 2026-09-02 (d) — Cinco pedidos do João: poderes do host, veredito da mesa, batidas, Evento da Noite e fim dos packs
 
 ### 1. O host deixou de carregar pelos outros

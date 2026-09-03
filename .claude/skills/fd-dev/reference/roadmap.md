@@ -166,9 +166,27 @@ Legenda: ✅ feito · 🚧 em curso · ⬜ por fazer · 🔗 ponto de integraç�
 - [x] **Cartas privadas** (melhoria): a mão só chega a cada dono (`board_hand`); o
       broadcast leva só a contagem (🎴×N). Deixaram de ser públicas.
 
+- [x] **As quatro camadas "hardcore" (2026-09-03)** — pedido do João: mais jogos e
+      intensidades mais fortes, com um "modo da morte". Ver `progress-log.md`.
+      · **Modificadores** (`game/modificadores.js`): ⛓️ Sem Escape · 🎯 Alvo
+        Marcado · 🔁 Dobro ou Nada · 🔒 Sem Anonimato · 📿 A Conta · 💀 Morte
+        Súbita — mudam as REGRAS da noite, ortogonais à intensidade.
+      · **A Conta** (`game/divida.js`): adiar com juro, transferir (quem assume
+        ganha uma vida), herdar de quem sai. Fecha no fim e no Cobrador.
+      · **Seis tipos novos**: 💣 Bomba-Relógio · 🔨 Leilão · 🔗 Sincronia ·
+        🕵️‍♂️ Detetor · ⚖️ Julgamento · 🤝 Contrato (~110 prompts). A roda passa
+        de 18 para **24 tipos**.
+      · **Modo da Morte** (`game/morte.js`): 4.º modo do lobby, mas implementado
+        como CAMADA sobre a Roda — não duplica o motor (ver #3 das reestruturações).
+      Princípio transversal, com testes dedicados: **nada disto manda beber mais**
+      — mexe em vidas, em vez, em exposição e em risco de saída.
+      Verificado: `npm test` **167/167** em 25 corridas seguidas; build limpo.
+      **Por validar à mesa no playtest de 11 set.**
+
 **Colega (BD)**
 - [ ] Troubleshooting de queries/performance durante os testes
 - [ ] Validar estratégia de limpeza/arquivo de salas antigas
+- [ ] Correr `db push` + seed com os 6 tipos novos (`db/02_seed.sql` já regenerado)
 
 ---
 
