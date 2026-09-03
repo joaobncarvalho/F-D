@@ -5,6 +5,7 @@ import { serializeBoard } from './board.js';
 import { serializeTournament } from './tournament.js';
 import { sanitizeText } from './util.js';
 import { serializeFeed } from './feed.js';
+import * as modificadores from './game/modificadores.js';
 import { EMOJIS, COLORS, defaultIdentity } from './content/identity.js';
 
 export { AppError }; // re-exportado para compatibilidade (socket.js importa daqui)
@@ -69,6 +70,7 @@ export class RoomManager {
       mode: 'wheel', // 'wheel' (roda) | 'board' (tabuleiro) | 'tournament' (torneio)
         curve: true, // curva de intensidade (leve → teto votado ao longo da noite)
     duracaoMin: null, // duração planeada da noite (min) — null = sem fim previsto
+      modifiers: [], // modificadores da noite (game/modificadores.js), escolhidos pelo host
       paused: false, // pausa do host: congela ações e cronómetros
       feed: [], // feed de eventos da sala (feed.js)
     };
@@ -268,6 +270,21 @@ export class RoomManager {
   }
 
   /**
+   * Modificadores da noite (game/modificadores.js). Só o host, e só no lobby:
+   * ligá-los a meio mudava as regras a quem já tinha decidido o que fazer com as
+   * vidas que tem.
+   */
+  setModifiers(code, playerId, lista) {
+    const room = this.getRoom(code);
+    if (!room) throw new AppError('Sala não encontrada.');
+    const player = room.players.get(playerId);
+    if (!player || !player.isHost) throw new AppError('Só o host escolhe os modificadores.');
+    if (room.status !== 'lobby') throw new AppError('O jogo já começou.');
+    room.modifiers = modificadores.normaliza(lista);
+    return room;
+  }
+
+  /**
    * Pausa do host ("intervalo, casa de banho"). Enquanto a sala está em pausa o
    * servidor recusa ações de jogo e os cronómetros do cliente congelam.
    */
@@ -368,6 +385,7 @@ export function serializeRoom(room) {
     mode: room.mode || 'wheel',
     curve: room.curve !== false,
     duracaoMin: room.duracaoMin || null,
+    modifiers: modificadores.serialize(room.modifiers || []),
     paused: !!room.paused,
     feed: serializeFeed(room),
     // Estado de jogo (null enquanto no lobby). Serialização/anonimização em game.js/board.js.

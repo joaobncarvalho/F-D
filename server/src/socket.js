@@ -9,6 +9,7 @@ import { registerBoardHandlers } from './socket/boardHandlers.js';
 import { registerTournamentHandlers } from './socket/tournamentHandlers.js';
 import * as autoresolve from './autoresolve.js';
 import * as director from './game/director.js';
+import * as modificadores from './game/modificadores.js';
 import * as snapshot from './snapshot.js';
 
 const rooms = new RoomManager();
@@ -217,6 +218,17 @@ export function registerSocketHandlers(io) {
       }
     });
 
+    socket.on('set_modifiers', ({ modifiers } = {}, ack) => {
+      try {
+        const { code, playerId } = socket.data;
+        rooms.setModifiers(code, playerId, modifiers);
+        broadcastState(io, code);
+        if (typeof ack === 'function') ack({ ok: true });
+      } catch (err) {
+        handleError(socket, ack, err);
+      }
+    });
+
     socket.on('pause_game', ({ paused } = {}, ack) => {
       try {
         const { code, playerId } = socket.data;
@@ -273,6 +285,7 @@ export function registerSocketHandlers(io) {
             intensity: intensityResult.intensity,
             curve: room.curve,
             duracaoMin: room.duracaoMin, // plano da noite → o Diretor monta o final
+            modifiers: room.modifiers, // regras da noite (game/modificadores.js)
           }); // modo Roda
         }
         io.to(code).emit('game_started', { mode: room.mode, intensityResult });
@@ -406,6 +419,16 @@ export function registerSocketHandlers(io) {
           io.to(res.accusedId).emit('intrigas_reason', {
             roundId: room.game.round.id,
             reason: res.reason,
+          });
+        }
+        // Modificador "Sem Anonimato": a razão vai para a mesa TODA no fim, quer
+        // o acusado tenha ganho quer não. É o único sítio onde a promessa de
+        // anonimato das Intrigas se quebra — e só porque o host a desligou.
+        if (res.resolved && modificadores.revelaRazao(room)) {
+          io.to(room.code).emit('intrigas_reason', {
+            roundId: room.game.round.id,
+            reason: res.reason,
+            publica: true,
           });
         }
         broadcastState(io, room.code);

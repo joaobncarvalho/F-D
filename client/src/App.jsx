@@ -303,6 +303,7 @@ export default function App() {
   const setIdentity = useCallback((ident) => socket.emit('set_identity', ident), []);
   const setCurve = useCallback((on) => socket.emit('set_curve', { on }), []);
   const setNightLength = useCallback((minutos) => socket.emit('set_night_length', { minutos }), []);
+  const setModifiers = useCallback((modifiers) => socket.emit('set_modifiers', { modifiers }), []);
   const pauseGame = useCallback((paused) => socket.emit('pause_game', { paused }), []);
   const grupoAnswer = useCallback((value) => socket.emit('grupo_answer', { value }), []);
   const grupoReveal = useCallback(() => socket.emit('grupo_reveal'), []);
@@ -499,6 +500,7 @@ export default function App() {
             onSetIdentity={setIdentity}
             onSetCurve={setCurve}
             onSetNightLength={setNightLength}
+            onSetModifiers={setModifiers}
             onAddBots={addBots}
             onLeave={leaveRoom}
           />

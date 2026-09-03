@@ -113,6 +113,14 @@ async function resolveWheel(room) {
     }
 
     case 'prompt':
+      // Dobro ou Nada: se ele dobrou e a mesa não votou, fecha-se com quem votou
+      // (a mesma regra dos outros vereditos — o silêncio favorece quem atuou).
+      if (r?.dobro?.aberto) {
+        game.fechaVeredito(room);
+        pushFeed(room, '⏱️', 'Fechou-se o veredito do dobro com quem votou a tempo.');
+        return true;
+      }
+      if (r?.dobro && r.status === 'resolved') return continueOrAbandon(room);
       // Não responder é o mesmo que recusar: é a regra do jogo, não um castigo novo.
       if (r?.needsBuddy && !r.buddyId) game.chooseBuddy(room, r.currentPlayerId, outros(r.currentPlayerId)[0]?.id);
       pushFeed(room, '⏱️', 'Tempo esgotado — conta como recusa.');

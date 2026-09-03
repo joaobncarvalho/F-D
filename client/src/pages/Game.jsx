@@ -5,7 +5,7 @@ import Beat from '../components/Beat.jsx';
 import PalpiteBand from './games/PalpiteBand.jsx';
 import { MOLA, PULSA } from '../motion.js';
 import BrokenScreen from '../components/BrokenScreen.jsx';
-import { TYPES } from './games/shared.jsx';
+import { TYPES, MODIFICADORES } from './games/shared.jsx';
 import { PromptCard, ChoiceCard, IntrigasCard } from './games/cards.jsx';
 import { GuessingCard } from './games/GuessingCard.jsx';
 import { PiramideCard } from './games/PiramideCard.jsx';
@@ -229,6 +229,37 @@ export default function Game(props) {
 
       <Feed feed={room.feed} />
 
+      {/* Modificadores em vigor. Uma regra que muda o custo de recusar tem de
+          estar à vista de quem vai decidir recusar — não só no lobby, onde foi
+          ligada há uma hora. A Morte Súbita destaca-se quando começa a valer. */}
+      {g.modifiers?.length > 0 && (
+        <div
+          className="fd-card p-2.5 flex flex-wrap items-center gap-x-3 gap-y-1"
+          style={g.morteSubita ? { borderColor: 'rgba(244,63,94,0.55)' } : undefined}
+        >
+          {g.modifiers.map((k) => {
+            const m = MODIFICADORES[k];
+            if (!m) return null;
+            const aVigorar = k !== 'morte_subita' || g.morteSubita;
+            return (
+              <span
+                key={k}
+                className={`text-xs whitespace-nowrap ${aVigorar ? 'text-white/75' : 'text-white/30'}`}
+                title={m.desc}
+              >
+                {m.emoji} {m.label}
+                {k === 'morte_subita' && !g.morteSubita && ' (ainda não)'}
+              </span>
+            );
+          })}
+          {g.morteSubita && (
+            <span className="text-xs font-bold text-rose-300 w-full">
+              💀 Morte Súbita a valer: recusar põe-te fora.
+            </span>
+          )}
+        </div>
+      )}
+
       {g.activeRules?.length > 0 && (
         <div className="fd-card p-2.5 flex flex-col gap-1">
           <p className="text-xs font-bold text-amber-300">🎵 Regras ativas</p>
@@ -286,8 +317,13 @@ export default function Game(props) {
             room={room}
             youId={youId}
             isMyTurn={round.currentPlayerId === youId}
+            canControl={isHost || isSpinner}
+            podeDobrar={!!g.podeDobrar}
+            morteSubita={!!g.morteSubita}
             onAction={props.onAction}
             onChooseBuddy={props.onChooseBuddy}
+            onVota={props.onVotaVeredito}
+            onContinue={props.onContinue}
           />
         )}
         {revealed && g.phase === 'choice' && (

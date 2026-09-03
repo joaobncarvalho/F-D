@@ -5,10 +5,17 @@
 import { sfx } from '../../sfx.js';
 import Timer from '../../components/Timer.jsx';
 import { CardShell, BuddyBlock } from './shared.jsx';
+import VereditoBand from './VereditoBand.jsx';
 
-export function PromptCard({ round, room, youId, isMyTurn, onAction, onChooseBuddy }) {
+export function PromptCard({
+  round, room, youId, isMyTurn, canControl, podeDobrar, morteSubita,
+  onAction, onChooseBuddy, onVota, onContinue,
+}) {
   const isBoca = round.gameTypeKey === 'boca_calada';
   const buddyPending = round.needsBuddy && !round.buddyId;
+  // Modificador "Dobro ou Nada": ele aceitou e foi a dobrar — a ronda fica aberta
+  // enquanto a mesa julga, com a mesma faixa de veredito dos jogos a tempo.
+  const emJulgamento = !!round.dobro;
   return (
     <CardShell typeKey={round.gameTypeKey}>
       <p className="text-lg leading-snug">{round.prompt?.text || '—'}</p>
@@ -25,26 +32,51 @@ export function PromptCard({ round, room, youId, isMyTurn, onAction, onChooseBud
           <p className="text-xs text-white/40">Responde antes que toque… ou bebe! 🍺</p>
         </div>
       )}
-      {isMyTurn && !buddyPending ? (
-        <div className="flex gap-3 mt-1">
-          <button
-            onClick={() => {
-              sfx.click();
-              onAction('accept');
-            }}
-            className="fd-btn fd-btn-success flex-1"
-          >
-            {isBoca ? '🎤 Respondo' : '✅ Aceito'}
-          </button>
-          <button
-            onClick={() => {
-              sfx.click();
-              onAction('refuse');
-            }}
-            className="fd-btn fd-btn-danger flex-1"
-          >
-            {isBoca ? '🤐 Boca Calada' : '🍺 Recuso'}
-          </button>
+      {emJulgamento ? (
+        <div className="flex flex-col gap-2 mt-1">
+          <VereditoBand veredito={round.veredito} room={room} youId={youId} onVota={onVota} />
+          {round.dobro.resultado && canControl && (
+            <button onClick={() => { sfx.click(); onContinue(); }} className="fd-btn fd-btn-primary">
+              ➡️ Continuar
+            </button>
+          )}
+        </div>
+      ) : isMyTurn && !buddyPending ? (
+        <div className="flex flex-col gap-2 mt-1">
+          <div className="flex gap-3">
+            <button
+              onClick={() => {
+                sfx.click();
+                onAction('accept');
+              }}
+              className="fd-btn fd-btn-success flex-1"
+            >
+              {isBoca ? '🎤 Respondo' : '✅ Aceito'}
+            </button>
+            <button
+              onClick={() => {
+                sfx.click();
+                onAction('refuse');
+              }}
+              className="fd-btn fd-btn-danger flex-1"
+            >
+              {morteSubita ? '💀 Recuso (saio)' : isBoca ? '🤐 Boca Calada' : '🍺 Recuso'}
+            </button>
+          </div>
+          {/* Dobro ou Nada: o preço está escrito no botão — ninguém deve dobrar
+              sem saber que a vida que pode ganhar é a mesma que pode perder. */}
+          {podeDobrar && (
+            <button
+              onClick={() => {
+                sfx.click();
+                onAction('double');
+              }}
+              className="fd-btn fd-btn-ghost text-sm"
+              style={{ borderColor: 'rgba(255,176,32,0.5)' }}
+            >
+              🔁 Dobro ou nada — a mesa julga: +1 vida se conseguires, −1 se falhares
+            </button>
+          )}
         </div>
       ) : !isMyTurn ? (
         <p className="text-sm text-white/40 mt-1">A aguardar {round.currentPlayerName}…</p>

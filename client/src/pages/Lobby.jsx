@@ -17,6 +17,27 @@ const INTENSITY_OPTS = [
   { key: 'caos', label: '💥 Caos' },
 ];
 
+/**
+ * Espelho do `modificadores.avisos` do servidor. Duplicado de propósito: é texto
+ * de lobby, e mandá-lo pela rede obrigava a um round-trip a cada toque num chip.
+ * O servidor continua a ser quem manda nas regras — isto só as explica.
+ */
+function avisosModificadores(ativos = [], votos = {}) {
+  const out = [];
+  const tem = (k) => ativos.includes(k);
+  if (tem('sem_escape') && tem('morte_subita')) {
+    out.push('⛓️💀 No último terço, uma recusa põe-te fora à primeira.');
+  }
+  if (tem('alvo_marcado') && tem('sem_escape')) {
+    out.push('🎯⛓️ Quem começa a perder afunda depressa.');
+  }
+  const forte = Object.values(votos || {}).some((v) => v === 'hardcore' || v === 'caos');
+  if (ativos.length >= 3 && forte) {
+    out.push('⚠️ Três modificadores com intensidade alta é uma noite curta. Combinem antes de começar.');
+  }
+  return out;
+}
+
 // Modo dev: mostra atalhos de playtest (bots). Ativo em `npm run dev` ou com ?dev.
 const DEV_MODE =
   (typeof import.meta !== 'undefined' && import.meta.env?.DEV) ||
@@ -24,7 +45,7 @@ const DEV_MODE =
 
 export default function Lobby({
   room, youId, messages, error, onSendMessage, onStart, onVoteIntensity,
-  onSetMode, onSetIdentity, onSetCurve, onSetNightLength, onAddBots, onLeave,
+  onSetMode, onSetIdentity, onSetCurve, onSetNightLength, onSetModifiers, onAddBots, onLeave,
 }) {
   const [draft, setDraft] = useState('');
   const [showQR, setShowQR] = useState(false);
@@ -319,6 +340,53 @@ export default function Lobby({
           </div>
         </div>
       )}
+
+      {/* Modificadores da noite — regras, não conteúdo. Todos veem o que está
+          ligado (uma regra que muda o custo de recusar tem de estar à vista
+          antes de alguém decidir recusar); só o host mexe. */}
+      {(() => {
+        const cat = room.modifiers?.catalogo || [];
+        const ativos = room.modifiers?.ativos || [];
+        if (!cat.length || (!isHost && !ativos.length)) return null;
+        const visiveis = isHost ? cat : cat.filter((m) => ativos.includes(m.key));
+        return (
+          <div className="fd-card p-3 flex flex-col gap-2">
+            <span className="text-sm text-white/60">
+              ⚡ Modificadores{' '}
+              <span className="text-white/40">— mudam as regras, não o conteúdo</span>
+            </span>
+            {visiveis.map((m) => {
+              const on = ativos.includes(m.key);
+              return (
+                <button
+                  key={m.key}
+                  disabled={!isHost}
+                  onClick={() => {
+                    sfx.click();
+                    onSetModifiers(on ? ativos.filter((k) => k !== m.key) : [...ativos, m.key]);
+                  }}
+                  className={`fd-chip flex flex-col items-start gap-0.5 text-left ${on ? 'fd-chip-on' : ''} ${
+                    !isHost ? 'opacity-70' : ''
+                  }`}
+                >
+                  <span className="font-bold">
+                    {m.emoji} {m.label}
+                  </span>
+                  <span className="text-xs opacity-70 font-normal leading-tight">{m.desc}</span>
+                </button>
+              );
+            })}
+            {avisosModificadores(ativos, room.intensityVotes).map((a) => (
+              <p key={a} className="text-xs text-amber-300/80 leading-tight">
+                {a}
+              </p>
+            ))}
+            <p className="text-xs text-white/40">
+              Nenhum destes manda beber mais — mexem em vidas, em vez e em exposição.
+            </p>
+          </div>
+        );
+      })()}
 
       {isHost && (
         <div className="fd-card p-3 flex flex-col gap-2">

@@ -18,6 +18,8 @@ import { GRUPO_KEYS, setupGrupo, serializeGrupo } from './game/grupo.js';
 import { setupCascata, serializeCascata } from './game/cascata.js';
 import { setupDesenho, serializeDesenho } from './game/desenho.js';
 import { setupReacaoRoda, serializeReacaoRoda } from './game/reacao.js';
+import { ganhaVida, elimina } from './game/helpers.js';
+import * as modificadores from './game/modificadores.js';
 import * as director from './game/director.js';
 import * as palpites from './game/palpites.js';
 import * as veredito from './game/veredito.js';
@@ -63,10 +65,52 @@ export function fechaVeredito(room) {
   const g = room.game;
   const r = g?.round;
   if (!r?.veredito || r.veredito.fechado) return { fechado: false };
-  const res = r.gameTypeKey === 'mimica' ? mimicaVeredito(room) : relampagoVeredito(room);
+  const res = r.dobro
+    ? dobroVeredito(room)
+    : r.gameTypeKey === 'mimica'
+      ? mimicaVeredito(room)
+      : relampagoVeredito(room);
   if (!res) return { fechado: false };
-  pushFeed(room, res.conseguiu ? '👏' : '💔', veredito.frase(room, res.atorId, res.conseguiu, r.veredito));
+  pushFeed(
+    room,
+    res.conseguiu ? '👏' : '💔',
+    res.frase || veredito.frase(room, res.atorId, res.conseguiu, r.veredito)
+  );
   return { fechado: true, ...res };
+}
+
+/**
+ * Modificador "Dobro ou Nada": alguém aceitou e foi a dobrar. A mesa julgou.
+ *
+ * A aposta é simétrica de propósito — uma vida contra uma vida. Se o prémio
+ * fosse menor do que o risco, ninguém dobrava e o modificador não existia; se
+ * fosse maior, dobrava-se sempre e deixava de ser uma decisão.
+ */
+function dobroVeredito(room) {
+  const g = room.game;
+  const r = g.round;
+  const res = veredito.fecha(room);
+  const atorId = r.currentPlayerId;
+  const nome = nameOf(room, atorId) || 'alguém';
+  let efeito;
+  if (res.conseguiu) {
+    efeito = ganhaVida(room, atorId);
+    r.dobro.resultado = 'ganhou';
+  } else {
+    efeito = perdeVida(room, atorId, { motivo: 'falhou o dobro' });
+    r.dobro.resultado = 'perdeu';
+  }
+  r.dobro.aberto = false;
+  r.status = 'resolved';
+  palpites.resolve(room, 'aceita'); // ele aceitou — dobrar não muda isso
+  return {
+    ...res,
+    efeito,
+    atorId,
+    frase: res.conseguiu
+      ? `🔁 ${nome} dobrou e a mesa deu por bom (${res.sim}-${res.nao}) — mais uma vida`
+      : `🔁 ${nome} dobrou e falhou (${res.nao}-${res.sim}) — menos uma vida`,
+  };
 }
 export { aposta as darPalpite } from './game/palpites.js';
 export { castGuess } from './game/segredos.js';
@@ -134,6 +178,20 @@ function advanceTurn(room) {
     g.currentPlayerId = null;
     return;
   }
+  // Modificador "Alvo Marcado": quem acabou de perder uma vida não sai da mira.
+  // Consome-se a marca aqui (é de uso único por ronda) e o travão das repetições
+  // vive no helpers.marcaAlvo — a mesa não fica a ver a mesma pessoa afundar.
+  if (g.alvoMarcadoId) {
+    const alvo = room.players.get(g.alvoMarcadoId);
+    g.alvoMarcadoId = null;
+    if (alvo && alvo.connected && !alvo.eliminated && order.length > 1) {
+      g.currentPlayerId = alvo.id;
+      pushFeed(room, '🎯', `Alvo Marcado: ${alvo.name} não sai da mira.`);
+      return;
+    }
+    g.alvoSeguidas = 0;
+  }
+
   // Um evento pode ter virado a mesa ao contrário (eventos.js: 'inversao').
   if (g.ordemInvertida) order.reverse();
   let idx = 0;
@@ -306,7 +364,10 @@ export function tallyIntensity(room) {
   return { intensity, randomized, candidates, counts };
 }
 
-export function initGame(room, { lives = DEFAULT_LIVES, intensity = 'leve', curve = true, duracaoMin = null } = {}) {
+export function initGame(
+  room,
+  { lives = DEFAULT_LIVES, intensity = 'leve', curve = true, duracaoMin = null, modifiers = [] } = {}
+) {
   const n = Math.max(MIN_LIVES, Math.min(MAX_LIVES, Number(lives) || DEFAULT_LIVES));
   for (const p of room.players.values()) {
     p.lives = n;
@@ -340,6 +401,10 @@ export function initGame(room, { lives = DEFAULT_LIVES, intensity = 'leve', curv
     tregua: 0, // rondas sem se perderem vidas
     ordemInvertida: false, // um evento pode virar a mesa ao contrário
     activeRules: [], // regras com duração: { id, playerId, playerName, text, remaining }
+    // --- Modificadores da noite (game/modificadores.js) ---
+    modifiers: modificadores.normaliza(modifiers),
+    alvoMarcadoId: null, // "Alvo Marcado": quem fica na mira da próxima ronda
+    alvoSeguidas: 0, // …e há quantas rondas seguidas (travão de repetições)
     finalStats: null,
   };
   eventos.agendaProximo(room.game); // marca a ronda do primeiro evento
@@ -531,15 +596,42 @@ export function resolveAction(room, playerId, action) {
   const st = statsFor(g, playerId);
   let effect;
 
+  // Modificador "Dobro ou Nada": aceitar não fecha logo a ronda — quem quiser
+  // arriscar entrega-se ao julgamento da mesa por mais uma vida.
+  if (action === 'double') {
+    if (!modificadores.podeDobrar(room, g.round)) throw new AppError('Não podes dobrar nesta ronda.');
+    g.round.dobro = { aberto: true, resultado: null };
+    g.round.status = 'doubling';
+    veredito.abre(g.round, [playerId, g.round.buddyId], 'Cumpriu, a dobrar?');
+    pushFeed(room, '🔁', `${player.name} foi a dobrar. A mesa decide.`);
+    return { round: g.round, effect: { type: 'doubling', playerId }, gameOver: null };
+  }
+
   if (action === 'refuse') {
     st.refusals += 1;
     st.drinks += 1;
     pushFeed(room, '🍺', `${player.name} recusou e bebeu`);
-    // Pelo helper partilhado (game/helpers.js) e não à mão: é ele que conhece a
-    // regra do "sem vidas → shot" E a trégua dos eventos da noite.
-    effect = perdeVida(room, playerId, { motivo: 'recusou' });
-    if (effect?.type === 'eliminated') pushFeed(room, '💀', `${player.name} ficou sem vidas — shot!`);
-    if (effect?.type === 'tregua') pushFeed(room, '🛡️', `A trégua salvou o ${player.name}`);
+
+    if (modificadores.morteSubita(room) && (g.tregua || 0) <= 0) {
+      // Morte Súbita: no último terço da noite não há vidas a descontar — quem
+      // recusa sai. Note-se que NÃO se bebe mais por isso: o castigo é a saída.
+      effect = elimina(room, playerId, 'morte súbita');
+      pushFeed(room, '💀', `Morte Súbita: ${player.name} recusou e está fora.`);
+    } else {
+      // Pelo helper partilhado (game/helpers.js) e não à mão: é ele que conhece a
+      // regra do "sem vidas → shot", a trégua dos eventos e o Alvo Marcado.
+      const custo = modificadores.custoRecusa(room);
+      for (let i = 0; i < custo; i++) {
+        const passo = perdeVida(room, playerId, { motivo: 'recusou' });
+        effect = passo || effect;
+        if (!passo || passo.type !== 'vida_perdida') break; // trégua ou já saiu
+      }
+      if (custo > 1 && effect?.type !== 'tregua') {
+        pushFeed(room, '⛓️', `Sem Escape: a recusa do ${player.name} custou o dobro.`);
+      }
+      if (effect?.type === 'eliminated') pushFeed(room, '💀', `${player.name} ficou sem vidas — shot!`);
+      if (effect?.type === 'tregua') pushFeed(room, '🛡️', `A trégua salvou o ${player.name}`);
+    }
     g.round.status = 'refused';
   } else {
     effect = { type: 'accepted', playerId };
@@ -644,6 +736,13 @@ export function continueRound(room, playerId) {
   // só avançam depois de a ronda estar resolvida.
   if (['choice', 'relampago', 'mimica', 'roleta', 'duelo', 'grupo', 'cascata', 'desenho', 'reacao'].includes(g.phase)) {
     if (g.round?.status !== 'resolved') throw new AppError('Esta ronda ainda não terminou.');
+    fecharRonda(room);
+    return { game: g, rewarded: [] };
+  }
+
+  // Dobro ou Nada: a ronda de prompt fica aberta enquanto a mesa julga.
+  if (g.phase === 'prompt' && g.round?.dobro) {
+    if (g.round.status !== 'resolved') throw new AppError('A mesa ainda está a decidir.');
     fecharRonda(room);
     return { game: g, rewarded: [] };
   }
@@ -758,6 +857,12 @@ function serializeRound(g) {
     // Segunda camada: enquanto um joga, a mesa aposta (game/palpites.js).
     palpite: palpites.serialize(r),
   };
+  // Modificador "Dobro ou Nada": o botão só aparece a quem pode dobrar AGORA, e
+  // a faixa de veredito é a mesma dos jogos a tempo (client já a sabe desenhar).
+  if (r.dobro) {
+    base.dobro = { aberto: !!r.dobro.aberto, resultado: r.dobro.resultado || null };
+    base.veredito = veredito.serialize(r);
+  }
   if (r.gameTypeKey === 'isto_ou_aquilo') {
     base.options = r.options || [];
     base.chosen = r.chosen ?? null;
@@ -793,6 +898,11 @@ export function serializeGame(room) {
     // --- Evento da Noite ---
     ultimoEvento: g.ultimoEvento || null,
     tregua: g.tregua || 0,
+    // --- Modificadores (game/modificadores.js) ---
+    modifiers: g.modifiers || [],
+    morteSubita: modificadores.morteSubita(room), // já está a valer? (banner + botões)
+    podeDobrar: modificadores.podeDobrar(room, g.round), // mostra o botão "dobrar"
+    alvoMarcadoId: g.alvoMarcadoId || null,
     ordemInvertida: !!g.ordemInvertida,
     startingLives: g.startingLives,
     roundCount: g.roundCount,

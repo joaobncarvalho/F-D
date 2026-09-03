@@ -28,6 +28,22 @@ export const TYPES = [
   { key: 'reacao', label: 'Reação', color: '#fde047', emoji: '⚡' },
 ];
 
+/**
+ * Modificadores da noite (espelho de server/src/game/modificadores.js).
+ *
+ * Aqui só para o rótulo curto do HUD durante o jogo: o catálogo completo, com as
+ * descrições, chega pela rede no `room.modifiers.catalogo` e é esse que o lobby
+ * mostra. Se um dia aparecer uma chave nova, o HUD ignora-a em silêncio em vez
+ * de partir a ronda a meio.
+ */
+export const MODIFICADORES = {
+  sem_escape: { emoji: '⛓️', label: 'Sem Escape', desc: 'Recusar custa duas vidas.' },
+  alvo_marcado: { emoji: '🎯', label: 'Alvo Marcado', desc: 'Quem perde vida fica na mira.' },
+  dobro_ou_nada: { emoji: '🔁', label: 'Dobro ou Nada', desc: 'Aceitar pode valer o dobro.' },
+  sem_anonimato: { emoji: '🔒', label: 'Sem Anonimato', desc: 'As Intrigas revelam sempre a razão.' },
+  morte_subita: { emoji: '💀', label: 'Morte Súbita', desc: 'No fim da noite, recusar elimina.' },
+};
+
 /** Cor/emoji/label de um tipo — com um fallback seguro para tipos desconhecidos. */
 export function typeMeta(key) {
   return TYPES.find((t) => t.key === key) || { key, label: key, color: '#9b5cff', emoji: '🎲' };

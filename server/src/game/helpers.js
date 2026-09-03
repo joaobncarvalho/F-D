@@ -1,5 +1,8 @@
 // F&D — helpers partilhados do motor da Roda (game.js e módulos dos mini-jogos).
 // Funções puras / sem dependências de outras partes do motor → sem ciclos de import.
+// (`modificadores.js` só depende de `intensity.js`, por isso não fecha ciclo.)
+
+import * as modificadores from './modificadores.js';
 
 // Jogadores ATIVOS (ligados e não eliminados) por ordem de entrada. É a base das
 // vezes, votações e distribuições — eliminados (sem vidas) ficam a ver.
@@ -45,9 +48,51 @@ export function perdeVida(room, playerId, { motivo = '', emoji = '💔' } = {}) 
   if (player.lives === 0) {
     player.eliminated = true; // sem vidas → fora (telemóvel partido)
     st.shots += 1; // o "shot" fatal
+    marcaAlvo(g, null);
     return { type: 'eliminated', playerId, lives: 0, motivo, emoji: '💀' };
   }
+  // Modificador "Alvo Marcado": quem acabou de perder uma vida fica na mira da
+  // ronda seguinte. Fica aqui, e não no `resolveAction`, porque agora há cinco
+  // caminhos que tiram vidas (recusa, veredito, eventos) — escrito em cada um,
+  // era regra esquecida em três.
+  if (modificadores.ativo({ game: g }, 'alvo_marcado')) marcaAlvo(g, playerId);
   return { type: 'vida_perdida', playerId, lives: player.lives, motivo, emoji };
+}
+
+/** Nº máximo de rondas seguidas que a mesma pessoa pode ficar na mira. */
+export const MAX_ALVO_SEGUIDAS = 2;
+
+/**
+ * Regista (ou limpa) quem fica na mira. O travão das repetições vive aqui: sem
+ * ele, azar a dobrar punha a mesa inteira a ver uma pessoa afundar sozinha.
+ */
+function marcaAlvo(g, playerId) {
+  if (!playerId) {
+    g.alvoMarcadoId = null;
+    g.alvoSeguidas = 0;
+    return;
+  }
+  g.alvoSeguidas = g.alvoMarcadoId === playerId ? (g.alvoSeguidas || 0) + 1 : 1;
+  g.alvoMarcadoId = g.alvoSeguidas <= MAX_ALVO_SEGUIDAS ? playerId : null;
+  if (!g.alvoMarcadoId) g.alvoSeguidas = 0;
+}
+
+/**
+ * Põe alguém fora de uma vez só, sem passar pelas vidas.
+ *
+ * Usado pela Morte Súbita e (a seguir) pelo Modo da Morte. NÃO conta um shot: o
+ * castigo é a saída, e somar-lhe bebida seria mandar beber mais quem já estava
+ * a levar com tudo — exatamente o que estes modos não devem fazer.
+ *
+ * @returns {{type:'eliminated', playerId, lives:0, motivo, emoji}|null}
+ */
+export function elimina(room, playerId, motivo = '') {
+  const g = room.game;
+  const player = room.players.get(playerId);
+  if (!player || !g || player.eliminated) return null;
+  player.lives = 0;
+  player.eliminated = true;
+  return { type: 'eliminated', playerId, lives: 0, motivo, emoji: '💀' };
 }
 
 /** Devolve uma vida (eventos bons, prémios). Nunca ressuscita quem já saiu. */
