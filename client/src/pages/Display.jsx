@@ -186,7 +186,14 @@ function PainelRoda({ room, g }) {
       <p className="fd-tv-big font-extrabold" style={{ color: meta.color }}>
         {meta.emoji} {meta.label}
       </p>
-      {r.prompt?.text && <p className="fd-tv-title fd-title font-extrabold mt-[2vh] leading-tight">{r.prompt.text}</p>}
+      {/* Os tipos "hardcore" não guardam o texto em `prompt`: cada um tem o seu
+          campo (o tema da Bomba, o desafio do Leilão…). O ecrã grande quer só a
+          frase que a mesa está a ler, venha ela de onde vier. */}
+      {(() => {
+        const texto = r.prompt?.text || r.tema || r.desafio || r.pergunta || r.acusacao || r.pacto;
+        if (!texto) return null;
+        return <p className="fd-tv-title fd-title font-extrabold mt-[2vh] leading-tight">{texto}</p>;
+      })()}
       {r.options && (
         <div className="flex gap-[2vw] justify-center mt-[3vh]">
           {r.options.map((o, i) => (

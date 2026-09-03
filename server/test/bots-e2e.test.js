@@ -40,6 +40,10 @@ test('Roda e2e (bots): joga todas as mecânicas sem encravar nem fugas', async (
     'boca_calada', 'desafio', 'isto_ou_aquilo', 'intrigas', 'segredos', 'piramide', 'vasco',
     // Tipos de mesa inteira / mecânica (2026-09-01) — se algum encravar, este teste pendura.
     'eu_nunca', 'mais_provavel', 'termometro', 'quem_disse', 'cascata', 'desenho', 'reacao',
+    // Tipos "hardcore" (2026-09-03). A Bomba é a mais delicada: o pavio conta em
+    // segundos reais e uma mesa de bots joga em milissegundos, por isso é aqui
+    // que se apanha se o `bots.js` deixar de adiantar o relógio dela.
+    'bomba', 'leilao', 'sincronia', 'detetor', 'julgamento', 'contrato',
   ];
   while (room.game && room.game.phase !== 'gameover' && iters++ < 8000) {
     // Este teste é sobre MECÂNICAS, não sobre desgaste: mantém-se a mesa de pé

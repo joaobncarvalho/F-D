@@ -16,6 +16,9 @@ import { GrupoCard } from './games/grupoCards.jsx';
 import { CascataCard } from './games/CascataCard.jsx';
 import { DesenhoCard } from './games/DesenhoCard.jsx';
 import { ReacaoCard } from './games/ReacaoCard.jsx';
+import {
+  BombaCard, LeilaoCard, SincroniaCard, DetetorCard, JulgamentoCard, ContratoCard,
+} from './games/hardcoreCards.jsx';
 import Feed, { ShareResult } from '../components/Feed.jsx';
 import { Avatar } from './games/shared.jsx';
 import { socket } from '../socket.js';
@@ -38,6 +41,13 @@ const SPIN_PHASES = [
   'cascata',
   'desenho',
   'reacao',
+  // Tipos "hardcore" — a roda gira para eles como para os outros.
+  'bomba',
+  'leilao',
+  'sincronia',
+  'detetor',
+  'julgamento',
+  'contrato',
 ];
 
 // Sugestões para os indecisos na preparação (banco curado — offline, sem custo).
@@ -483,6 +493,76 @@ export default function Game(props) {
             onStart={props.onDesenhoStart}
             onGuess={props.onDesenhoGuess}
             onGiveUp={props.onDesenhoGiveUp}
+            onContinue={props.onContinue}
+          />
+        )}
+        {/* Tipos "hardcore" (ver games/hardcoreCards.jsx). */}
+        {revealed && g.phase === 'bomba' && (
+          <BombaCard
+            key={round.id}
+            round={round}
+            room={room}
+            youId={youId}
+            canControl={isHost || isSpinner}
+            onPassa={props.onBombaPassa}
+            onContinue={props.onContinue}
+          />
+        )}
+        {revealed && g.phase === 'leilao' && (
+          <LeilaoCard
+            key={round.id}
+            round={round}
+            room={room}
+            youId={youId}
+            canControl={isHost || isSpinner}
+            onLicita={props.onLeilaoLicita}
+            onContinue={props.onContinue}
+          />
+        )}
+        {revealed && g.phase === 'sincronia' && (
+          <SincroniaCard
+            key={round.id}
+            round={round}
+            room={room}
+            youId={youId}
+            canControl={isHost || isSpinner}
+            onResponde={props.onSincroniaResponde}
+            onContinue={props.onContinue}
+          />
+        )}
+        {revealed && g.phase === 'detetor' && (
+          <DetetorCard
+            key={round.id}
+            round={round}
+            room={room}
+            youId={youId}
+            canControl={isHost || isSpinner}
+            onMarca={props.onDetetorMarca}
+            onVota={props.onDetetorVota}
+            onContinue={props.onContinue}
+          />
+        )}
+        {revealed && g.phase === 'julgamento' && (
+          <JulgamentoCard
+            key={round.id}
+            round={round}
+            room={room}
+            youId={youId}
+            canControl={isHost || isSpinner}
+            onAoVoto={props.onJulgamentoAoVoto}
+            onVota={props.onVotaVeredito}
+            onContinue={props.onContinue}
+          />
+        )}
+        {revealed && g.phase === 'contrato' && (
+          <ContratoCard
+            key={round.id}
+            round={round}
+            room={room}
+            youId={youId}
+            canControl={isHost || isSpinner}
+            onEscolhe={props.onContratoEscolhe}
+            onAssina={props.onContratoAssina}
             onContinue={props.onContinue}
           />
         )}

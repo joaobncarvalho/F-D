@@ -46,6 +46,23 @@ const JOGOS = {
   cascata: 'Todos começam a beber. Só podes parar depois de quem está à tua frente. O último bebe muito mais.',
   desenho: 'Desenhas a palavra no telemóvel; os outros adivinham. Ninguém acerta = bebes tu.',
   reacao: 'Assim que o ecrã ficar verde: carrega. O último bebe. Carregar antes do sinal também.',
+  bomba: 'Diz um item do tema e passa. O pavio é secreto — quem a tiver na mão quando rebentar perde uma vida ❤️',
+  leilao: 'Ninguém quer o desafio. Licitam-se goles EM SEGREDO para escapar: quem licitar menos, fá-lo (e não bebe). Os outros bebem o que licitaram.',
+  sincronia: 'Dois respondem à mesma pergunta em segredo. Se derem a mesma resposta, bebe a mesa toda; se não, bebem os dois.',
+  detetor: 'Respondes em voz alta e podes mentir. A mesa vota se acreditou. Quem vota mal bebe 2; enganar toda a gente dá uma vida ❤️ e ser lido por todos tira uma.',
+  julgamento: 'A mesa acusa-te; sorteia-se um advogado de defesa. Condenado, perdes uma vida ❤️ Absolvido, quem te condenou bebe 2 e o advogado ganha uma vida.',
+  contrato: 'Um pacto entre dois, por 5 jogadas. Se assinarem os dois, ganham uma vida cada ❤️ Quem recusar bebe 2. Cumprir é por honra — a mesa fiscaliza.',
+};
+
+// Modificadores da noite (o host liga-os no lobby). Nenhum manda beber mais:
+// mexem em vidas, em vez e em exposição. Ver server/src/game/modificadores.js.
+const MODIFICADORES_REGRAS = {
+  '⛓️ Sem Escape': 'Recusar custa duas vidas em vez de uma.',
+  '🎯 Alvo Marcado': 'Quem perde uma vida volta a ser o alvo na ronda seguinte (no máximo duas vezes seguidas).',
+  '🔁 Dobro ou Nada': 'Depois de aceitares, podes dobrar: a mesa julga. Consegues, ganhas uma vida; falhas, perdes a que estava em jogo.',
+  '🔒 Sem Anonimato': 'A razão das Intrigas é sempre revelada a toda a mesa no fim.',
+  '📿 A Conta': 'Podes adiar o gole e ficar a dever, com juro. A conta passa-se a quem a aceitar (e ganha uma vida por isso), herda-se de quem sai, e fecha no fim da noite.',
+  '💀 Morte Súbita': 'A partir do último terço da noite, recusar elimina-te em vez de tirar uma vida.',
 };
 
 export default function Rules({ mode = 'wheel', onClose }) {
@@ -82,6 +99,23 @@ export default function Rules({ mode = 'wheel', onClose }) {
           <p className="text-sm text-white/70 leading-snug">
             Bebe-se com moderação e há sempre água na mesa. Se alguém não estiver bem, o host pausa o
             jogo — o botão ⏸️ está no topo.
+          </p>
+        </div>
+
+        {/* Os modificadores mudam as REGRAS da noite, e por isso vêm antes dos
+            mini-jogos: quem abre isto a meio do jogo quer perceber porque é que
+            recusar lhe custou duas vidas, e a resposta não está em nenhum jogo. */}
+        <p className="text-sm font-semibold text-white/60 mt-1">
+          ⚡ Modificadores <span className="text-white/35">— o host liga-os no lobby</span>
+        </p>
+        <div className="fd-card p-4 flex flex-col gap-2">
+          {Object.entries(MODIFICADORES_REGRAS).map(([nome, texto]) => (
+            <p key={nome} className="text-xs text-white/70 leading-snug">
+              <b className="text-white">{nome}</b> — {texto}
+            </p>
+          ))}
+          <p className="text-[11px] text-white/40 leading-snug">
+            Nenhum destes manda beber mais do que o jogo normal: mexem em vidas, em vez e em exposição.
           </p>
         </div>
 

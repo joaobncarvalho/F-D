@@ -201,6 +201,70 @@ async function resolveWheel(room) {
       if (r?.substate === 'asking') { game.roletaAnswer(room, r.currentPlayerId); return true; }
       return continueOrAbandon(room);
 
+    // ----- Tipos da camada 3 --------------------------------------------------
+    // A regra é a mesma de sempre: fecha-se com o que já se sabe, e o silêncio
+    // nunca inventa um castigo que a mesa não decidiu.
+
+    case 'bomba':
+      // Ninguém passou e o pavio acabou → rebenta em quem a tinha na mão. É a
+      // regra do jogo, não um castigo do auto-resolve: quem segura, leva.
+      if (r?.substate === 'a_arder') {
+        game.bombaEstoira(room);
+        pushFeed(room, '💣', 'Ninguém passou a tempo. BUM.');
+        return true;
+      }
+      return continueOrAbandon(room);
+
+    case 'leilao':
+      if (r?.substate === 'licitar') {
+        game.fechaLeilao(room);
+        pushFeed(room, '⏱️', 'O leilão fechou com quem licitou a tempo.');
+        return true;
+      }
+      return continueOrAbandon(room);
+
+    case 'sincronia':
+      if (r?.substate === 'responder') {
+        game.fechaSincronia(room);
+        pushFeed(room, '⏱️', 'Tempo esgotado — quem não respondeu conta como divergência.');
+        return true;
+      }
+      return continueOrAbandon(room);
+
+    case 'detetor':
+      // Ele nem marcou se era verdade → não se decide por ele; passa-se a vez.
+      if (r?.substate === 'responder') return abandon(room);
+      if (r?.substate === 'votar') {
+        game.fechaDetetor(room);
+        pushFeed(room, '⏱️', 'Fechou-se o detetor com quem votou a tempo.');
+        return true;
+      }
+      return continueOrAbandon(room);
+
+    case 'julgamento':
+      if (r?.substate === 'defesa') {
+        game.julgamentoAoVoto(room, r.reuId);
+        pushFeed(room, '⏱️', 'Acabou o tempo de defesa — ao voto.');
+        return true;
+      }
+      if (r?.substate === 'votar') {
+        game.fechaVeredito(room);
+        pushFeed(room, '⏱️', 'O júri decidiu com os votos que houve.');
+        return true;
+      }
+      return continueOrAbandon(room);
+
+    case 'contrato':
+      // Um pacto que entra em vigor por silêncio não é um pacto: quem não
+      // assinou, recusou. O `contrato.fecha` já trata disso.
+      if (r?.substate === 'escolher') return abandon(room);
+      if (r?.substate === 'assinar') {
+        game.contratoExpira(room);
+        pushFeed(room, '⏱️', 'O tempo de assinar acabou — quem não decidiu, recusou.');
+        return true;
+      }
+      return continueOrAbandon(room);
+
     case 'duelo':
       if (r?.substate === 'calling') {
         game.dueloCall(room, r.currentPlayerId, Math.random() < 0.5 ? 'cara' : 'coroa');

@@ -34,10 +34,15 @@ import { nameOf } from './helpers.js';
  * @param round     a ronda (mutada)
  * @param atores    quem NÃO vota (quem esteve a atuar)
  * @param pergunta  o que a mesa está a julgar
+ * @param rotulos   { sim, nao, aviso } — o que se lê nos botões. O Julgamento
+ *                  vota "inocente/culpado", não "conseguiu/não conseguiu"; sem
+ *                  isto seria preciso um segundo sistema de votação só por causa
+ *                  das palavras, com uma segunda regra de empate a divergir.
  */
-export function abre(round, atores = [], pergunta = 'Conseguiu?') {
+export function abre(round, atores = [], pergunta = 'Conseguiu?', rotulos = null) {
   round.veredito = {
     pergunta,
+    rotulos: rotulos || null,
     atores: atores.filter(Boolean),
     votos: {}, // playerId -> 'sim' | 'nao' (secreto até fechar)
     fechado: false,
@@ -108,6 +113,7 @@ export function serialize(round) {
   if (!v) return null;
   const base = {
     pergunta: v.pergunta,
+    rotulos: v.rotulos || null,
     atores: v.atores,
     jaVotaram: Object.keys(v.votos),
     fechado: v.fechado,

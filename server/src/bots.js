@@ -274,6 +274,123 @@ export async function driveBots(room, hooks = {}) {
       return false;
     }
 
+    // ----- Tipos da camada 3 --------------------------------------------------
+
+    // BOMBA: passa-se enquanto arder. O pavio é secreto (só o servidor o sabe),
+    // por isso os bots fazem o que uma pessoa faz — passam e torcem.
+    if (g.phase === 'bomba') {
+      const r = g.round;
+      if (r.substate === 'a_arder') {
+        const holder = room.players.get(r.holderId);
+        if (!holder?.isBot) return false;
+        // Numa mesa SÓ de bots (playtest/testes) o pavio nunca chegava ao fim:
+        // as passagens acontecem em milissegundos e o pavio conta em segundos, e
+        // a ronda ficava a passar a bomba para sempre. Adianta-se o relógio ao
+        // fim de umas voltas — o mesmo truque da Reação, e pela mesma razão.
+        const semHumanos = players(room).every((p) => p.isBot || !p.connected);
+        if (semHumanos && r.passagens >= 6) r.acesaEm = Date.now() - r.pavioMs - 1;
+        game.bombaPassa(room, holder.id);
+        return true;
+      }
+      const cur = room.players.get(g.currentPlayerId);
+      if (cur?.isBot) { game.continueRound(room, cur.id); return true; }
+      return false;
+    }
+
+    // LEILÃO: cada bot licita um número ao calhas dentro do máximo.
+    if (g.phase === 'leilao') {
+      const r = g.round;
+      if (r.substate === 'licitar') {
+        const next = bots.find((b) => r.participantes.includes(b.id) && r.licitacoes[b.id] === undefined);
+        if (next) { game.leilaoLicita(room, next.id, Math.floor(rand() * 4)); return true; }
+        return false;
+      }
+      const cur = room.players.get(g.currentPlayerId);
+      if (cur?.isBot) { game.continueRound(room, cur.id); return true; }
+      return false;
+    }
+
+    // SINCRONIA: a dupla escolhe uma cara cada um.
+    if (g.phase === 'sincronia') {
+      const r = g.round;
+      if (r.substate === 'responder') {
+        for (const id of [r.currentPlayerId, r.parId]) {
+          const p = room.players.get(id);
+          if (p?.isBot && !r.respostas[id]) {
+            const alvo = pick(activeOthers(room, id));
+            if (alvo) { game.sincroniaResponde(room, id, alvo.id); return true; }
+          }
+        }
+        return false;
+      }
+      const cur = room.players.get(g.currentPlayerId);
+      if (cur?.isBot) { game.continueRound(room, cur.id); return true; }
+      return false;
+    }
+
+    // DETETOR: marcar verdade/mentira → a mesa vota → continuar.
+    if (g.phase === 'detetor') {
+      const r = g.round;
+      if (r.substate === 'responder') {
+        const cur = room.players.get(r.currentPlayerId);
+        if (cur?.isBot) { game.detetorMarca(room, cur.id, rand() < 0.5); return true; }
+        return false;
+      }
+      if (r.substate === 'votar') {
+        const next = bots.find((b) => b.id !== r.currentPlayerId && !r.votos[b.id] && !b.eliminated);
+        if (next) { game.detetorVota(room, next.id, rand() < 0.5 ? 'acredito' : 'mentira'); return true; }
+        return false;
+      }
+      const cur = room.players.get(g.currentPlayerId);
+      if (cur?.isBot) { game.continueRound(room, cur.id); return true; }
+      return false;
+    }
+
+    // JULGAMENTO: dar a defesa por terminada → o júri vota → continuar.
+    if (g.phase === 'julgamento') {
+      const r = g.round;
+      if (r.substate === 'defesa') {
+        const adv = room.players.get(r.advogadoId);
+        if (adv?.isBot) { game.julgamentoAoVoto(room, adv.id); return true; }
+        return false;
+      }
+      if (r.substate === 'votar') {
+        const v = r.veredito;
+        const next = bots.find((b) => !v.atores.includes(b.id) && !v.votos[b.id] && !b.eliminated);
+        if (next) { game.votaVeredito(room, next.id, rand() < 0.5 ? 'sim' : 'nao'); return true; }
+        return false;
+      }
+      const cur = room.players.get(g.currentPlayerId);
+      if (cur?.isBot) { game.continueRound(room, cur.id); return true; }
+      return false;
+    }
+
+    // CONTRATO: escolher parceiro → os dois assinam (ou não) → continuar.
+    if (g.phase === 'contrato') {
+      const r = g.round;
+      if (r.substate === 'escolher') {
+        const cur = room.players.get(r.currentPlayerId);
+        if (cur?.isBot) {
+          const p = pick(activeOthers(room, cur.id));
+          if (p) { game.contratoEscolhe(room, cur.id, p.id); return true; }
+        }
+        return false;
+      }
+      if (r.substate === 'assinar') {
+        for (const id of [r.currentPlayerId, r.parceiroId]) {
+          const p = room.players.get(id);
+          if (p?.isBot && r.assinaturas[id] === undefined) {
+            game.contratoAssina(room, id, rand() < 0.7);
+            return true;
+          }
+        }
+        return false;
+      }
+      const cur = room.players.get(g.currentPlayerId);
+      if (cur?.isBot) { game.continueRound(room, cur.id); return true; }
+      return false;
+    }
+
     // INTRIGAS: choosing → escolher alvo; rps → jogar; reveal → continuar.
     if (g.phase === 'intrigas') {
       const r = g.round;

@@ -819,6 +819,106 @@ export function registerSocketHandlers(io) {
       }
     });
 
+    // ----- Tipos da camada 3 --------------------------------------------------
+    // Bomba-Relógio: o pavio vive no servidor e nunca vai no payload, por isso é
+    // a passagem que descobre se já rebentou.
+    socket.on('bomba_passa', (_payload, ack) => {
+      try {
+        const room = requireRoom(socket);
+        const res = game.bombaPassa(room, socket.data.playerId);
+        if (res.rebentou) {
+          io.to(room.code).emit('bomba_rebentou', { quemId: res.round.result.quemId });
+          if (res.efeito) io.to(room.code).emit('action_result', { effect: res.efeito });
+        }
+        broadcastState(io, room.code);
+        if (typeof ack === 'function') ack({ ok: true });
+      } catch (err) {
+        handleError(socket, ack, err);
+      }
+    });
+
+    socket.on('leilao_licita', ({ golos } = {}, ack) => {
+      try {
+        if (throttled(socket, 'submit', 150)) return void (typeof ack === 'function' && ack({ ok: true }));
+        const room = requireRoom(socket);
+        game.leilaoLicita(room, socket.data.playerId, golos);
+        broadcastState(io, room.code);
+        if (typeof ack === 'function') ack({ ok: true });
+      } catch (err) {
+        handleError(socket, ack, err);
+      }
+    });
+
+    socket.on('sincronia_responde', ({ escolhidoId } = {}, ack) => {
+      try {
+        if (throttled(socket, 'submit', 150)) return void (typeof ack === 'function' && ack({ ok: true }));
+        const room = requireRoom(socket);
+        game.sincroniaResponde(room, socket.data.playerId, escolhidoId);
+        broadcastState(io, room.code);
+        if (typeof ack === 'function') ack({ ok: true });
+      } catch (err) {
+        handleError(socket, ack, err);
+      }
+    });
+
+    socket.on('detetor_marca', ({ verdade } = {}, ack) => {
+      try {
+        const room = requireRoom(socket);
+        game.detetorMarca(room, socket.data.playerId, verdade);
+        broadcastState(io, room.code);
+        if (typeof ack === 'function') ack({ ok: true });
+      } catch (err) {
+        handleError(socket, ack, err);
+      }
+    });
+
+    socket.on('detetor_vota', ({ valor } = {}, ack) => {
+      try {
+        if (throttled(socket, 'submit', 150)) return void (typeof ack === 'function' && ack({ ok: true }));
+        const room = requireRoom(socket);
+        const res = game.detetorVota(room, socket.data.playerId, valor);
+        if (res.fechado && res.efeito) io.to(room.code).emit('action_result', { effect: res.efeito });
+        broadcastState(io, room.code);
+        if (typeof ack === 'function') ack({ ok: true });
+      } catch (err) {
+        handleError(socket, ack, err);
+      }
+    });
+
+    socket.on('julgamento_ao_voto', (_payload, ack) => {
+      try {
+        const room = requireRoom(socket);
+        game.julgamentoAoVoto(room, socket.data.playerId);
+        broadcastState(io, room.code);
+        if (typeof ack === 'function') ack({ ok: true });
+      } catch (err) {
+        handleError(socket, ack, err);
+      }
+    });
+
+    socket.on('contrato_escolhe', ({ parceiroId } = {}, ack) => {
+      try {
+        const room = requireRoom(socket);
+        game.contratoEscolhe(room, socket.data.playerId, parceiroId);
+        broadcastState(io, room.code);
+        if (typeof ack === 'function') ack({ ok: true });
+      } catch (err) {
+        handleError(socket, ack, err);
+      }
+    });
+
+    socket.on('contrato_assina', ({ aceita } = {}, ack) => {
+      try {
+        const room = requireRoom(socket);
+        const res = game.contratoAssina(room, socket.data.playerId, aceita);
+        for (const e of res.efeitos || []) io.to(room.code).emit('action_result', { effect: e });
+        broadcastState(io, room.code);
+        if (typeof ack === 'function') ack({ ok: true });
+      } catch (err) {
+        handleError(socket, ack, err);
+      }
+    });
+
     socket.on('skip_turn', (_payload, ack) => {
       try {
         const room = requireRoom(socket);

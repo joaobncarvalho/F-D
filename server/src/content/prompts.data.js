@@ -731,6 +731,154 @@ export const GAME_TYPES = [
     label: 'Reação',
     prompts: [],
   },
+
+  // ----- Tipos "hardcore" (camada 3) ------------------------------------------
+  // Estes seis sobem a aposta em CONSEQUÊNCIA, não em volume: o que muda é quem
+  // decide, quanto custa decidir mal, e o que sobra depois de a ronda acabar.
+
+  {
+    // Bomba-Relógio — o texto do prompt é o TEMA que se vai dizendo enquanto a
+    // bomba anda à volta. Sem intensidade forte de propósito: o que aperta aqui
+    // é o pavio, não a pergunta.
+    key: 'bomba',
+    label: 'Bomba-Relógio',
+    prompts: [
+      ['Marcas de cerveja', 'leve'],
+      ['Coisas que se levam para a praia', 'leve'],
+      ['Cantores portugueses', 'leve'],
+      ['Programas de televisão', 'leve'],
+      ['Coisas que há numa mochila', 'leve'],
+      ['Desportos olímpicos', 'leve'],
+      ['Marcas de telemóvel', 'leve'],
+      ['Cidades europeias', 'leve'],
+      ['Doces de pastelaria', 'leve'],
+      ['Coisas que se dizem numa despedida', 'leve'],
+      ['Desculpas para faltar ao trabalho', 'picante'],
+      ['Sítios improváveis para dar um beijo', 'picante'],
+      ['Mentiras que já contámos aos pais', 'picante'],
+      ['Coisas que se fazem quando ninguém está a ver', 'picante'],
+      ['Razões para bloquear alguém', 'picante'],
+      ['Coisas que só se dizem depois de três copos', 'hardcore'],
+      ['Motivos reais para acabar uma relação', 'hardcore'],
+      ['Coisas de que já te arrependeste no dia seguinte', 'hardcore'],
+      ['Segredos que este grupo já não guarda bem', 'caos'],
+      ['Assuntos que ninguém devia trazer à mesa', 'caos'],
+    ],
+  },
+  {
+    // Leilão — o texto é o DESAFIO que ninguém quer fazer. Tem de ser sempre uma
+    // coisa concreta e executável ali, senão não há por que licitar.
+    key: 'leilao',
+    label: 'Leilão',
+    prompts: [
+      ['Faz uma imitação de alguém desta mesa até adivinharem quem é.', 'leve'],
+      ['Canta o refrão da última música que ouviste, de pé.', 'leve'],
+      ['Fala como um narrador de futebol durante a próxima ronda inteira.', 'leve'],
+      ['Deixa a pessoa à tua direita escolher-te um penteado novo agora.', 'leve'],
+      ['Conta uma história tua de dois minutos sem dizer a letra "a".', 'leve'],
+      ['Faz uma dança de trinta segundos sem música.', 'leve'],
+      ['Manda mensagem à terceira pessoa da tua lista a dizer que tens saudades.', 'picante'],
+      ['Lê em voz alta a última mensagem que enviaste a alguém.', 'picante'],
+      ['Deixa a mesa ver a tua galeria de fotos durante dez segundos.', 'picante'],
+      ['Liga a alguém e canta-lhe os parabéns sem explicar porquê.', 'picante'],
+      ['Conta o momento mais embaraçoso do último ano, com detalhes.', 'picante'],
+      ['Deixa alguém desta mesa publicar uma story no teu perfil.', 'hardcore'],
+      ['Diz o que pensas mesmo sobre a pessoa à tua esquerda, na cara dela.', 'hardcore'],
+      ['Lê em voz alta a tua última conversa com o teu/tua ex.', 'hardcore'],
+      ['Responde com sinceridade a qualquer pergunta que a mesa quiser fazer.', 'caos'],
+      ['Entrega o telemóvel desbloqueado a alguém desta mesa por uma ronda.', 'caos'],
+    ],
+  },
+  {
+    // Sincronia — a resposta é sempre um JOGADOR, por isso as perguntas têm de
+    // apontar para dentro da mesa. "Quem…", nunca "o quê".
+    key: 'sincronia',
+    label: 'Sincronia',
+    prompts: [
+      ['Quem desta mesa chega sempre atrasado?', 'leve'],
+      ['Quem é o primeiro a querer ir para casa?', 'leve'],
+      ['Quem come sempre a comida dos outros?', 'leve'],
+      ['Quem fala mais alto quando bebe?', 'leve'],
+      ['Quem é o mais dramático do grupo?', 'leve'],
+      ['Quem sobrevivia mais tempo sozinho numa ilha?', 'leve'],
+      ['Quem é que nunca lê as mensagens do grupo?', 'leve'],
+      ['Quem tem sempre uma desculpa pronta?', 'leve'],
+      ['Quem desta mesa mente melhor?', 'picante'],
+      ['Quem já ficou com alguém e não contou a ninguém?', 'picante'],
+      ['Quem é mais capaz de stalkar um ex às três da manhã?', 'picante'],
+      ['Quem é que a mesa toda acha que está apaixonado e não admite?', 'picante'],
+      ['Quem mandava a mensagem errada à pessoa errada?', 'picante'],
+      ['Quem desta mesa guarda o pior segredo dos outros?', 'hardcore'],
+      ['Quem é que já falou mal de alguém que está aqui sentado?', 'hardcore'],
+      ['Quem trairia primeiro o grupo por um bom motivo?', 'caos'],
+    ],
+  },
+  {
+    // Detetor de Mentiras — perguntas que dão MESMO para mentir. Uma pergunta de
+    // resposta óbvia ou verificável não serve: a mesa tem de ficar em dúvida.
+    key: 'detetor',
+    label: 'Detetor',
+    prompts: [
+      ['Já fugiste de uma conta num restaurante?', 'leve'],
+      ['Já fingiste estar doente para faltar a um plano com alguém desta mesa?', 'leve'],
+      ['Já dormiste num sítio muito estranho? Conta qual.', 'leve'],
+      ['Já perdeste alguma coisa muito cara de alguém e não contaste?', 'leve'],
+      ['Já cantaste em público sozinho?', 'leve'],
+      ['Já chumbaste a alguma coisa e disseste que tinhas passado?', 'leve'],
+      ['Já ficaste com alguém que este grupo conhece?', 'picante'],
+      ['Já leste as mensagens de alguém sem essa pessoa saber?', 'picante'],
+      ['Já disseste "eu amo-te" sem sentir?', 'picante'],
+      ['Já saíste de casa de alguém sem dizer adeus?', 'picante'],
+      ['Já inventaste uma história inteira só para impressionar alguém?', 'picante'],
+      ['Já traíste a confiança de alguém que está nesta mesa?', 'hardcore'],
+      ['Já tiveste um crush por alguém deste grupo?', 'hardcore'],
+      ['Já mentiste sobre uma coisa importante a quem estava contigo?', 'hardcore'],
+      ['Já fizeste alguma coisa esta noite de que ninguém aqui faz ideia?', 'caos'],
+      ['Há alguma coisa que este grupo pensa de ti que é mentira?', 'caos'],
+    ],
+  },
+  {
+    // Julgamento — a acusação. Escrita SEM nome: o réu é quem estiver à vez, e o
+    // texto tem de encaixar em qualquer pessoa da mesa.
+    key: 'julgamento',
+    label: 'Julgamento',
+    prompts: [
+      ['É acusado de ser quem mais estraga os planos do grupo.', 'leve'],
+      ['É acusado de nunca pagar a sua parte da conta à primeira.', 'leve'],
+      ['É acusado de chegar sempre atrasado e nunca pedir desculpa.', 'leve'],
+      ['É acusado de falar demasiado sobre si próprio.', 'leve'],
+      ['É acusado de ser o pior a escolher música.', 'leve'],
+      ['É acusado de desaparecer das conversas de grupo quando lhe convém.', 'leve'],
+      ['É acusado de dar conselhos que nunca segue.', 'leve'],
+      ['É acusado de contar segredos dos outros como se fossem histórias.', 'picante'],
+      ['É acusado de ser o mais falso a elogiar.', 'picante'],
+      ['É acusado de trocar os amigos por quem lhe interessa no momento.', 'picante'],
+      ['É acusado de já ter mentido a alguém desta mesa este mês.', 'picante'],
+      ['É acusado de fingir estar bem para não ter de falar do assunto.', 'hardcore'],
+      ['É acusado de ser quem mais julga os outros à socapa.', 'hardcore'],
+      ['É acusado de ter magoado alguém desta mesa e nunca ter admitido.', 'caos'],
+    ],
+  },
+  {
+    // Contrato — o pacto. Tem de ser cumprível ao longo de várias rondas e
+    // verificável por quem está à mesa (a fiscalização é da mesa, não da app).
+    key: 'contrato',
+    label: 'Contrato',
+    prompts: [
+      ['Bebem sempre ao mesmo tempo: se um bebe, o outro acompanha.', 'leve'],
+      ['Não podem dizer o nome um do outro — só apelidos inventados.', 'leve'],
+      ['Falam sempre no plural, como se fossem uma pessoa só.', 'leve'],
+      ['Têm de estar de acordo em todas as votações da mesa.', 'leve'],
+      ['Sempre que um for desafiado, o outro tem de o defender em voz alta.', 'leve'],
+      ['Não podem falar um com o outro diretamente — só através de terceiros.', 'leve'],
+      ['Um só pode beber depois de pedir licença ao outro.', 'leve'],
+      ['Respondem sempre às perguntas do outro com sinceridade total.', 'picante'],
+      ['Cada um tem de elogiar o outro, a sério, antes de cada ronda.', 'picante'],
+      ['Se um recusar um desafio, o outro tem de o fazer por ele.', 'picante'],
+      ['Partilham tudo o que a mesa perguntar a qualquer um dos dois.', 'hardcore'],
+      ['Ficam responsáveis um pelo outro: o castigo de um é dos dois.', 'hardcore'],
+    ],
+  },
 ];
 
 // Mini-duelos simbólicos do Duelo 1v1 — resolvem-se FORA da app (presencial); a

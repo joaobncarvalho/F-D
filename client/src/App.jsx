@@ -305,6 +305,15 @@ export default function App() {
   const setNightLength = useCallback((minutos) => socket.emit('set_night_length', { minutos }), []);
   const setModifiers = useCallback((modifiers) => socket.emit('set_modifiers', { modifiers }), []);
   const transfereDivida = useCallback((paraId) => socket.emit('divida_transfere', { paraId }), []);
+  // Tipos "hardcore" (ver server/src/game/{bomba,leilao,sincronia,detetor,julgamento,contrato}.js)
+  const bombaPassa = useCallback(() => socket.emit('bomba_passa'), []);
+  const leilaoLicita = useCallback((golos) => socket.emit('leilao_licita', { golos }), []);
+  const sincroniaResponde = useCallback((escolhidoId) => socket.emit('sincronia_responde', { escolhidoId }), []);
+  const detetorMarca = useCallback((verdade) => socket.emit('detetor_marca', { verdade }), []);
+  const detetorVota = useCallback((valor) => socket.emit('detetor_vota', { valor }), []);
+  const julgamentoAoVoto = useCallback(() => socket.emit('julgamento_ao_voto'), []);
+  const contratoEscolhe = useCallback((parceiroId) => socket.emit('contrato_escolhe', { parceiroId }), []);
+  const contratoAssina = useCallback((aceita) => socket.emit('contrato_assina', { aceita }), []);
   const escolheHerdeiro = useCallback((herdeiroId) => socket.emit('heranca_escolhe', { herdeiroId }), []);
   const pauseGame = useCallback((paused) => socket.emit('pause_game', { paused }), []);
   const grupoAnswer = useCallback((value) => socket.emit('grupo_answer', { value }), []);
@@ -587,6 +596,14 @@ export default function App() {
             onAction={playerAction}
             onTransfereDivida={transfereDivida}
             onEscolheHerdeiro={escolheHerdeiro}
+            onBombaPassa={bombaPassa}
+            onLeilaoLicita={leilaoLicita}
+            onSincroniaResponde={sincroniaResponde}
+            onDetetorMarca={detetorMarca}
+            onDetetorVota={detetorVota}
+            onJulgamentoAoVoto={julgamentoAoVoto}
+            onContratoEscolhe={contratoEscolhe}
+            onContratoAssina={contratoAssina}
             onChooseBuddy={chooseBuddy}
             onChooseOption={chooseOption}
             onChooseTarget={chooseTarget}

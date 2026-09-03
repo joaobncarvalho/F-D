@@ -18,6 +18,12 @@ import { GRUPO_KEYS, setupGrupo, serializeGrupo } from './game/grupo.js';
 import { setupCascata, serializeCascata } from './game/cascata.js';
 import { setupDesenho, serializeDesenho } from './game/desenho.js';
 import { setupReacaoRoda, serializeReacaoRoda } from './game/reacao.js';
+import { setupBomba, serializeBomba } from './game/bomba.js';
+import { setupLeilao, serializeLeilao } from './game/leilao.js';
+import { setupSincronia, serializeSincronia } from './game/sincronia.js';
+import { setupDetetor, serializeDetetor } from './game/detetor.js';
+import { setupJulgamento, serializeJulgamento, julgamentoVeredito } from './game/julgamento.js';
+import { setupContrato, serializeContrato, fecha as fechaContrato } from './game/contrato.js';
 import { ganhaVida, elimina } from './game/helpers.js';
 import * as modificadores from './game/modificadores.js';
 import * as divida from './game/divida.js';
@@ -47,6 +53,13 @@ export {
   vascoRedeem,
 } from './game/vasco.js';
 export { chooseTarget, submitRps } from './game/intrigas.js';
+export { bombaPassa, bombaExpirou, bombaEstoira } from './game/bomba.js';
+export { leilaoLicita, fecha as fechaLeilao } from './game/leilao.js';
+export { sincroniaResponde, fecha as fechaSincronia } from './game/sincronia.js';
+export { detetorMarca, detetorVota, fecha as fechaDetetor } from './game/detetor.js';
+export { julgamentoAoVoto } from './game/julgamento.js';
+export { contratoEscolhe } from './game/contrato.js';
+import { contratoAssina as contratoAssinaRaw, contratoExpira as contratoExpiraRaw } from './game/contrato.js';
 
 /**
  * Voto no veredito da mesa. Um só handler para todos os jogos a tempo: quando a
@@ -68,9 +81,11 @@ export function fechaVeredito(room) {
   if (!r?.veredito || r.veredito.fechado) return { fechado: false };
   const res = r.dobro
     ? dobroVeredito(room)
-    : r.gameTypeKey === 'mimica'
-      ? mimicaVeredito(room)
-      : relampagoVeredito(room);
+    : r.gameTypeKey === 'julgamento'
+      ? julgamentoVeredito(room)
+      : r.gameTypeKey === 'mimica'
+        ? mimicaVeredito(room)
+        : relampagoVeredito(room);
   if (!res) return { fechado: false };
   pushFeed(
     room,
@@ -303,6 +318,14 @@ const TYPE_PROFILE = {
   desenho: { min: 3, peso: 4 },
   vasco: { min: 4, peso: 3 },
   piramide: { min: 3, peso: 3 },
+  // Tipos "hardcore" (camada 3). Pesos deliberadamente moderados: são todos mais
+  // longos ou mais expostos do que a média, e uma noite feita só disto cansa.
+  bomba: { min: 3, peso: 8 }, // curto e barulhento → aguenta sair muitas vezes
+  leilao: { min: 3, peso: 5 },
+  sincronia: { min: 4, peso: 6 }, // precisa de dupla + mesa para pagar
+  detetor: { min: 3, peso: 6 },
+  julgamento: { min: 4, peso: 4 }, // réu + advogado + júri
+  contrato: { min: 3, peso: 4 }, // deixa uma regra ativa atrás de si
 };
 const DEFAULT_PROFILE = { min: 2, peso: 6 };
 // Quantos tipos recentes se evitam. Com sorteio uniforme entre 18 tipos, o mesmo
@@ -567,6 +590,30 @@ export async function spinWheel(room, playerId) {
   } else if (gt.key === 'reacao') {
     if (setupReacaoRoda(room, round)) g.phase = 'reacao';
     else await fallbackDesafio(room, round, inten);
+  } else if (gt.key === 'bomba') {
+    const p = await pickPrompt(room, 'bomba', inten);
+    setupBomba(round, p, room); // pavio SERVER-SIDE
+    g.phase = 'bomba';
+  } else if (gt.key === 'leilao') {
+    const p = await pickPrompt(room, 'leilao', inten);
+    setupLeilao(room, round, p);
+    g.phase = 'leilao';
+  } else if (gt.key === 'sincronia') {
+    const p = await pickPrompt(room, 'sincronia', inten);
+    if (setupSincronia(room, round, p)) g.phase = 'sincronia';
+    else await fallbackDesafio(room, round, inten);
+  } else if (gt.key === 'detetor') {
+    const p = await pickPrompt(room, 'detetor', inten);
+    setupDetetor(round, p); // a marca "era verdade?" nunca vai no broadcast
+    g.phase = 'detetor';
+  } else if (gt.key === 'julgamento') {
+    const p = await pickPrompt(room, 'julgamento', inten);
+    if (setupJulgamento(room, round, p)) g.phase = 'julgamento';
+    else await fallbackDesafio(room, round, inten);
+  } else if (gt.key === 'contrato') {
+    const p = await pickPrompt(room, 'contrato', inten);
+    if (setupContrato(room, round, p)) g.phase = 'contrato';
+    else await fallbackDesafio(room, round, inten);
   }
 
   // A segunda camada abre-se DEPOIS de a ronda estar montada — o Isto ou Aquilo
@@ -718,6 +765,33 @@ export function cobraDivida(room, playerId) {
   return golos;
 }
 
+/**
+ * Contrato: assinar (ou recusar). Passa pelo game.js e não é um re-export direto
+ * porque um pacto aceite vira uma REGRA ATIVA, e as `activeRules` são daqui — é
+ * o mesmo mecanismo dos desafios com duração, e não vale a pena ter dois.
+ */
+export function contratoAssina(room, playerId, aceita) {
+  return aplicaContrato(room, contratoAssinaRaw(room, playerId, aceita));
+}
+
+/** Auto-resolve: quem não assinou a tempo recusou (ver game/contrato.js). */
+export function contratoExpira(room) {
+  return aplicaContrato(room, contratoExpiraRaw(room));
+}
+
+function aplicaContrato(room, res) {
+  if (res.fechado) {
+    if (res.regra) {
+      addRule(room, room.game.round.currentPlayerId, res.regra.texto, res.regra.jogadas);
+      pushFeed(room, '🤝', `Contrato assinado: ${res.regra.texto}`);
+    } else {
+      const quem = res.round.result.recusaram.map((p) => p.name).join(' e ');
+      pushFeed(room, '✍️', `O contrato caiu — ${quem || 'ninguém'} não assinou.`);
+    }
+  }
+  return res;
+}
+
 /** Buddy: quem tem o desafio escolhe outro jogador que "bebe junto". */
 export function chooseBuddy(room, playerId, buddyId) {
   const g = room.game;
@@ -791,7 +865,14 @@ export function continueRound(room, playerId) {
 
   // Tipos que se fecham com um veredicto simples (escolha / marcação manual):
   // só avançam depois de a ronda estar resolvida.
-  if (['choice', 'relampago', 'mimica', 'roleta', 'duelo', 'grupo', 'cascata', 'desenho', 'reacao'].includes(g.phase)) {
+  if (
+    [
+      'choice', 'relampago', 'mimica', 'roleta', 'duelo', 'grupo', 'cascata', 'desenho', 'reacao',
+      // Tipos da camada 3: todos fecham num ecrã de resultado que a mesa lê antes
+      // de a vez passar — a mesma regra dos outros, e por isso a mesma lista.
+      'bomba', 'leilao', 'sincronia', 'detetor', 'julgamento', 'contrato',
+    ].includes(g.phase)
+  ) {
     if (g.round?.status !== 'resolved') throw new AppError('Esta ronda ainda não terminou.');
     fecharRonda(room);
     return { game: g, rewarded: [] };
@@ -950,6 +1031,12 @@ function serializeRound(g) {
   if (r.gameTypeKey === 'cascata') serializeCascata(base, r);
   if (r.gameTypeKey === 'desenho') serializeDesenho(base, r);
   if (r.gameTypeKey === 'reacao') serializeReacaoRoda(base, r);
+  if (r.gameTypeKey === 'bomba') serializeBomba(base, r);
+  if (r.gameTypeKey === 'leilao') serializeLeilao(base, r);
+  if (r.gameTypeKey === 'sincronia') serializeSincronia(base, r);
+  if (r.gameTypeKey === 'detetor') serializeDetetor(base, r);
+  if (r.gameTypeKey === 'julgamento') serializeJulgamento(base, r);
+  if (r.gameTypeKey === 'contrato') serializeContrato(base, r);
   return base;
 }
 

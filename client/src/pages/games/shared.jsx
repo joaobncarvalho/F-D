@@ -26,6 +26,14 @@ export const TYPES = [
   { key: 'cascata', label: 'Cascata', color: '#60a5fa', emoji: '🌊' },
   { key: 'desenho', label: 'Desenha', color: '#34d399', emoji: '🎨' },
   { key: 'reacao', label: 'Reação', color: '#fde047', emoji: '⚡' },
+  // Tipos "hardcore": sobem a aposta em consequência (quem decide, quanto custa
+  // decidir mal, e o que sobra depois da ronda) e não em volume de bebida.
+  { key: 'bomba', label: 'Bomba', color: '#f43f5e', emoji: '💣' },
+  { key: 'leilao', label: 'Leilão', color: '#eab308', emoji: '🔨' },
+  { key: 'sincronia', label: 'Sincronia', color: '#2dd4bf', emoji: '🔗' },
+  { key: 'detetor', label: 'Detetor', color: '#c084fc', emoji: '🕵️‍♂️' },
+  { key: 'julgamento', label: 'Julgamento', color: '#94a3b8', emoji: '⚖️' },
+  { key: 'contrato', label: 'Contrato', color: '#fb7185', emoji: '🤝' },
 ];
 
 /**
