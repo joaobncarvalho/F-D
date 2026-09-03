@@ -376,6 +376,32 @@ export function registerSocketHandlers(io) {
       }
     });
 
+    // A Conta (game/divida.js). Adiar passa pelo `player_action` como qualquer
+    // outra decisão da ronda; o que precisa de handler próprio é o que acontece
+    // FORA da ronda: passar a conta a alguém e deixá-la a alguém ao sair.
+    socket.on('divida_transfere', ({ paraId } = {}, ack) => {
+      try {
+        const room = requireRoom(socket);
+        const res = game.transfereDivida(room, socket.data.playerId, paraId);
+        if (res.vida) io.to(room.code).emit('action_result', { effect: res.vida });
+        broadcastState(io, room.code);
+        if (typeof ack === 'function') ack({ ok: true });
+      } catch (err) {
+        handleError(socket, ack, err);
+      }
+    });
+
+    socket.on('heranca_escolhe', ({ herdeiroId } = {}, ack) => {
+      try {
+        const room = requireRoom(socket);
+        game.escolheHerdeiro(room, socket.data.playerId, herdeiroId);
+        broadcastState(io, room.code);
+        if (typeof ack === 'function') ack({ ok: true });
+      } catch (err) {
+        handleError(socket, ack, err);
+      }
+    });
+
     socket.on('choose_buddy', ({ buddyId } = {}, ack) => {
       try {
         const room = requireRoom(socket);

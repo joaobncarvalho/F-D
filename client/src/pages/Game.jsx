@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import Wheel from '../components/Wheel.jsx';
 import Beat from '../components/Beat.jsx';
 import PalpiteBand from './games/PalpiteBand.jsx';
+import DividaBand from './games/DividaBand.jsx';
 import { MOLA, PULSA } from '../motion.js';
 import BrokenScreen from '../components/BrokenScreen.jsx';
 import { TYPES, MODIFICADORES } from './games/shared.jsx';
@@ -260,6 +261,14 @@ export default function Game(props) {
         </div>
       )}
 
+      <DividaBand
+        divida={g.divida}
+        room={room}
+        youId={youId}
+        onTransfere={props.onTransfereDivida}
+        onHerdeiro={props.onEscolheHerdeiro}
+      />
+
       {g.activeRules?.length > 0 && (
         <div className="fd-card p-2.5 flex flex-col gap-1">
           <p className="text-xs font-bold text-amber-300">🎵 Regras ativas</p>
@@ -319,6 +328,7 @@ export default function Game(props) {
             isMyTurn={round.currentPlayerId === youId}
             canControl={isHost || isSpinner}
             podeDobrar={!!g.podeDobrar}
+            podeAdiar={!!g.podeAdiar}
             morteSubita={!!g.morteSubita}
             onAction={props.onAction}
             onChooseBuddy={props.onChooseBuddy}
@@ -766,6 +776,23 @@ function GameOver({ room, isHost, onReset, onLeave }) {
         <div className="fd-card p-3 text-center" style={{ background: 'rgba(31,211,182,0.12)' }}>
           <p className="text-sm text-white/60">🏆 Último de pé</p>
           <p className="text-2xl font-extrabold text-emerald-300">{stats.survivor.name}</p>
+        </div>
+      )}
+
+      {/* A Conta fechou. Quem adiou a noite toda vê aqui o que estava a adiar —
+          é o momento em que o sistema deixa de ser um número no HUD. */}
+      {stats?.contaFinal?.length > 0 && (
+        <div className="fd-card p-3">
+          <h2 className="text-sm font-semibold text-amber-300 mb-1">📿 A conta fechou</h2>
+          <p className="text-xs text-white/50 mb-2">O que ficou por beber venceu no fim da noite.</p>
+          <ul className="flex flex-col gap-1">
+            {stats.contaFinal.map((c) => (
+              <li key={c.id} className="flex justify-between text-sm">
+                <span>{c.name}</span>
+                <span className="text-amber-300/90">{c.golos} goles</span>
+              </li>
+            ))}
+          </ul>
         </div>
       )}
 

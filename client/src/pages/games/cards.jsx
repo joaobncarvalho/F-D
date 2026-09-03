@@ -8,7 +8,7 @@ import { CardShell, BuddyBlock } from './shared.jsx';
 import VereditoBand from './VereditoBand.jsx';
 
 export function PromptCard({
-  round, room, youId, isMyTurn, canControl, podeDobrar, morteSubita,
+  round, room, youId, isMyTurn, canControl, podeDobrar, podeAdiar, morteSubita,
   onAction, onChooseBuddy, onVota, onContinue,
 }) {
   const isBoca = round.gameTypeKey === 'boca_calada';
@@ -63,6 +63,20 @@ export function PromptCard({
               {morteSubita ? '💀 Recuso (saio)' : isBoca ? '🤐 Boca Calada' : '🍺 Recuso'}
             </button>
           </div>
+          {/* A Conta: adiar não é escapar. A vida custa o mesmo que recusar — o
+              que muda é que o gole fica a dever, com juro, à vista da mesa. */}
+          {podeAdiar && (
+            <button
+              onClick={() => {
+                sfx.click();
+                onAction('adiar');
+              }}
+              className="fd-btn fd-btn-ghost text-sm"
+              style={{ borderColor: 'rgba(255,176,32,0.4)' }}
+            >
+              📿 Adiar — não bebes agora, mas ficas a dever (a vida custa o mesmo)
+            </button>
+          )}
           {/* Dobro ou Nada: o preço está escrito no botão — ninguém deve dobrar
               sem saber que a vida que pode ganhar é a mesma que pode perder. */}
           {podeDobrar && (

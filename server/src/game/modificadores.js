@@ -62,6 +62,12 @@ export const CATALOGO = [
     desc: 'A razão das Intrigas é sempre revelada a toda a mesa no fim.',
   },
   {
+    key: 'divida',
+    emoji: '📿',
+    label: 'A Conta',
+    desc: 'Podes adiar o gole e ficar a dever (com juro). A conta passa-se, herda-se, e fecha no fim.',
+  },
+  {
     key: 'morte_subita',
     emoji: '💀',
     label: 'Morte Súbita',

@@ -100,6 +100,15 @@ async function resolveWheel(room) {
   const cur = g.currentPlayerId;
   const outros = (id) => [...room.players.values()].filter((p) => p.connected && !p.eliminated && p.id !== id);
 
+  // A herança tranca-se em cima de qualquer fase: quem saiu já não está a olhar
+  // para o telemóvel (às vezes já nem está na sala), e uma conta pendurada à
+  // espera dele ficava para sempre. Sorteia-se e segue.
+  if (g.heranca) {
+    game.escolheHerdeiro(room, g.heranca.deId, null);
+    pushFeed(room, '⏱️', 'Ninguém escolheu — a conta foi ao ar.');
+    return true;
+  }
+
   switch (g.phase) {
     case 'prep':
     case 'gameover':

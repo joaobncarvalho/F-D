@@ -20,6 +20,7 @@ import { setupDesenho, serializeDesenho } from './game/desenho.js';
 import { setupReacaoRoda, serializeReacaoRoda } from './game/reacao.js';
 import { ganhaVida, elimina } from './game/helpers.js';
 import * as modificadores from './game/modificadores.js';
+import * as divida from './game/divida.js';
 import * as director from './game/director.js';
 import * as palpites from './game/palpites.js';
 import * as veredito from './game/veredito.js';
@@ -405,6 +406,9 @@ export function initGame(
     modifiers: modificadores.normaliza(modifiers),
     alvoMarcadoId: null, // "Alvo Marcado": quem fica na mira da próxima ronda
     alvoSeguidas: 0, // …e há quantas rondas seguidas (travão de repetições)
+    // --- A Conta (game/divida.js) ---
+    dividas: {}, // playerId -> goles em dívida
+    heranca: null, // quem saiu a dever está a escolher herdeiro
     finalStats: null,
   };
   eventos.agendaProximo(room.game); // marca a ronda do primeiro evento
@@ -607,10 +611,22 @@ export function resolveAction(room, playerId, action) {
     return { round: g.round, effect: { type: 'doubling', playerId }, gameOver: null };
   }
 
-  if (action === 'refuse') {
+  // "Adiar" é uma recusa como as outras — a vida custa o mesmo. O que muda é que
+  // o gole não se bebe agora: fica na conta, com juro, à vista de toda a mesa.
+  const adiou = action === 'adiar';
+  if (adiou && !divida.podeAdiar(room, playerId)) {
+    throw new AppError('Não podes adiar agora — ou não está ligado, ou a conta está cheia.');
+  }
+
+  if (action === 'refuse' || adiou) {
     st.refusals += 1;
-    st.drinks += 1;
-    pushFeed(room, '🍺', `${player.name} recusou e bebeu`);
+    if (adiou) {
+      const total = divida.adia(room, playerId);
+      pushFeed(room, '📿', `${player.name} adiou — fica a dever ${total} ${total === 1 ? 'gole' : 'goles'}`);
+    } else {
+      st.drinks += 1;
+      pushFeed(room, '🍺', `${player.name} recusou e bebeu`);
+    }
 
     if (modificadores.morteSubita(room) && (g.tregua || 0) <= 0) {
       // Morte Súbita: no último terço da noite não há vidas a descontar — quem
@@ -639,12 +655,17 @@ export function resolveAction(room, playerId, action) {
     g.round.status = 'resolved';
   }
 
+  // Quem sai com a conta por pagar deixa-a a alguém (game/divida.js). É o último
+  // ato de quem sai — e é o que impede que sair signifique deixar de contar.
+  if (effect?.type === 'eliminated') abreHerancaSeHouver(room, playerId);
+
   // A plateia apostou em aceitar/beber (game/palpites.js) — fecha-se com o que
-  // aconteceu de facto, sem uma segunda fonte de verdade sobre a ronda.
-  palpites.resolve(room, action === 'refuse' ? 'bebe' : 'aceita');
+  // aconteceu de facto, sem uma segunda fonte de verdade sobre a ronda. Adiar
+  // conta como beber: a mesa apostou que ele não ia cumprir, e não cumpriu.
+  palpites.resolve(room, action === 'refuse' || adiou ? 'bebe' : 'aceita');
 
   // Aceitar um desafio com duração → passa a regra ativa (N jogadas).
-  const dur = action !== 'refuse' ? g.round.ruleDuration : null;
+  const dur = action !== 'refuse' && !adiou ? g.round.ruleDuration : null;
   const ruleText = g.round.prompt?.text;
   fecharRonda(room, { limpaRonda: false }); // decrementa regras existentes... (já salta o eliminado)
   if (dur && ruleText) addRule(room, playerId, ruleText, dur); // ...e adiciona a nova com duração cheia
@@ -659,6 +680,42 @@ export function resolveAction(room, playerId, action) {
     room.status = 'ended';
   }
   return { round: g.round, effect, gameOver };
+}
+
+/**
+ * Abre a herança de quem acabou de sair, se houver conta por pagar.
+ *
+ * Num sítio só porque há vários caminhos para a eliminação (recusa, Morte
+ * Súbita, veredito, eventos) e a conta de quem sai não pode desaparecer só
+ * porque saiu por uma porta em vez de outra.
+ */
+function abreHerancaSeHouver(room, playerId) {
+  const h = divida.abreHeranca(room, playerId);
+  if (h) {
+    pushFeed(room, '👑', `${h.deName} saiu a dever ${h.golos}. Escolhe quem herda a conta.`);
+  }
+  return h;
+}
+
+/** Quem saiu escolhe (ou o auto-resolve sorteia) a quem deixa a conta. */
+export function escolheHerdeiro(room, playerId, escolhidoId) {
+  const res = divida.escolheHerdeiro(room, playerId, escolhidoId);
+  pushFeed(room, '👑', `${res.deName} deixou ${res.golos} goles ao ${res.herdeiroName}.`);
+  return res;
+}
+
+/** Alguém assume a conta de outro — e ganha uma vida por o fazer. */
+export function transfereDivida(room, deId, paraId) {
+  const res = divida.transfere(room, deId, paraId);
+  pushFeed(room, '📿', `${res.paraName} assumiu os ${res.golos} goles do ${res.deName} — e ganhou uma vida.`);
+  return res;
+}
+
+/** A conta de alguém vence agora (evento do Cobrador, fim da noite). */
+export function cobraDivida(room, playerId) {
+  const golos = divida.cobra(room, playerId);
+  if (golos) pushFeed(room, '📿', `${nameOf(room, playerId)} pagou a conta: ${golos} goles.`);
+  return golos;
 }
 
 /** Buddy: quem tem o desafio escolhe outro jogador que "bebe junto". */
@@ -818,6 +875,13 @@ export function resetToLobby(room, playerId) {
 
 function buildStats(room) {
   const g = room.game;
+  // A CONTA FECHA. Uma dívida que nunca vence é decoração — e sem isto adiar era
+  // uma forma gratuita de nunca beber. O que se devia entra nos goles do fim.
+  const contaFinal = g.modifiers?.includes('divida') ? divida.contas(room) : [];
+  if (contaFinal.length) {
+    divida.cobraTudo(room);
+    pushFeed(room, '📿', `A conta fechou: ${contaFinal.map((c) => `${c.name} ${c.golos}`).join(' · ')}`);
+  }
   const rows = [...room.players.values()]
     .sort((a, b) => a.joinedAt.localeCompare(b.joinedAt))
     .map((p) => {
@@ -836,7 +900,14 @@ function buildStats(room) {
     rows.reduce((best, r) => (r[key] > (best?.[key] ?? -1) && r[key] > 0 ? r : best), null);
   const alive = rows.filter((r) => !r.eliminated);
   const survivor = alive.length === 1 ? alive[0] : null; // último de pé
-  return { rows, roundCount: g.roundCount, mostDrinks: top('drinks'), mostRefusals: top('refusals'), survivor };
+  return {
+    rows,
+    roundCount: g.roundCount,
+    mostDrinks: top('drinks'),
+    mostRefusals: top('refusals'),
+    survivor,
+    contaFinal, // quem tinha conta aberta quando a noite acabou (📿 A Conta)
+  };
 }
 
 /** Serializa a ronda para a rede — anonimiza votos/segredos até ao reveal. */
@@ -903,6 +974,9 @@ export function serializeGame(room) {
     morteSubita: modificadores.morteSubita(room), // já está a valer? (banner + botões)
     podeDobrar: modificadores.podeDobrar(room, g.round), // mostra o botão "dobrar"
     alvoMarcadoId: g.alvoMarcadoId || null,
+    // --- A Conta (game/divida.js): null quando o modificador está desligado ---
+    divida: divida.serialize(room),
+    podeAdiar: divida.podeAdiar(room, g.currentPlayerId),
     ordemInvertida: !!g.ordemInvertida,
     startingLives: g.startingLives,
     roundCount: g.roundCount,

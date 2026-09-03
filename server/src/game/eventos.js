@@ -27,6 +27,7 @@
 // a noite numa eliminatória em vez de um jogo.
 
 import { connectedOrder, perdeVida, ganhaVida, drink, nameOf, shuffle } from './helpers.js';
+import * as divida from './divida.js';
 
 // De quantas em quantas rondas se tenta um evento. Não é fixo: sorteia-se uma
 // janela para a mesa nunca conseguir prever "agora vem aí".
@@ -104,8 +105,39 @@ export const EVENTOS_RODA = [
       todosBebem: 1,
     }),
   },
+  {
+    key: 'perdao_de_contas',
+    tom: 'bom',
+    emoji: '🧾',
+    titulo: 'Perdão de contas',
+    peso: 5,
+    aplica: (room) => {
+      // Só sai quando o modificador "A Conta" está ligado E há conta aberta: um
+      // evento que não muda nada é pior do que evento nenhum — a mesa olha para
+      // o ecrã à espera de alguma coisa. Devolver null põe-no de parte.
+      const abertas = divida.contas(room);
+      if (!abertas.length) return null;
+      const sortudo = abertas[0]; // o maior devedor — é onde faz diferença
+      delete room.game.dividas[sortudo.id];
+      return { texto: `A casa perdoa os ${sortudo.golos} goles do ${sortudo.name}. Conta limpa.` };
+    },
+  },
 
   // ----- MAUS -----------------------------------------------------------------
+  {
+    key: 'o_cobrador',
+    tom: 'mau',
+    emoji: '📿',
+    titulo: 'O Cobrador',
+    peso: 6,
+    aplica: (room) => {
+      const abertas = divida.contas(room);
+      if (!abertas.length) return null;
+      divida.cobraTudo(room);
+      const lista = abertas.map((c) => `${c.name} ${c.golos}`).join(' · ');
+      return { texto: `Chegou o Cobrador. As contas vencem AGORA: ${lista}.` };
+    },
+  },
   {
     key: 'tempestade',
     tom: 'mau',

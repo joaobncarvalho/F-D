@@ -304,6 +304,8 @@ export default function App() {
   const setCurve = useCallback((on) => socket.emit('set_curve', { on }), []);
   const setNightLength = useCallback((minutos) => socket.emit('set_night_length', { minutos }), []);
   const setModifiers = useCallback((modifiers) => socket.emit('set_modifiers', { modifiers }), []);
+  const transfereDivida = useCallback((paraId) => socket.emit('divida_transfere', { paraId }), []);
+  const escolheHerdeiro = useCallback((herdeiroId) => socket.emit('heranca_escolhe', { herdeiroId }), []);
   const pauseGame = useCallback((paused) => socket.emit('pause_game', { paused }), []);
   const grupoAnswer = useCallback((value) => socket.emit('grupo_answer', { value }), []);
   const grupoReveal = useCallback(() => socket.emit('grupo_reveal'), []);
@@ -583,6 +585,8 @@ export default function App() {
             onBeginPlay={beginPlay}
             onSpin={spinWheel}
             onAction={playerAction}
+            onTransfereDivida={transfereDivida}
+            onEscolheHerdeiro={escolheHerdeiro}
             onChooseBuddy={chooseBuddy}
             onChooseOption={chooseOption}
             onChooseTarget={chooseTarget}
