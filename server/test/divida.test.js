@@ -28,12 +28,17 @@ function start(names = ['Ana', 'Rui', 'Zé'], opts = {}) {
 /** Força uma ronda de Desafio simples no jogador da vez. */
 async function rondaDesafio(room) {
   const spinnerId = room.game.currentPlayerId;
+  const contagem = room.game.roundCount; // um giro descartado nao aconteceu (ver modificadores.test.js)
   for (let i = 0; i < 2000; i++) {
     const round = await game.spinWheel(room, spinnerId);
-    if (round.gameTypeKey === 'desafio' && !round.needsBuddy) return round;
+    if (round.gameTypeKey === 'desafio' && !round.needsBuddy) {
+      room.game.roundCount = contagem + 1;
+      return round;
+    }
     room.game.round = null;
     room.game.phase = 'wheel';
     room.game.currentPlayerId = spinnerId;
+    room.game.roundCount = contagem;
   }
   throw new Error('A roda nunca calhou num Desafio simples.');
 }

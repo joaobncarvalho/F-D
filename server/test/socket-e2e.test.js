@@ -88,7 +88,13 @@ async function giraAte(s, tipos) {
     const quem = socketDe(s, s.ultimo?.game?.currentPlayerId);
     const proximo = esperaEstado(s.a, (r) => !!r.game.round, 'ronda');
     const res = await pede(quem, 'spin_wheel');
-    if (!res.ok) continue;
+    if (!res.ok) {
+      // A espera fica pendurada e o seu temporizador rejeita 4s depois — já
+      // fora do teste, como unhandledRejection que derruba a corrida inteira.
+      // Quanto mais tipos a roda tem, mais voltas isto dá e mais provável era.
+      proximo.catch(() => {});
+      continue;
+    }
     room = await proximo;
     if (tipos.includes(room.game.round.gameTypeKey)) return room;
     await pede(s.a, 'skip_turn'); // ronda que não interessa: fecha e volta a girar

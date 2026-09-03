@@ -30,15 +30,27 @@ function start(names = ['Ana', 'Rui', 'Zé'], opts = {}) {
   return { rm, room, players };
 }
 
-/** Força uma ronda de Desafio no jogador da vez, sem depender do sorteio. */
+/**
+ * Força uma ronda de Desafio no jogador da vez, sem depender do sorteio.
+ *
+ * Repõe o `roundCount` a cada giro descartado. Um giro que se deita fora não
+ * aconteceu, e deixá-lo contar fazia a mesa "envelhecer" às centenas de rondas
+ * enquanto se procurava um tipo — o que ligava sozinha a Morte Súbita (que
+ * arranca à 20.ª ronda) e partia este ficheiro à sorte.
+ */
 async function rondaDesafio(room) {
   const spinnerId = room.game.currentPlayerId;
-  for (let i = 0; i < 2000; i++) {
+  const contagem = room.game.roundCount;
+  for (let i = 0; i < 3000; i++) {
     const round = await game.spinWheel(room, spinnerId);
-    if (round.gameTypeKey === 'desafio' && !round.needsBuddy) return round;
+    if (round.gameTypeKey === 'desafio' && !round.needsBuddy) {
+      room.game.roundCount = contagem + 1;
+      return round;
+    }
     room.game.round = null;
     room.game.phase = 'wheel';
     room.game.currentPlayerId = spinnerId;
+    room.game.roundCount = contagem;
   }
   throw new Error('A roda nunca calhou num Desafio simples.');
 }
