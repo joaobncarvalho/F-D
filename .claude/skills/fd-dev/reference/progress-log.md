@@ -5,6 +5,70 @@
 
 ---
 
+## 2026-09-03 (b) — Playtest: o duelo final não acabava a noite; e onze duelos em vez de três
+
+Dois achados do João a jogar o Modo da Morte.
+
+### 1. BUG: a Última Ronda não acabava
+A mesa era avisada de que restavam dois e de que o que vinha era o final, o duelo
+resolvia-se… e ninguém saía. Causa: **perder um duelo só custava três goles** —
+nunca eliminou ninguém, em modo nenhum. Como continuavam a sobrar dois, o
+`estadoDoFim` devolvia `'duelo'` outra vez e TODAS as rondas seguintes eram o
+mesmo "duelo final". O jogo não tinha como acabar.
+
+O preço da derrota passa a depender do modo, decidido num só sítio
+(`duelo.fecharDuelo`):
+
+| | |
+|---|---|
+| Roda | três goles (como antes — um duelo é um momento, não uma sentença) |
+| Modo da Morte | uma **vida** — pagar um 1v1 a goles não faz sentido num modo em que tudo o resto custa vidas |
+| **Duelo final** | **elimina**, quaisquer que sejam as vidas |
+
+Um final anunciado tem de ser decisivo: é a regra que faltava.
+
+Dois arranjos que vieram com ele:
+· `dueloFinal` deixa de ser uma marca que fica presa e passa a ser **recalculado a
+  cada ronda** — um fantasma pode ressuscitar alguém, voltar a haver três à mesa,
+  e nesse caso o final deixa de estar à porta;
+· o efeito (vida perdida / eliminação) passa a ser emitido pelos handlers do
+  socket, para o cliente o animar como anima os outros.
+
+No ecrã, a carta do duelo passa a dizer o que está em jogo **antes** de se jogar
+("quem perder perde uma vida" / "quem perder está fora, e a noite acaba aqui") e
+coroa o vencedor no fim. Quem vai duelar tem de saber o preço antes, não a lê-lo
+no resultado.
+
+### 2. Onze duelos em vez de três
+Três davam sempre a mesma noite — cara ou coroa e braço de ferro a repetirem-se.
+Mais oito, todos resolvidos à mesa (zero trabalho de cliente: a carta já desenha
+`emoji`/`label`/`desc` genericamente): ✊ Pedra-Papel-Tesoura · 👁️ Duelo de
+Olhares · 🖐️ Rápido no Gatilho · 🔢 Quantos Dedos · 😐 Quem Ri Primeiro ·
+🦩 Numa Perna Só · 🔤 À Vez, Sem Repetir · 🧠 Memória.
+
+Regras que usei para os escolher, e que ficaram escritas no ficheiro: resolvem-se
+em menos de um minuto, **decidem-se sozinhos** (a mesa vê quem ganhou sem ter de
+arbitrar) e não exigem nada além do que está na mesa. Nenhum é de resistência
+física — o jogo já tem álcool, não precisa de apneia.
+
+Não houve alteração de BD: os `DUELO_GAMES` são constantes de código, não
+`game_types` (o teste que compara o `02_seed.sql` com o `prompts.data.js`
+continua verde, o que o prova).
+
+### Ficheiros
+`server/src/game/duelo.js` (o preço da derrota), `game.js` (recálculo do
+`dueloFinal`), `socket.js` (emite o efeito), `content/prompts.data.js` (+8
+duelos); `client/src/pages/games/quickCards.jsx` (aviso antes + resultado),
+`pages/Game.jsx`, `components/Rules.jsx`.
+Testes: +6 (`morte.test.js` 3 · `roda-novos-tipos.test.js` 3) — **167 → 173**.
+
+### Como foi verificado
+`npm test` **173/173** em 12 corridas seguidas; build do cliente limpo. O teste
+que interessa é o que reproduz o bug: leva a mesa até restarem dois, resolve o
+duelo e exige `phase === 'gameover'` com o vencedor em `finalStats.survivor`.
+
+---
+
 ## 2026-09-03 — As quatro camadas "hardcore": modificadores, A Conta, seis tipos novos e o Modo da Morte
 
 O pedido era "mais jogos e níveis de intensidade mais hardcore, incluindo um modo

@@ -211,3 +211,47 @@ test('Cara ou Coroa: a moeda é lançada pela app e decide sozinha', async () =>
   const esperado = r.coin.face === 'cara' ? ana.id : round.opponentId;
   assert.equal(r.result.winnerId, esperado);
 });
+
+// ----- Duelo: catálogo e preço da derrota fora do Modo da Morte ---------------
+
+test('Duelo: perder continua a custar goles na Roda normal (não vidas)', async () => {
+  const { room } = start(['Ana', 'Rui', 'Zé', 'Mia']);
+  const round = await spinUntil(room, 'duelo');
+  const vencedor = round.currentPlayerId;
+  const perdedor = round.opponentId;
+  const vidasAntes = room.players.get(perdedor).lives;
+  if (round.substate === 'calling') room.game.round.substate = 'duelling';
+  game.dueloResult(room, vencedor, vencedor);
+
+  assert.equal(room.game.stats[perdedor].drinks, room.game.round.result.golos);
+  assert.ok(room.game.round.result.golos > 0, 'na Roda paga-se a goles');
+  assert.equal(room.players.get(perdedor).lives, vidasAntes, 'e não a vidas');
+  assert.equal(room.game.round.result.final, false);
+});
+
+test('Duelo: o catálogo tem variedade a sério e está todo bem formado', async () => {
+  const { DUELO_GAMES } = await import('../src/content/prompts.data.js');
+  assert.ok(DUELO_GAMES.length >= 10, `só ${DUELO_GAMES.length} duelos — voltava a repetir-se`);
+  const chaves = new Set();
+  for (const d of DUELO_GAMES) {
+    assert.ok(d.key && d.emoji && d.label && d.desc, `duelo mal formado: ${d.key}`);
+    assert.ok(d.desc.length > 30, `${d.key}: a descrição tem de explicar as regras à mesa`);
+    assert.equal(chaves.has(d.key), false, `chave repetida: ${d.key}`);
+    chaves.add(d.key);
+  }
+  // Só o cara-ou-coroa se resolve DENTRO da app (ver game/duelo.js: substate
+  // 'calling'). Se aparecer outro, o setupDuelo tem de saber dele.
+  assert.ok(chaves.has('cara_coroa'));
+});
+
+test('Duelo: com o catálogo maior, a roda não repete sempre os mesmos', async () => {
+  const { room } = start(['Ana', 'Rui', 'Zé', 'Mia']);
+  const vistos = new Set();
+  for (let i = 0; i < 60; i++) {
+    const round = await spinUntil(room, 'duelo');
+    vistos.add(round.duel.key);
+    room.game.round = null;
+    room.game.phase = 'wheel';
+  }
+  assert.ok(vistos.size >= 6, `em 60 duelos só saíram ${vistos.size} tipos: ${[...vistos]}`);
+});

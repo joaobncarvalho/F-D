@@ -140,6 +140,14 @@ tudo mexe em vidas, em vez, em exposição e em risco de saída. Ver
       motor. Não há recusar · quem sai vira fantasma (cartas + testamento) ·
       o relógio encurta · acaba num duelo entre os dois últimos.
 
+### 📋 Vindo do playtest de 2026-09-03 — feito
+- [x] **A Última Ronda não acabava** — perder um duelo só custava goles, por isso
+      o "duelo final" nunca eliminava ninguém e repetia-se para sempre. No Modo
+      da Morte a derrota passa a custar uma vida, e no duelo final **elimina**.
+- [x] **Onze duelos em vez de três** — saíam sempre cara ou coroa e braço de
+      ferro. +8 resolvidos à mesa (pedra-papel-tesoura, olhares, gatilho, dedos,
+      quem ri primeiro, numa perna só, à vez sem repetir, memória).
+
 **Por testar à mesa** (playtest de 11 set): poucos modificadores de cada vez, e
 o Modo da Morte com 5+ pessoas — é aí que os fantasmas ganham massa crítica.
 Perguntas em aberto para o playtest: o pavio da Bomba (18–62 s) está bem

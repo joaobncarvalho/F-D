@@ -589,6 +589,7 @@ export default function Game(props) {
         )}
         {revealed && g.phase === 'duelo' && (
           <DueloCard
+            morte={g.morte}
             key={round.id}
             round={round}
             youId={youId}

@@ -43,7 +43,7 @@ const JOGOS = {
   categoria_relampago: 'Uma categoria, oito segundos, itens em voz alta. No fim a MESA vota se aguentaste — se não, perdes uma vida ❤️',
   mimica: 'Mimas a palavra que só tu vês. No fim a MESA vota se percebeu — se não, perdes uma vida ❤️ (empate conta a teu favor).',
   roleta_russa: 'Pergunta embaraçosa: respondes ou passas — e cada passe fica mais caro.',
-  duelo: 'Dois jogadores, um mini-duelo presencial. Quem perde bebe.',
+  duelo: 'Dois jogadores, um mini-duelo sorteado de onze (pedra-papel-tesoura, olhares, braço de ferro, memória…). Quem perde bebe — no Modo da Morte perde uma vida, e no duelo final sai.',
   eu_nunca: 'Todos respondem ao mesmo tempo: "já fiz" ou "nunca". Quem já fez, bebe.',
   mais_provavel: 'Todos votam na pessoa mais provável de fazer aquilo. O mais votado bebe um golo por voto.',
   termometro: 'Cada um escolhe 0 a 10 em segredo. Revela-se tudo: os extremos bebem.',

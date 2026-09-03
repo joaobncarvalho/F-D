@@ -902,6 +902,59 @@ export const DUELO_GAMES = [
     label: 'Braço de Ferro',
     desc: 'Cotovelos na mesa, mãos dadas. À melhor de uma — sem cotoveladas.',
   },
+  // Os oito abaixo entraram porque três davam sempre a mesma noite: cara ou
+  // coroa e braço de ferro a repetirem-se de duelo em duelo. Regras para os
+  // escolher: resolvem-se em menos de um minuto, decidem-se sozinhos (a mesa vê
+  // quem ganhou sem ter de arbitrar) e não exigem nada além do que está na mesa.
+  // Nenhum é de resistência física — o jogo já tem álcool, não precisa de apneia.
+  {
+    key: 'pedra_papel',
+    emoji: '✊',
+    label: 'Pedra, Papel ou Tesoura',
+    desc: 'À melhor de três. Contagem até três em voz alta e mostrem ao mesmo tempo.',
+  },
+  {
+    key: 'duelo_olhares',
+    emoji: '👁️',
+    label: 'Duelo de Olhares',
+    desc: 'Olhos nos olhos, sem desviar. Perde quem piscar, rir ou baixar os olhos primeiro.',
+  },
+  {
+    key: 'gatilho',
+    emoji: '🖐️',
+    label: 'Rápido no Gatilho',
+    desc: 'Mãos na mesa, longe do copo. Alguém da mesa grita "JÁ" — ganha quem lhe tocar primeiro.',
+  },
+  {
+    key: 'adivinha_dedos',
+    emoji: '🔢',
+    label: 'Quantos Dedos',
+    desc: 'Escondem uma mão atrás das costas e mostram ao mesmo tempo. Antes disso, cada um diz o TOTAL que acha que vai sair. Ganha quem acertar (ou chegar mais perto).',
+  },
+  {
+    key: 'sem_rir',
+    emoji: '😐',
+    label: 'Quem Ri Primeiro',
+    desc: 'Cara séria os dois. A mesa tem trinta segundos para vos fazer rir — perde o primeiro que ceder. Empate: perdem os dois.',
+  },
+  {
+    key: 'equilibrio',
+    emoji: '🦩',
+    label: 'Numa Perna Só',
+    desc: 'De pé, numa perna só, braços cruzados. Perde quem puser o outro pé no chão primeiro.',
+  },
+  {
+    key: 'alfabeto',
+    emoji: '🔤',
+    label: 'À Vez, Sem Repetir',
+    desc: 'A mesa dá uma categoria. Dizem à vez, dois segundos cada um. Perde quem falhar, repetir ou hesitar.',
+  },
+  {
+    key: 'memoria',
+    emoji: '🧠',
+    label: 'Memória',
+    desc: 'Um diz um objeto; o outro repete-o e acrescenta outro; e assim por diante. Perde quem trocar a ordem ou se esquecer.',
+  },
 ];
 
 // Quadros do Jogo do Vasco: cada quadro tem um tema e 9 palavras (grelha 3×3).

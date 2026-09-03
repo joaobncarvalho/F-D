@@ -204,7 +204,9 @@ export function RoletaCard({ round, youId, canControl, onAnswer, onPass, onConti
   );
 }
 
-export function DueloCard({ round, youId, canControl, onResult, onCall, onContinue }) {
+export function DueloCard({ round, youId, canControl, morte, onResult, onCall, onContinue }) {
+  const morteVida = !!morte; // no Modo da Morte um duelo custa uma vida…
+  const morteFinal = !!morte?.dueloFinal; // …e o final põe fora
   const duelists = [
     { id: round.currentPlayerId, name: round.currentPlayerName },
     { id: round.opponentId, name: round.opponentName },
@@ -268,6 +270,17 @@ export function DueloCard({ round, youId, canControl, onResult, onCall, onContin
         </>
       )}
 
+      {/* No Modo da Morte um duelo não se paga a goles: custa uma vida, e no
+          DUELO FINAL põe fora. Quem vai duelar tem de saber isso ANTES de
+          decidir como o joga — não a ler no resultado. */}
+      {round.substate !== 'result' && (morteFinal || morteVida) && (
+        <p className={`text-sm font-bold ${morteFinal ? 'text-rose-300' : 'text-amber-300'}`}>
+          {morteFinal
+            ? '💀 Duelo final: quem perder está fora, e a noite acaba aqui.'
+            : '⚔️ Quem perder este duelo perde uma vida.'}
+        </p>
+      )}
+
       {escondeResultado ? null : round.substate === 'duelling' ? (
         canMark ? (
           <div className="flex flex-col gap-2 mt-1">
@@ -289,8 +302,17 @@ export function DueloCard({ round, youId, canControl, onResult, onCall, onContin
         <>
           <p className="text-lg font-bold text-emerald-300">🏆 {round.result?.winnerName} ganhou!</p>
           <p className="text-base text-rose-300">
-            🍺 {round.result?.loserName} bebe {round.result?.golos} golos.
+            {round.result?.eliminado
+              ? `💀 ${round.result?.loserName} está fora.`
+              : round.result?.perdeuVida
+                ? `⚔️ ${round.result?.loserName} perde uma vida.`
+                : `🍺 ${round.result?.loserName} bebe ${round.result?.golos} golos.`}
           </p>
+          {round.result?.final && (
+            <p className="fd-title text-xl font-extrabold text-amber-300">
+              👑 {round.result?.winnerName} é o último de pé.
+            </p>
+          )}
           <ContinueButton show={canControl} onContinue={onContinue} />
         </>
       )}

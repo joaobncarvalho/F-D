@@ -7,7 +7,8 @@
 
 import { AppError } from '../errors.js';
 import { DUELO_GAMES } from '../content/prompts.data.js';
-import { connectedOrder, drink, nameOf } from './helpers.js';
+import { connectedOrder, drink, nameOf, perdeVida, elimina } from './helpers.js';
+import * as morte from './morte.js';
 
 const PERDEDOR_GOLOS = 3;
 
@@ -28,19 +29,47 @@ export function setupDuelo(room, round) {
   return true;
 }
 
-/** Fecha o duelo: quem perde bebe. Partilhado pelo veredicto manual e pela moeda. */
+/**
+ * Fecha o duelo. Partilhado pelo veredicto manual e pela moeda.
+ *
+ * O preço da derrota depende do modo, e é aqui que isso se decide:
+ *
+ *   Roda            três goles. Um duelo é um momento, não uma sentença.
+ *   Modo da Morte   uma VIDA — pagar um 1v1 a goles não faz sentido num modo em
+ *                   que tudo o resto custa vidas.
+ *   DUELO FINAL     ELIMINA, quaisquer que sejam as vidas. Este é o bug que isto
+ *                   veio corrigir: a mesa era avisada de que restavam dois e de
+ *                   que aquilo era o final, o duelo resolvia-se… e ninguém saía,
+ *                   por isso continuavam a sobrar dois e TODAS as rondas
+ *                   seguintes eram outra vez o "duelo final". O jogo não acabava.
+ *                   Um final anunciado tem de ser decisivo.
+ */
 function fecharDuelo(room, r, winnerId) {
   const g = room.game;
   const loserId = [r.currentPlayerId, r.opponentId].find((id) => id !== winnerId);
-  drink(g, loserId, PERDEDOR_GOLOS);
+
+  let efeito = null;
+  const final = !!g.morte?.dueloFinal;
+  if (morte.ativo(room)) {
+    efeito = final
+      ? elimina(room, loserId, 'perdeu o duelo final')
+      : perdeVida(room, loserId, { motivo: 'perdeu o duelo', emoji: '⚔️' });
+  } else {
+    drink(g, loserId, PERDEDOR_GOLOS);
+  }
+
   r.substate = 'result';
   r.status = 'resolved';
+  r.efeito = efeito; // o socket.js emite-o para o cliente animar
   r.result = {
     winnerId,
     winnerName: nameOf(room, winnerId),
     loserId,
     loserName: nameOf(room, loserId),
-    golos: PERDEDOR_GOLOS,
+    golos: morte.ativo(room) ? 0 : PERDEDOR_GOLOS,
+    final,
+    eliminado: efeito?.type === 'eliminated',
+    perdeuVida: efeito?.type === 'vida_perdida',
   };
   return r;
 }
@@ -89,3 +118,5 @@ export function serializeDuelo(base, r) {
   base.coin = r.coin || null; // { call, face } — o cliente anima a moeda até esta face
   base.result = r.result || null;
 }
+
+export { PERDEDOR_GOLOS };

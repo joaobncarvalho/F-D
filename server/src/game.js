@@ -275,9 +275,15 @@ function fecharRonda(room, { limpaRonda = true } = {}) {
     pushFeed(room, '🏆', ultimo ? `${ultimo.name} é o último de pé.` : 'Não sobrou ninguém.');
     return g;
   }
-  if (fim === 'duelo' && !g.morte.dueloFinal) {
-    g.morte.dueloFinal = true;
-    pushFeed(room, '⚔️', 'Restam dois. A próxima ronda é o duelo final.');
+  if (g.morte) {
+    // Recalculado a cada ronda, e não uma marca que fica: um fantasma pode
+    // ressuscitar alguém e voltar a haver três à mesa — nesse caso o final
+    // deixa de estar à porta e a roda volta a decidir o que sai.
+    const eraFinal = g.morte.dueloFinal;
+    g.morte.dueloFinal = fim === 'duelo';
+    if (g.morte.dueloFinal && !eraFinal) {
+      pushFeed(room, '⚔️', 'Restam dois. A próxima ronda é o duelo final — quem perder, sai.');
+    }
   }
   morte.passaRonda(room); // liberta a carta de fantasma da ronda
 

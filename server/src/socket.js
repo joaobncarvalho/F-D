@@ -682,7 +682,10 @@ export function registerSocketHandlers(io) {
     socket.on('duelo_call', ({ call } = {}, ack) => {
       try {
         const room = requireRoom(socket);
-        game.dueloCall(room, socket.data.playerId, call);
+        const r1 = game.dueloCall(room, socket.data.playerId, call);
+        // No Modo da Morte perder um duelo custa uma vida (ou a saida, se for o
+        // final) -- o cliente precisa do efeito para o animar.
+        if (r1?.efeito) io.to(room.code).emit('action_result', { effect: r1.efeito });
         broadcastState(io, room.code);
         if (typeof ack === 'function') ack({ ok: true });
       } catch (err) {
@@ -693,7 +696,8 @@ export function registerSocketHandlers(io) {
     socket.on('duelo_result', ({ winnerId } = {}, ack) => {
       try {
         const room = requireRoom(socket);
-        game.dueloResult(room, socket.data.playerId, winnerId);
+        const r2 = game.dueloResult(room, socket.data.playerId, winnerId);
+        if (r2?.efeito) io.to(room.code).emit('action_result', { effect: r2.efeito });
         broadcastState(io, room.code);
         if (typeof ack === 'function') ack({ ok: true });
       } catch (err) {

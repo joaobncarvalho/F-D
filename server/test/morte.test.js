@@ -260,3 +260,90 @@ test('restando um, a noite acaba sozinha com as estatísticas', async () => {
   assert.ok(room.game.finalStats.survivor, 'há um último de pé');
   assert.equal(room.game.finalStats.survivor.eliminated, false);
 });
+
+// ----- O duelo final (bug reportado no playtest de 2026-09-03) ----------------
+//
+// A mesa era avisada de que restavam dois e de que aquilo era o final, o duelo
+// resolvia-se… e ninguém saía: perder um duelo só custava goles. Continuavam a
+// sobrar dois, por isso TODAS as rondas seguintes eram outra vez o "duelo final"
+// e o jogo nunca acabava. Um final anunciado tem de ser decisivo.
+
+async function ateAoDuelo(room) {
+  // Elimina até restarem dois → a ronda seguinte é o duelo final.
+  while (morte.estadoDoFim(room) !== 'duelo') {
+    await rondaDesafio(room);
+    game.resolveAction(room, room.game.currentPlayerId, 'refuse');
+    if (room.game.morte.testamentoAberto) game.fechaTestamento(room);
+  }
+  assert.equal(room.game.morte.dueloFinal, true, 'o final foi anunciado');
+  const round = await game.spinWheel(room, room.game.currentPlayerId);
+  assert.equal(round.gameTypeKey, 'duelo');
+  return round;
+}
+
+test('o duelo final elimina quem perde — e a noite ACABA aí', async () => {
+  const { room } = start(['Ana', 'Rui', 'Zé', 'Mia'], { lives: 3 });
+  const round = await ateAoDuelo(room);
+
+  const vencedor = round.currentPlayerId;
+  const perdedor = round.opponentId;
+  if (round.substate === 'calling') {
+    // Cara ou coroa resolve-se dentro da app; forçamos o outro caminho para o
+    // teste ser sobre o FIM e não sobre o sorteio da moeda.
+    room.game.round.substate = 'duelling';
+  }
+  game.dueloResult(room, vencedor, vencedor);
+
+  assert.equal(room.game.round.result.final, true);
+  assert.equal(room.game.round.result.eliminado, true);
+  assert.equal(room.players.get(perdedor).eliminated, true, 'perder o final põe fora');
+
+  game.continueRound(room, room.game.currentPlayerId);
+  assert.equal(room.game.phase, 'gameover', 'a noite acaba no duelo final');
+  assert.equal(room.status, 'ended');
+  assert.equal(room.game.finalStats.survivor.id, vencedor);
+});
+
+test('fora do final, perder um duelo custa uma vida (não goles)', async () => {
+  const { room } = start(['Ana', 'Rui', 'Zé', 'Mia', 'Bea']);
+  let round = null;
+  for (let i = 0; i < 4000 && !round; i++) {
+    const r = await game.spinWheel(room, room.game.currentPlayerId);
+    if (r.gameTypeKey === 'duelo') round = r;
+    else {
+      room.game.round = null;
+      room.game.phase = 'wheel';
+    }
+  }
+  assert.ok(round, 'a roda nunca calhou num duelo');
+  assert.equal(room.game.morte.dueloFinal, false, 'ainda há mesa a mais para o final');
+
+  const vencedor = round.currentPlayerId;
+  const perdedor = round.opponentId;
+  const vidasAntes = room.players.get(perdedor).lives;
+  if (round.substate === 'calling') room.game.round.substate = 'duelling';
+  game.dueloResult(room, vencedor, vencedor);
+
+  assert.equal(room.players.get(perdedor).lives, vidasAntes - 1);
+  assert.equal(room.players.get(perdedor).eliminated, false, 'ainda não sai');
+  assert.equal(room.game.stats[perdedor]?.drinks || 0, 0, 'num modo de vidas não se paga a goles');
+});
+
+test('ressuscitar alguém desliga o duelo final', async () => {
+  const { room } = start(['Ana', 'Rui', 'Zé', 'Mia']);
+  await ateAoDuelo(room);
+  room.game.round = null;
+  room.game.phase = 'wheel';
+
+  // Um fantasma traz alguém de volta → voltam a ser três, e o final espera.
+  const fantasmaId = Object.keys(room.game.morte.fantasmas)[0];
+  const outroFora = Object.keys(room.game.morte.fantasmas).find((id) => id !== fantasmaId);
+  room.game.morte.fantasmas[fantasmaId].cartas = ['ressuscitar'];
+  room.game.morte.cartaJogadaNaRonda = false;
+  game.fantasmaJogaCarta(room, fantasmaId, 'ressuscitar', outroFora);
+
+  assert.equal(morte.estadoDoFim(room), null, 'com três à mesa não há final à porta');
+  await rondaDesafio(room);
+  game.resolveAction(room, room.game.currentPlayerId, 'accept');
+  assert.equal(room.game.morte.dueloFinal, false, 'a marca do final não fica presa');
+});
