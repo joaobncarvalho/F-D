@@ -95,7 +95,9 @@ export function registerSocketHandlers(io) {
         // isso quem chega assiste e APOSTA (que é o que mantém a mesa dentro).
         if (latecomer) {
           if (room.mode === 'board') board.addLatecomer(room, player);
-          else if (room.mode === 'wheel') game.addLatecomer(room, player);
+          // O Modo da Morte corre o mesmo motor da Roda, e quem chega entra vivo:
+          // é mais uma pessoa a jogar, e a eliminação trata do resto.
+          else if (room.mode === 'wheel' || room.mode === 'morte') game.addLatecomer(room, player);
         }
         bindSocketToRoom(socket, room.code, player.id);
         respond(ack, socket, 'room_joined', {
@@ -819,6 +821,33 @@ export function registerSocketHandlers(io) {
       }
     });
 
+    // ----- Modo da Morte: as ações de quem já saiu ----------------------------
+    // É o que impede que ser eliminado signifique ficar a ver os outros
+    // divertirem-se — o pior castigo possível numa festa.
+    socket.on('fantasma_carta', ({ carta, alvoId } = {}, ack) => {
+      try {
+        const room = requireRoom(socket);
+        const res = game.fantasmaJogaCarta(room, socket.data.playerId, carta, alvoId);
+        for (const e of res.efeitos || []) io.to(room.code).emit('action_result', { effect: e });
+        io.to(room.code).emit('fantasma_jogou', { emoji: res.emoji, texto: res.texto });
+        broadcastState(io, room.code);
+        if (typeof ack === 'function') ack({ ok: true });
+      } catch (err) {
+        handleError(socket, ack, err);
+      }
+    });
+
+    socket.on('testamento', ({ texto } = {}, ack) => {
+      try {
+        const room = requireRoom(socket);
+        game.deixaTestamento(room, socket.data.playerId, texto);
+        broadcastState(io, room.code);
+        if (typeof ack === 'function') ack({ ok: true });
+      } catch (err) {
+        handleError(socket, ack, err);
+      }
+    });
+
     // ----- Tipos da camada 3 --------------------------------------------------
     // Bomba-Relógio: o pavio vive no servidor e nunca vai no payload, por isso é
     // a passagem que descobre se já rebentou.
@@ -1053,6 +1082,16 @@ function broadcastState(io, code) {
   const room = rooms.getRoom(code);
   if (!room) return; // sala já foi removida (ficou vazia)
   io.to(code).emit('room_state', { room: serializeRoom(room) });
+  // Modo da Morte: a mão de cada fantasma é PRIVADA, pela mesma razão das cartas
+  // do Tabuleiro — se a mesa soubesse que cartas andam por aí, jogava contra
+  // elas em vez de jogar a ronda. O broadcast só leva quantas são.
+  if (room.mode === 'morte' && room.game?.morte) {
+    for (const p of room.players.values()) {
+      if (!p.connected || p.isBot) continue;
+      const cartas = game.maoFantasma(room, p.id);
+      if (cartas) io.to(p.id).emit('fantasma_mao', { cartas });
+    }
+  }
   // Tabuleiro: as cartas são PRIVADAS — entrega a cada jogador ligado a SUA mão
   // (o broadcast só leva a contagem). Cobre advance/jogar carta/ganhar/reconexão.
   if (room.mode === 'board' && room.board) {

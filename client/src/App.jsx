@@ -57,6 +57,7 @@ export default function App() {
   const [vascoRole, setVascoRole] = useState(null); // { roundId, isImpostor, word } — PRIVADO
   const [mimicaWord, setMimicaWord] = useState(null); // { roundId, word, mode… } — PRIVADO
   const [boardHand, setBoardHand] = useState(null); // { cards } — mão de cartas do tabuleiro (PRIVADA)
+  const [fantasmaMao, setFantasmaMao] = useState(null); // { cartas } — Modo da Morte (PRIVADA)
   const [intensityResult, setIntensityResult] = useState(null); // { intensity, randomized, candidates, counts }
   const [desenhoWord, setDesenhoWord] = useState(null); // { roundId, word } — PRIVADO
   const [muted, setMuted] = useState(sfx.isMuted());
@@ -198,6 +199,10 @@ export default function App() {
     function onDesenhoWord(payload) {
       setDesenhoWord(payload);
     }
+    // Modo da Morte: a mão do fantasma é privada (só quem já saiu a vê).
+    function onFantasmaMao({ cartas }) {
+      setFantasmaMao({ cartas: cartas || [] });
+    }
     function onBoardHand({ cards, traps }) {
       setBoardHand({ cards: cards || [], traps: traps || [] });
     }
@@ -225,6 +230,7 @@ export default function App() {
     socket.on('mimica_word', onMimicaWord);
     socket.on('desenho_word', onDesenhoWord);
     socket.on('board_hand', onBoardHand);
+    socket.on('fantasma_mao', onFantasmaMao);
     socket.on('error_msg', onError);
     socket.on('session_invalid', onSessionInvalid);
 
@@ -241,6 +247,7 @@ export default function App() {
       socket.off('mimica_word', onMimicaWord);
       socket.off('desenho_word', onDesenhoWord);
       socket.off('board_hand', onBoardHand);
+      socket.off('fantasma_mao', onFantasmaMao);
       socket.off('error_msg', onError);
       socket.off('session_invalid', onSessionInvalid);
     };
@@ -306,6 +313,9 @@ export default function App() {
   const setModifiers = useCallback((modifiers) => socket.emit('set_modifiers', { modifiers }), []);
   const transfereDivida = useCallback((paraId) => socket.emit('divida_transfere', { paraId }), []);
   // Tipos "hardcore" (ver server/src/game/{bomba,leilao,sincronia,detetor,julgamento,contrato}.js)
+  // Modo da Morte (ver server/src/game/morte.js)
+  const fantasmaCarta = useCallback((carta, alvoId) => socket.emit('fantasma_carta', { carta, alvoId }), []);
+  const deixaTestamento = useCallback((texto) => socket.emit('testamento', { texto }), []);
   const bombaPassa = useCallback(() => socket.emit('bomba_passa'), []);
   const leilaoLicita = useCallback((golos) => socket.emit('leilao_licita', { golos }), []);
   const sincroniaResponde = useCallback((escolhidoId) => socket.emit('sincronia_responde', { escolhidoId }), []);
@@ -596,6 +606,9 @@ export default function App() {
             onAction={playerAction}
             onTransfereDivida={transfereDivida}
             onEscolheHerdeiro={escolheHerdeiro}
+            fantasmaMao={fantasmaMao}
+            onFantasmaCarta={fantasmaCarta}
+            onTestamento={deixaTestamento}
             onBombaPassa={bombaPassa}
             onLeilaoLicita={leilaoLicita}
             onSincroniaResponde={sincroniaResponde}

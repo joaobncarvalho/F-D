@@ -19,6 +19,7 @@ import * as game from './game.js';
 import * as board from './board.js';
 import * as tournament from './tournament.js';
 import { pushFeed } from './feed.js';
+import * as morte from './game/morte.js';
 import { log } from './log.js';
 
 const DEFAULT_MS = Number(process.env.AUTO_RESOLVE_MS ?? 75_000);
@@ -53,7 +54,14 @@ function signature(room) {
 }
 
 function timeoutFor(room) {
-  if (room.mode === 'wheel' && CURTAS.has(room.game?.phase)) return CURTO_MS;
+  // MODO DA MORTE: o relógio da ronda encurta a cada eliminação (game/morte.js).
+  // É o que faz a mesa sentir a noite a fechar-se sem ninguém anunciar nada — e
+  // por isso o prazo de auto-resolução tem mesmo de o seguir, senão o aperto era
+  // só um número no ecrã.
+  if (room.mode === 'morte' && room.game?.morte) {
+    return morte.segundosRonda(room) * 1000;
+  }
+  if ((room.mode === 'wheel' || room.mode === 'morte') && CURTAS.has(room.game?.phase)) return CURTO_MS;
   return DEFAULT_MS;
 }
 
@@ -99,6 +107,15 @@ async function resolveWheel(room) {
   const r = g.round;
   const cur = g.currentPlayerId;
   const outros = (id) => [...room.players.values()].filter((p) => p.connected && !p.eliminated && p.id !== id);
+
+  // Um testamento por escrever não pode segurar a mesa: quem acabou de sair pode
+  // já estar a ir buscar uma cerveja. Passado o prazo, não deixa regra nenhuma —
+  // e não se inventa uma por ele.
+  if (g.morte?.testamentoAberto) {
+    const fechado = game.fechaTestamento(room);
+    pushFeed(room, '📜', `${fechado.deName} saiu sem deixar nada dito.`);
+    return true;
+  }
 
   // A herança tranca-se em cima de qualquer fase: quem saiu já não está a olhar
   // para o telemóvel (às vezes já nem está na sala), e uma conta pendurada à

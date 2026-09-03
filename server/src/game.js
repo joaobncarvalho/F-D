@@ -27,6 +27,7 @@ import { setupContrato, serializeContrato, fecha as fechaContrato } from './game
 import { ganhaVida, elimina } from './game/helpers.js';
 import * as modificadores from './game/modificadores.js';
 import * as divida from './game/divida.js';
+import * as morte from './game/morte.js';
 import * as director from './game/director.js';
 import * as palpites from './game/palpites.js';
 import * as veredito from './game/veredito.js';
@@ -237,6 +238,16 @@ function advanceTurn(room) {
  */
 function fecharRonda(room, { limpaRonda = true } = {}) {
   const g = room.game;
+
+  // MODO DA MORTE: as eliminações da ronda tratam-se aqui, num sítio só (há uma
+  // dúzia de caminhos que eliminam alguém). Antes do `advanceTurn`, para a vez
+  // não ir parar a quem acabou de sair.
+  const ceifa = morte.varre(room);
+  for (const c of ceifa.condenados) pushFeed(room, '💀', `Ronda condenada: ${c.name} está fora.`);
+  for (const n of ceifa.novos) {
+    pushFeed(room, '👻', `${n.name} saiu — e volta como fantasma, com cartas e um testamento.`);
+  }
+
   advanceTurn(room);
   if (limpaRonda) g.round = null;
 
@@ -251,6 +262,24 @@ function fecharRonda(room, { limpaRonda = true } = {}) {
     pushFeed(room, '🏁', 'E é assim que acaba a noite.');
     return g;
   }
+
+  // MODO DA MORTE: acaba sozinho. Sobrou um → é o vencedor e a noite fecha, com
+  // as estatísticas; sobraram dois → a próxima ronda é o duelo final. Nenhum dos
+  // dois depende de alguém se lembrar de carregar em "terminar".
+  const fim = morte.estadoDoFim(room);
+  if (fim === 'fim') {
+    g.phase = 'gameover';
+    g.finalStats = buildStats(room);
+    room.status = 'ended';
+    const [ultimo] = connectedOrder(room);
+    pushFeed(room, '🏆', ultimo ? `${ultimo.name} é o último de pé.` : 'Não sobrou ninguém.');
+    return g;
+  }
+  if (fim === 'duelo' && !g.morte.dueloFinal) {
+    g.morte.dueloFinal = true;
+    pushFeed(room, '⚔️', 'Restam dois. A próxima ronda é o duelo final.');
+  }
+  morte.passaRonda(room); // liberta a carta de fantasma da ronda
 
   g.phase = 'wheel';
   eventos.passaRonda(g); // consome a trégua, se houver
@@ -390,9 +419,14 @@ export function tallyIntensity(room) {
 
 export function initGame(
   room,
-  { lives = DEFAULT_LIVES, intensity = 'leve', curve = true, duracaoMin = null, modifiers = [] } = {}
+  // `lives` sem valor por omissão AQUI: o número por omissão depende do modo (ver
+  // abaixo), e um default no destructuring ganhava-lhe sempre.
+  { lives = null, intensity = 'leve', curve = true, duracaoMin = null, modifiers = [] } = {}
 ) {
-  const n = Math.max(MIN_LIVES, Math.min(MAX_LIVES, Number(lives) || DEFAULT_LIVES));
+  // O Modo da Morte começa com menos vidas: duas dão um estado de "ferido" antes
+  // do fim, e três arrastavam uma noite que vive de fechar depressa.
+  const porOmissao = morte.ativo(room) ? morte.VIDAS_DEFEITO : DEFAULT_LIVES;
+  const n = Math.max(MIN_LIVES, Math.min(MAX_LIVES, Number(lives) || porOmissao));
   for (const p of room.players.values()) {
     p.lives = n;
     p.eliminated = false; // novo jogo → todos voltam a jogar
@@ -432,6 +466,8 @@ export function initGame(
     // --- A Conta (game/divida.js) ---
     dividas: {}, // playerId -> goles em dívida
     heranca: null, // quem saiu a dever está a escolher herdeiro
+    // --- Modo da Morte (game/morte.js): null nos outros modos ---
+    morte: morte.ativo(room) ? morte.estadoInicial() : null,
     finalStats: null,
   };
   eventos.agendaProximo(room.game); // marca a ronda do primeiro evento
@@ -490,11 +526,14 @@ export async function spinWheel(room, playerId) {
   // se a mesa acabou de aguentar três jogos longos, e em que ponto vai a noite.
   const l = director.leitura(room);
   const fase = director.faseDaNoite(room);
-  const gt = pickWeightedType(types, {
+  let gt = pickWeightedType(types, {
     jogadores: l.jogadores,
     recentes: g.recentTypes || [],
     pesos: director.pesosDe(l, fase),
   });
+  // MODO DA MORTE: restam dois → o Diretor não escolhe nada. A noite acaba com
+  // um duelo frente a frente, e não com o que a roda calhar a dar.
+  if (g.morte?.dueloFinal) gt = types.find((t) => t.key === 'duelo') || gt;
   if (!gt) throw new AppError('Não há tipos de jogo disponíveis.');
   g.recentTypes = [gt.key, ...(g.recentTypes || [])].slice(0, 4);
   director.registaFoco(room, playerId);
@@ -623,6 +662,7 @@ export async function spinWheel(room, playerId) {
 
   g.round = round;
   g.roundCount += 1;
+  morte.abreRonda(room); // fotografa as vidas (a carta 💀 Condenar precisa disto)
   pushFeed(room, '🎡', `${player.name} girou a roda → ${round.gameTypeLabel}`);
   return round;
 }
@@ -675,11 +715,21 @@ export function resolveAction(room, playerId, action) {
       pushFeed(room, '🍺', `${player.name} recusou e bebeu`);
     }
 
-    if (modificadores.morteSubita(room) && (g.tregua || 0) <= 0) {
-      // Morte Súbita: no último terço da noite não há vidas a descontar — quem
-      // recusa sai. Note-se que NÃO se bebe mais por isso: o castigo é a saída.
-      effect = elimina(room, playerId, 'morte súbita');
-      pushFeed(room, '💀', `Morte Súbita: ${player.name} recusou e está fora.`);
+    // No Modo da Morte não há recusar: ou fazes, ou sais. É a primeira das três
+    // regras do modo (ver game/morte.js) e a razão de ele existir.
+    const saiPorRecusar = morte.ativo(room) || modificadores.morteSubita(room);
+    if (saiPorRecusar && (g.tregua || 0) <= 0) {
+      // Não há vidas a descontar — quem recusa sai. Note-se que NÃO se bebe mais
+      // por isso: o castigo é a saída, e somar-lhe bebida seria mandar beber
+      // mais precisamente quem a noite já castigou.
+      effect = elimina(room, playerId, morte.ativo(room) ? 'recusou' : 'morte súbita');
+      pushFeed(
+        room,
+        '💀',
+        morte.ativo(room)
+          ? `${player.name} recusou. Não há recusar — está fora.`
+          : `Morte Súbita: ${player.name} recusou e está fora.`
+      );
     } else {
       // Pelo helper partilhado (game/helpers.js) e não à mão: é ele que conhece a
       // regra do "sem vidas → shot", a trégua dos eventos e o Alvo Marcado.
@@ -750,6 +800,40 @@ export function escolheHerdeiro(room, playerId, escolhidoId) {
   pushFeed(room, '👑', `${res.deName} deixou ${res.golos} goles ao ${res.herdeiroName}.`);
   return res;
 }
+
+// ----- Modo da Morte: as ações de quem já saiu -------------------------------
+
+/**
+ * Um fantasma joga uma carta. É o game.js que faz isto (e não o morte.js
+ * sozinho) porque a carta 🎯 Marcar mexe na ROTAÇÃO DA VEZ, e a rotação é daqui.
+ */
+export function fantasmaJogaCarta(room, playerId, key, alvoId) {
+  const res = morte.jogaCarta(room, playerId, key, alvoId);
+  if (res.marcar) {
+    room.game.alvoMarcadoId = res.marcar;
+    room.game.alvoSeguidas = 0; // uma carta não conta para o travão do modificador
+  }
+  pushFeed(room, res.emoji, res.texto);
+  return res;
+}
+
+/** O testamento de quem saiu: uma regra que vale até ao fim da noite. */
+export function deixaTestamento(room, playerId, texto) {
+  const res = morte.escreveTestamento(room, playerId, texto);
+  // `Infinity` e não um número grande: isto não é uma regra com duração que por
+  // acaso dura muito — é uma regra que não expira, e o `decrementRules` já
+  // filtra por `remaining > 0`.
+  addRule(room, res.deId, `👻 ${res.deName} deixou: ${res.texto}`, Infinity);
+  pushFeed(room, '📜', `Testamento de ${res.deName}: ${res.texto}`);
+  return res;
+}
+
+/** A mão privada de um fantasma (entrega individual, nunca no broadcast). */
+export function maoFantasma(room, playerId) {
+  return morte.mao(room, playerId);
+}
+
+export { fechaTestamento } from './game/morte.js';
 
 /** Alguém assume a conta de outro — e ganha uma vida por o fazer. */
 export function transfereDivida(room, deId, paraId) {
@@ -1061,6 +1145,8 @@ export function serializeGame(room) {
     morteSubita: modificadores.morteSubita(room), // já está a valer? (banner + botões)
     podeDobrar: modificadores.podeDobrar(room, g.round), // mostra o botão "dobrar"
     alvoMarcadoId: g.alvoMarcadoId || null,
+    // --- Modo da Morte (game/morte.js): null nos outros modos ---
+    morte: morte.serialize(room),
     // --- A Conta (game/divida.js): null quando o modificador está desligado ---
     divida: divida.serialize(room),
     podeAdiar: divida.podeAdiar(room, g.currentPlayerId),

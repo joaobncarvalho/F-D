@@ -4,6 +4,7 @@ import Wheel from '../components/Wheel.jsx';
 import Beat from '../components/Beat.jsx';
 import PalpiteBand from './games/PalpiteBand.jsx';
 import DividaBand from './games/DividaBand.jsx';
+import MorteBand from './games/MorteBand.jsx';
 import { MOLA, PULSA } from '../motion.js';
 import BrokenScreen from '../components/BrokenScreen.jsx';
 import { TYPES, MODIFICADORES } from './games/shared.jsx';
@@ -270,6 +271,15 @@ export default function Game(props) {
           )}
         </div>
       )}
+
+      <MorteBand
+        morte={g.morte}
+        mao={props.fantasmaMao}
+        room={room}
+        youId={youId}
+        onCarta={props.onFantasmaCarta}
+        onTestamento={props.onTestamento}
+      />
 
       <DividaBand
         divida={g.divida}

@@ -25,6 +25,11 @@ const MODOS = {
     texto:
       'Eliminação direta: duelos 1v1 até sobrar uma pessoa. Quem perde bebe e sai do quadro. Não há vidas — há eliminação.',
   },
+  morte: {
+    titulo: '💀 Última Ronda',
+    texto:
+      'Os mesmos jogos da Roda, com três regras a mais. (1) NÃO HÁ RECUSAR: ou fazes, ou sais — recusar não tira uma vida, põe-te fora. (2) QUEM SAI GANHA PODER: voltas como fantasma, com cartas que mexem em quem ficou (marcar o próximo alvo, condenar a ronda, ressuscitar alguém, trocar vidas) e um testamento — uma regra tua que vale até ao fim. Só se joga uma carta por ronda. (3) O RELÓGIO ENCURTA a cada eliminação. Restando dois, a noite acaba num duelo. Sair não obriga a beber mais: o castigo é a saída.',
+  },
 };
 
 const JOGOS = {

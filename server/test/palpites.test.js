@@ -28,12 +28,21 @@ function mesa(nomes = ['Ana', 'Rui', 'Zé', 'Nel']) {
   return { rm, room, jogadores };
 }
 
-/** Gira até sair um tipo que tenha palpites (a roda é aleatória). */
+/**
+ * Gira até sair um tipo que tenha palpites (a roda é aleatória).
+ *
+ * Salta os prompts com BUDDY. Não é conveniência: um prompt de buddy exige uma
+ * escolha antes de o jogador poder aceitar ou recusar, e este ficheiro é sobre
+ * palpites — a ronda que ele quer é a mais simples possível. Sem isto, o teste
+ * falhava de vez em quando com "Escolhe primeiro o teu buddy 🤝", à sorte do
+ * prompt que calhava (uma falha em cada doze corridas, e mais desde que a roda
+ * passou a ter 24 tipos).
+ */
 async function giraAte(room, chaves, tentativas = 800) {
   const g = room.game;
   for (let i = 0; i < tentativas; i++) {
     const round = await game.spinWheel(room, g.currentPlayerId);
-    if (chaves.includes(round.gameTypeKey)) return round;
+    if (chaves.includes(round.gameTypeKey) && !round.needsBuddy) return round;
     g.round = null;
     g.phase = 'wheel';
   }

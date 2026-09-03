@@ -262,11 +262,12 @@ export default function Lobby({
       {/* Modo de jogo — só o host escolhe; todos veem. */}
       <div className="fd-card p-3 flex flex-col gap-2">
         <span className="text-sm text-white/60">🎮 Modo de jogo</span>
-        <div className="flex gap-2">
+        <div className="grid grid-cols-2 gap-2">
           {[
             { key: 'wheel', label: '🎡 Roda' },
             { key: 'board', label: '🎲 Tabuleiro' },
             { key: 'tournament', label: '🏆 Torneio' },
+            { key: 'morte', label: '💀 Última Ronda' },
           ].map((m) => (
             <button
               key={m.key}
@@ -291,6 +292,14 @@ export default function Lobby({
         {room.mode === 'tournament' && (
           <p className="text-xs text-amber-300/80">
             🏆 Torneio: duelos 1v1 de eliminação direta com os jogos rápidos. Quem sobra é o rei/rainha da noite.
+          </p>
+        )}
+        {room.mode === 'morte' && (
+          <p className="text-xs text-rose-300/90 leading-snug">
+            💀 <b>Última Ronda</b>: os mesmos jogos da Roda, mas <b>não há recusar</b> — ou fazes, ou
+            sais. Quem sai volta como <b>fantasma</b>, com cartas que mexem em quem ficou e um
+            testamento que vale até ao fim. O relógio aperta a cada eliminação e a noite acaba num
+            duelo entre os dois últimos. <span className="text-white/50">Perde-se, não se bebe mais.</span>
           </p>
         )}
         {!isHost && <p className="text-xs text-white/40">Só o host escolhe o modo.</p>}

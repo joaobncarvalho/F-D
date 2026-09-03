@@ -191,14 +191,16 @@ export class RoomManager {
     return room;
   }
 
-  /** Modo de jogo escolhido pelo host no lobby ('wheel' | 'board' | 'tournament'). */
+  /** Modo escolhido pelo host ('wheel' | 'board' | 'tournament' | 'morte'). */
   setMode(code, playerId, mode) {
     const room = this.getRoom(code);
     if (!room) throw new AppError('Sala não encontrada.');
     const player = room.players.get(playerId);
     if (!player || !player.isHost) throw new AppError('Só o host pode escolher o modo.');
     if (room.status !== 'lobby') throw new AppError('O jogo já começou.');
-    room.mode = ['board', 'tournament'].includes(mode) ? mode : 'wheel';
+    // 'morte' corre o MESMO motor da Roda (game.js) com outras regras de
+    // resolução — ver game/morte.js. Não é um quarto motor.
+    room.mode = ['board', 'tournament', 'morte'].includes(mode) ? mode : 'wheel';
     return room;
   }
 
