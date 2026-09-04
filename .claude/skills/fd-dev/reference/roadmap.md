@@ -209,12 +209,13 @@ Legenda: ✅ feito · 🚧 em curso · ⬜ por fazer · 🔗 ponto de integraç�
       Verificado: `npm test` **195/195** em 12 corridas + `/admin` real no Chrome
       com 14 noites simuladas.
 
-- [ ] **⚖️ Tribunal da Injustiça** (ideia do João, 04 set) — tipo novo exclusivo
-      do Hardcore e do Tabuleiro: defende-se uma teoria ridícula e a mesa é o
-      júri. Transforma a prisão do Tabuleiro numa ACUSAÇÃO (80% julgamento · 20%
-      condenação direta), dando-lhe a hipótese que hoje não tem. Desenho completo
-      e duas decisões por tomar (a duração e o registo do conteúdo) em
-      `backlog.md`. **Por construir.**
+- [x] **⚖️ Tribunal da Injustiça (2026-09-04)** — ideia do João, construída: tipo
+      novo exclusivo do Hardcore (na Roda) e do Tabuleiro. 90 s para defender uma
+      tese indefensável; a mesa é o júri. A prisão do Tabuleiro passa a ser uma
+      ACUSAÇÃO (80% julgamento · 20% condenação direta) e ganha a hipótese que
+      não tinha — absolvido, escapa à pena. 30 temas na BD, editáveis na /admin
+      como todo o conteúdo. Verificado: `npm test` **209/209**, build limpo, e a
+      /admin exercida no browser (criar e apagar um tema a sério).
 
 **Colega (BD)**
 - [ ] **Correr `db/04_telemetria.sql`** (ou `prisma db push`) — sem isso as

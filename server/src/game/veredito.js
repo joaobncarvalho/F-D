@@ -25,6 +25,12 @@
 // O auto-resolve (autoresolve.js) fecha a votação com quem já votou, como já faz
 // nos jogos de grupo.
 
+// O `holder` é o objeto que GUARDA a votação. Por omissão é a ronda da Roda
+// (`room.game.round`), que é onde vivem todas as votações desde o início. O
+// Tabuleiro passa o seu (`room.board.tribunal`) porque lá não há "ronda" — e é
+// só por isso que estas funções o aceitam. Continua a haver um único sistema de
+// votação, com uma única regra de empate: era isso que se queria proteger.
+
 import { AppError } from '../errors.js';
 import { nameOf } from './helpers.js';
 
@@ -54,8 +60,8 @@ export function abre(round, atores = [], pergunta = 'Conseguiu?', rotulos = null
 }
 
 /** Um voto da mesa. Não se troca depois de dado. */
-export function vota(room, playerId, valor) {
-  const r = room.game?.round;
+export function vota(room, playerId, valor, holder = null) {
+  const r = holder || room.game?.round;
   const v = r?.veredito;
   if (!v) throw new AppError('Não há veredito a decidir.');
   if (v.fechado) throw new AppError('A votação já fechou.');
@@ -75,8 +81,8 @@ export function eleitores(room, v) {
 }
 
 /** Já votou toda a gente que podia? */
-export function completo(room) {
-  const v = room.game?.round?.veredito;
+export function completo(room, holder = null) {
+  const v = (holder || room.game?.round)?.veredito;
   if (!v || v.fechado) return false;
   const podem = eleitores(room, v);
   return podem.length > 0 && podem.every((p) => v.votos[p.id]);
@@ -86,8 +92,8 @@ export function completo(room) {
  * Fecha a votação e devolve o veredito.
  * @returns {{ conseguiu:boolean, sim:number, nao:number }|null}
  */
-export function fecha(room) {
-  const v = room.game?.round?.veredito;
+export function fecha(room, holder = null) {
+  const v = (holder || room.game?.round)?.veredito;
   if (!v || v.fechado) return null;
   const valores = Object.values(v.votos);
   v.sim = valores.filter((x) => x === 'sim').length;

@@ -18,7 +18,7 @@ import { CascataCard } from './games/CascataCard.jsx';
 import { DesenhoCard } from './games/DesenhoCard.jsx';
 import { ReacaoCard } from './games/ReacaoCard.jsx';
 import {
-  BombaCard, LeilaoCard, SincroniaCard, DetetorCard, JulgamentoCard, ContratoCard,
+  BombaCard, LeilaoCard, SincroniaCard, DetetorCard, JulgamentoCard, ContratoCard, TribunalCard,
 } from './games/hardcoreCards.jsx';
 import Feed, { ShareResult } from '../components/Feed.jsx';
 import { Avatar } from './games/shared.jsx';
@@ -569,6 +569,18 @@ export default function Game(props) {
             youId={youId}
             canControl={isHost || isSpinner}
             onAoVoto={props.onJulgamentoAoVoto}
+            onVota={props.onVotaVeredito}
+            onContinue={props.onContinue}
+          />
+        )}
+        {revealed && g.phase === 'tribunal' && (
+          <TribunalCard
+            key={round.id}
+            round={round}
+            room={room}
+            youId={youId}
+            canControl={isHost || isSpinner}
+            onAoVoto={props.onTribunalAoVoto}
             onVota={props.onVotaVeredito}
             onContinue={props.onContinue}
           />

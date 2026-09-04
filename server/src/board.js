@@ -33,6 +33,9 @@ import {
 import { openBlackjack, handValue } from './board/blackjack.js';
 import { openEvento } from './board/evento.js';
 import { openReacao, serializeReacaoPending } from './board/reacao.js';
+import { serializeTribunal as serializeBoardTribunal } from './board/tribunal.js';
+// Ações do ⚖️ Tribunal chamadas pelo socket.js — re-exportadas daqui, como as outras.
+export { boardTribunalAoVoto, boardTribunalVota, limpaTribunal, fechaTribunal } from './board/tribunal.js';
 // Ações das casas chamadas diretamente pelo socket.js/bots.js — re-exportadas daqui.
 export { boardBlackjack } from './board/blackjack.js';
 export { boardBeerpong } from './board/beerpong.js';
@@ -110,6 +113,26 @@ async function generateSquares() {
   return [{ kind: 'partida' }, ...bag].map((s, i) => ({ i, ...s }));
 }
 
+/**
+ * Enche o saco de teses do ⚖️ Tribunal para esta noite.
+ *
+ * Lido UMA vez, no arranque, e não a cada prisão: o `applyPrison` é síncrono e
+ * é chamado de seis sítios (incluindo de dentro de efeitos de cartas), e pôr um
+ * `await` lá dentro obrigava a tornar assíncrona meia dúzia de fluxos do
+ * tabuleiro. É o mesmo padrão dos bancos ?? / prisão / cartas, logo acima.
+ */
+async function carregaTeses(intensity) {
+  const saco = [];
+  // ~12 chegam para uma noite: são precisas 1 a 2 por prisão e o saco só se
+  // esvazia se a mesa for MUITO presa. Esgotando, o `sorteiaTese` tem reserva.
+  for (let i = 0; i < 12; i++) {
+    const p = await repo.getRandomPrompt('tribunal', intensity, { exclude: saco });
+    if (!p?.text) break;
+    saco.push(p.text);
+  }
+  return saco;
+}
+
 export async function initBoard(room, { intensity = 'leve' } = {}) {
   resetBags(room); // saco de prompts limpo (anti-repetição nas casas de mini-jogo)
   clearFeed(room);
@@ -148,6 +171,10 @@ export async function initBoard(room, { intensity = 'leve' } = {}) {
     order: [],
     currentPlayerId: null,
     pending: null, // { kind:'mini'|'gamble', ... } — bloqueia o fim da vez até resolver
+    // ⚖️ Tribunal da Injustiça (board/tribunal.js): o julgamento de quem vai
+    // preso. Fora do `pending` de propósito — ver o cabeçalho desse ficheiro.
+    tribunal: null,
+    teses: await carregaTeses(intensity), // saco anti-repetição das teses
     activeRules: [], // Roleta de Regras: { id, text, remaining, byId, byName }
     trapCards: [], // maldições escondidas: { id, key, square, ownerId, ownerName }
     lastMove: null,
@@ -225,6 +252,7 @@ function finalizeOrder(room) {
 /** Avançar 1/2/3 casas (bebe 2/4/6 golos). Resolve a casa; volta = vitória. Async (conteúdo). */
 export async function advance(room, playerId, squares) {
   const b = requireBoard(room, ['playing']);
+  if (b.tribunal) throw new AppError('Há um julgamento a decorrer.');
   if (b.pending) throw new AppError('Resolve a casa primeiro.');
   if (b.currentPlayerId !== playerId) throw new AppError('Não é a tua vez.');
   const n = Number(squares);
@@ -496,6 +524,7 @@ export function boardGamble(room, playerId, bet) {
 export function playCard(room, playerId, cardId, targetId, squareIndex) {
   const b = requireBoard(room, ['playing']);
   if (b.currentPlayerId !== playerId) throw new AppError('Só jogas cartas na tua vez.');
+  if (b.tribunal) throw new AppError('Há um julgamento a decorrer.');
   if (b.pending) throw new AppError('Resolve a casa primeiro.');
   const me = b.players[playerId];
   const idx = me.cards.findIndex((c) => c.id === cardId);
@@ -781,6 +810,7 @@ export function serializeBoard(room) {
     order: b.order,
     currentPlayerId: b.currentPlayerId,
     pending: serializePending(b.pending),
+    tribunal: serializeBoardTribunal(b.tribunal), // ⚖️ o julgamento, se houver
     activeRules: (b.activeRules || []).map((r) => ({ id: r.id, text: r.text, remaining: r.remaining, byName: r.byName })),
     // As maldições são SURPRESA: no broadcast vai só quantas estão no tabuleiro
     // (cada dono recebe as suas por canal privado, com board_hand).

@@ -44,8 +44,11 @@ test('Roda e2e (bots): joga todas as mecânicas sem encravar nem fugas', async (
     // segundos reais e uma mesa de bots joga em milissegundos, por isso é aqui
     // que se apanha se o `bots.js` deixar de adiantar o relógio dela.
     'bomba', 'leilao', 'sincronia', 'detetor', 'julgamento', 'contrato',
+    // ⚖️ Tribunal (2026-09-04): só sai em hardcore/caos, e a defesa de 90s mais a
+    // votação do júri gastam muitas iterações — daí o teto abaixo ter subido.
+    'tribunal',
   ];
-  while (room.game && room.game.phase !== 'gameover' && iters++ < 8000) {
+  while (room.game && room.game.phase !== 'gameover' && iters++ < 12000) {
     // Este teste é sobre MECÂNICAS, não sobre desgaste: mantém-se a mesa de pé
     // para todas poderem sair. Desde que falhar um jogo a tempo custa uma vida,
     // quatro bots eliminavam-se uns aos outros antes de a roda calhar nos tipos

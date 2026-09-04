@@ -167,7 +167,7 @@ O teto de 10 goles da Conta chega para haver negociação a sério?
 
 ---
 
-## ⚖️ Tribunal da Injustiça (ideia do João, 2026-09-04) — POR CONSTRUIR · P1
+## ⚖️ Tribunal da Injustiça (ideia do João, 2026-09-04) — ✅ FEITO
 
 Tipo novo, **exclusivo do Hardcore e do Tabuleiro**. O acusado tem tempo para
 defender uma teoria/ideologia ridícula; a mesa é o júri e decide a sentença.
@@ -200,7 +200,7 @@ ser possível, senão o julgamento é teatro e a mesa aprende a ignorá-lo.
   como todo o conteúdo.
 - Contabilizar na telemetria como qualquer tipo (sai/aceite/recusado).
 
-**⚠️ Duas decisões por tomar antes de construir:**
+**As duas decisões, tomadas:**
 
 1. **Os 3 minutos.** É muito para este jogo: são 3 minutos com uma pessoa a
    falar e sete a ouvir, exatamente o que o Diretor passa a vida a evitar (a

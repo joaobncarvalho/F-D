@@ -6,6 +6,7 @@ import { randomUUID } from 'node:crypto';
 import { AppError } from '../errors.js';
 import { pushFeed } from '../feed.js';
 import * as eventos from '../game/eventos.js';
+import { abreTribunal, haJuri, HIPOTESE_JULGAMENTO, ENABLED as TRIBUNAL_ON } from './tribunal.js';
 
 /** Garante que há tabuleiro (e, opcionalmente, a fase certa). */
 export function requireBoard(room, phases) {
@@ -109,15 +110,49 @@ export function applyPrison(room, playerId, reason = 'prisão') {
   const b = room.board;
   const me = b.players[playerId];
   const nm = nameOf(room, playerId);
+  const p = weightedPick(b.banks.prison);
+
+  // ⚖️ TRIBUNAL DA INJUSTIÇA: ir preso é uma ACUSAÇÃO, não uma sentença — na
+  // maior parte das vezes há julgamento primeiro (board/tribunal.js). Os 20%
+  // restantes são o azar de sempre: condenação direta, sem direito a falar.
+  //
+  // O julgamento não abre se já houver um a decorrer (dois ao mesmo tempo era
+  // uma mesa a julgar duas pessoas por dois motivos) nem se não houver ninguém
+  // para ser júri. Nesses casos cai-se na condenação direta, que é o caminho
+  // que este ficheiro sempre teve.
+  if (TRIBUNAL_ON && !b.tribunal && Math.random() < HIPOTESE_JULGAMENTO && haJuri(room, playerId)) {
+    me.slowStreak = 0; // a streak zera na acusação: já pagou por ela
+    abreTribunal(room, playerId, reason, p, sorteiaTese(b));
+    return { julgamento: true };
+  }
+
   me.slowStreak = 0;
   me.prisonCount += 1;
-  const p = weightedPick(b.banks.prison);
   if (p.skipTurns) me.skipTurns += p.skipTurns;
   if (p.drink) drinkFromSquare(room, playerId, p.drink);
   if (p.back) me.pos = Math.max(0, me.pos - p.back);
   if (p.loseCard && me.cards.length) me.cards.shift();
   b.lastEvent = { text: `🚔 ${nm} foi PRESO (${reason}): ${p.note}` };
   pushFeed(room, '🚔', `${nm} foi preso (${reason}) — ${p.note}`);
+  return { julgamento: false };
+}
+
+/**
+ * A tese que o réu vai ter de defender.
+ *
+ * Sai do saco de teses que o `initBoard` carregou do mesmo sítio que todo o
+ * conteúdo (BD → `/admin`, com fallback no `content/prompts.data.js`), filtrado
+ * pela intensidade do tabuleiro. Sem saco — tabuleiro antigo recuperado de um
+ * snapshot — há uma tese de reserva, para um julgamento nunca abrir sem tema.
+ */
+function sorteiaTese(b) {
+  const saco = b.teses || [];
+  if (!saco.length) return 'Defende que esta mesa tomou todas as decisões erradas desde que se sentou.';
+  const i = Math.floor(Math.random() * saco.length);
+  const t = saco[i];
+  saco.splice(i, 1); // não repete enquanto houver teses novas
+  if (!saco.length) b.teses = null; // esgotou: o initBoard volta a encher no próximo jogo
+  return t;
 }
 
 /** IDs ativos na corrida (ligados, não terminados), por ordem. */

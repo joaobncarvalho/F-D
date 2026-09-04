@@ -262,6 +262,33 @@ conta ativos) e o cliente mostra um **overlay de telemóvel partido**
 `resolveAction` termina o jogo (último de pé = `finalStats.survivor`) e emite
 `game_over`.
 
+### ⚖️ Tribunal da Injustiça (2026-09-04)
+
+Tipo novo, em **dois sítios** que partilham a votação e o conteúdo mas não o
+motor — a roda tem `round`, o tabuleiro não:
+
+- **Roda** (`game/tribunal.js`, fase `tribunal`): sai só em hardcore/caos. É o
+  primeiro tipo com `intensidades` no `TYPE_PROFILE` — o `pickWeightedType`
+  passou a receber a intensidade em vigor para poder filtrar. Substates
+  `defesa → votar → result`; condenado perde uma vida, absolvido faz beber quem
+  o condenou (a economia do Julgamento, para condenar não ser grátis).
+- **Tabuleiro** (`board/tribunal.js`): o `applyPrison` deixa de ser uma sentença
+  e passa a ser uma acusação — 80% abre julgamento, 20% condena logo. A pena sai
+  do banco `prisao` NO MOMENTO DA ACUSAÇÃO e fica guardada em `b.tribunal.pena`,
+  fora do payload: se o júri soubesse o que ele arrisca, votava por pena e não
+  por defesa. Vive em `b.tribunal` e **não** em `b.pending` porque três sítios
+  fazem `pending = null` logo a seguir a mandar alguém preso. Tranca a mesa toda
+  (`advance`/`playCard` recusam) e **não mexe na ordem das vezes**.
+- **Votação:** o `game/veredito.js` de sempre. Ganhou um parâmetro `holder`
+  opcional (`vota`/`completo`/`fecha`) para o tabuleiro poder apontar para o seu
+  objeto — continua a haver um único sistema de votação e uma única regra de
+  empate (que absolve).
+- **Conteúdo:** tipo `tribunal` em `prompts.data.js` + BD, editável na /admin. O
+  tabuleiro enche um saco de teses no `initBoard` (o `applyPrison` é síncrono e
+  tem seis chamadores — um `await` lá dentro contaminava meio motor).
+- **Desliga-se com `TRIBUNAL=0`**, como o `EVENTOS`/`SNAPSHOT`. Os testes do
+  tabuleiro que contam com prisão imediata usam-no.
+
 ### Telemetria e /admin (2026-09-04)
 
 **`telemetria.js`** — contadores AGREGADOS do que a mesa faz com o conteúdo. É o

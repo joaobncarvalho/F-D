@@ -125,6 +125,41 @@ export function registerBoardHandlers(socket, { io, requireRoom, broadcastState,
     }
   });
 
+  // ⚖️ Tribunal da Injustiça (board/tribunal.js): a defesa fecha-se, o júri vota,
+  // e depois a mesa lê o resultado antes de o julgamento sair da frente.
+  socket.on('board_tribunal_ao_voto', (_payload, ack) => {
+    try {
+      const room = requireRoom(socket);
+      board.boardTribunalAoVoto(room, socket.data.playerId);
+      broadcastState(io, room.code);
+      if (typeof ack === 'function') ack({ ok: true });
+    } catch (err) {
+      handleError(socket, ack, err);
+    }
+  });
+
+  socket.on('board_tribunal_vota', ({ valor } = {}, ack) => {
+    try {
+      const room = requireRoom(socket);
+      board.boardTribunalVota(room, socket.data.playerId, valor);
+      broadcastState(io, room.code);
+      if (typeof ack === 'function') ack({ ok: true });
+    } catch (err) {
+      handleError(socket, ack, err);
+    }
+  });
+
+  socket.on('board_tribunal_fecha', (_payload, ack) => {
+    try {
+      const room = requireRoom(socket);
+      board.limpaTribunal(room);
+      broadcastState(io, room.code);
+      if (typeof ack === 'function') ack({ ok: true });
+    } catch (err) {
+      handleError(socket, ack, err);
+    }
+  });
+
   socket.on('board_bid', ({ amount } = {}, ack) => {
     try {
       const room = requireRoom(socket);

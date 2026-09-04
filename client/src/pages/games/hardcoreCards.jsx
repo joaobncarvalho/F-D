@@ -12,6 +12,7 @@ import { useState } from 'react';
 import { sfx } from '../../sfx.js';
 import { CardShell, Avatar } from './shared.jsx';
 import VereditoBand from './VereditoBand.jsx';
+import Timer from '../../components/Timer.jsx';
 import { MOLA, LISTA, ITEM_LISTA } from '../../motion.js';
 
 /** Grelha de caras para escolher alguém. Repete-se nos seis, por isso vive aqui. */
@@ -481,6 +482,74 @@ export function ContratoCard({ round, room, youId, canControl, onEscolhe, onAssi
       <p className="text-[11px] text-white/35">
         {round.jaAssinaram.length} de 2 já decidiram
       </p>
+    </CardShell>
+  );
+}
+
+// ----- ⚖️ Tribunal da Injustiça ----------------------------------------------
+//
+// O cartão do réu e o da mesa são o MESMO — de propósito. Quem se está a
+// defender está a falar para a sala, não a olhar para o telemóvel; o telemóvel
+// serve só para o cronómetro e para o botão que dá a defesa por terminada
+// (qualquer um pode carregar, como no Julgamento).
+
+export function TribunalCard({ round, room, youId, canControl, onAoVoto, onVota, onContinue }) {
+  const reu = room.players.find((p) => p.id === round.reuId);
+  const souReu = round.reuId === youId;
+
+  if (round.substate === 'result') {
+    const r = round.result;
+    return (
+      <CardShell typeKey="tribunal">
+        <p className="text-sm text-white/50 leading-snug">"{round.tese}"</p>
+        <p className={`fd-title text-2xl font-extrabold ${r.absolvido ? 'text-emerald-300' : 'text-rose-300'}`}>
+          {r.absolvido ? '⚖️ CONVENCEU' : '🔨 NEM UM POUCO'}
+        </p>
+        <p className="text-sm text-white/55">
+          {r.absolvicoes} a favor · {r.condenacoes} contra
+        </p>
+        <p className="text-sm text-white/60">
+          {r.absolvido
+            ? r.pagantes.length
+              ? `${r.reuName} safou-se. Quem votou contra bebe ${r.custo}: ${r.pagantes.map((p) => p.name).join(', ')}.`
+              : `${r.reuName} safou-se — o júri inteiro deixou-se levar.`
+            : `${r.reuName} perde uma vida.`}
+        </p>
+        <Continuar canControl={canControl} onContinue={onContinue} />
+      </CardShell>
+    );
+  }
+
+  return (
+    <CardShell typeKey="tribunal">
+      <div className="flex flex-col items-center gap-1">
+        {reu && <Avatar player={reu} size={44} ring />}
+        <span className="text-[11px] uppercase tracking-widest text-amber-300/80">No banco dos réus</span>
+      </div>
+
+      <p className="text-xs uppercase tracking-[0.25em] text-white/35">Tens de defender que…</p>
+      <p className="fd-title text-xl font-extrabold leading-snug text-amber-200">{round.tese}</p>
+
+      {round.substate === 'defesa' ? (
+        <>
+          <Timer seconds={round.segundos || 90} runKey={round.id} size={72} />
+          <p className="text-sm text-white/55 leading-snug">
+            {souReu
+              ? 'A sério, em voz alta, e com convicção. O júri está a ver-te.'
+              : `${round.reuName} tem de defender isto a sério. Vocês julgam a seguir.`}
+          </p>
+          <button onClick={() => { sfx.click(); onAoVoto(); }} className="fd-btn fd-btn-primary">
+            ⚖️ Já chega — ao voto
+          </button>
+        </>
+      ) : (
+        <>
+          <VereditoBand veredito={round.veredito} room={room} youId={youId} onVota={onVota} />
+          <p className="text-[11px] text-white/35">
+            Se ele convencer, quem votou contra bebe {round.custoCondenarMal}.
+          </p>
+        </>
+      )}
     </CardShell>
   );
 }

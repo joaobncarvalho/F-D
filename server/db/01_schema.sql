@@ -139,6 +139,32 @@ CREATE TABLE IF NOT EXISTS "life_events" (
     CONSTRAINT "life_events_pkey" PRIMARY KEY ("id")
 );
 
+CREATE TABLE IF NOT EXISTS "telemetry_counters" (
+    "scope" TEXT NOT NULL,
+    "key" TEXT NOT NULL,
+    "label" TEXT,
+    "metrics" JSONB NOT NULL DEFAULT '{}',
+    "updated_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "telemetry_counters_pkey" PRIMARY KEY ("scope","key")
+);
+
+CREATE TABLE IF NOT EXISTS "telemetry_nights" (
+    "id" UUID NOT NULL,
+    "ended_at" TIMESTAMP(3) NOT NULL,
+    "mode" TEXT NOT NULL,
+    "intensity" TEXT,
+    "players" INTEGER NOT NULL DEFAULT 0,
+    "rounds" INTEGER NOT NULL DEFAULT 0,
+    "minutes" INTEGER NOT NULL DEFAULT 0,
+    "outcome" TEXT NOT NULL DEFAULT 'fim',
+    "modifiers" TEXT[] DEFAULT ARRAY[]::TEXT[],
+    "eliminated" INTEGER NOT NULL DEFAULT 0,
+    "drinks" INTEGER NOT NULL DEFAULT 0,
+
+    CONSTRAINT "telemetry_nights_pkey" PRIMARY KEY ("id")
+);
+
 CREATE UNIQUE INDEX IF NOT EXISTS "rooms_code_key" ON "rooms"("code");
 
 CREATE UNIQUE INDEX IF NOT EXISTS "rooms_host_player_id_key" ON "rooms"("host_player_id");
@@ -168,6 +194,12 @@ CREATE UNIQUE INDEX IF NOT EXISTS "board_items_category_title_key" ON "board_ite
 CREATE INDEX IF NOT EXISTS "room_snapshots_saved_at_idx" ON "room_snapshots"("saved_at");
 
 CREATE INDEX IF NOT EXISTS "life_events_room_id_idx" ON "life_events"("room_id");
+
+CREATE INDEX IF NOT EXISTS "telemetry_counters_scope_idx" ON "telemetry_counters"("scope");
+
+CREATE INDEX IF NOT EXISTS "telemetry_nights_ended_at_idx" ON "telemetry_nights"("ended_at");
+
+CREATE UNIQUE INDEX IF NOT EXISTS "telemetry_nights_ended_at_mode_key" ON "telemetry_nights"("ended_at", "mode");
 
 DO $$ BEGIN
   ALTER TABLE "rooms" ADD CONSTRAINT "rooms_host_player_id_fkey" FOREIGN KEY ("host_player_id") REFERENCES "players"("id") ON DELETE SET NULL ON UPDATE CASCADE;
@@ -298,3 +330,19 @@ ALTER TABLE "life_events" ADD COLUMN IF NOT EXISTS "player_id" UUID;
 ALTER TABLE "life_events" ADD COLUMN IF NOT EXISTS "round_id" UUID;
 ALTER TABLE "life_events" ADD COLUMN IF NOT EXISTS "type" "LifeEventType";
 ALTER TABLE "life_events" ADD COLUMN IF NOT EXISTS "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP;
+ALTER TABLE "telemetry_counters" ADD COLUMN IF NOT EXISTS "scope" TEXT;
+ALTER TABLE "telemetry_counters" ADD COLUMN IF NOT EXISTS "key" TEXT;
+ALTER TABLE "telemetry_counters" ADD COLUMN IF NOT EXISTS "label" TEXT;
+ALTER TABLE "telemetry_counters" ADD COLUMN IF NOT EXISTS "metrics" JSONB NOT NULL DEFAULT '{}';
+ALTER TABLE "telemetry_counters" ADD COLUMN IF NOT EXISTS "updated_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP;
+ALTER TABLE "telemetry_nights" ADD COLUMN IF NOT EXISTS "id" UUID;
+ALTER TABLE "telemetry_nights" ADD COLUMN IF NOT EXISTS "ended_at" TIMESTAMP(3);
+ALTER TABLE "telemetry_nights" ADD COLUMN IF NOT EXISTS "mode" TEXT;
+ALTER TABLE "telemetry_nights" ADD COLUMN IF NOT EXISTS "intensity" TEXT;
+ALTER TABLE "telemetry_nights" ADD COLUMN IF NOT EXISTS "players" INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE "telemetry_nights" ADD COLUMN IF NOT EXISTS "rounds" INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE "telemetry_nights" ADD COLUMN IF NOT EXISTS "minutes" INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE "telemetry_nights" ADD COLUMN IF NOT EXISTS "outcome" TEXT NOT NULL DEFAULT 'fim';
+ALTER TABLE "telemetry_nights" ADD COLUMN IF NOT EXISTS "modifiers" TEXT[] DEFAULT ARRAY[]::TEXT[];
+ALTER TABLE "telemetry_nights" ADD COLUMN IF NOT EXISTS "eliminated" INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE "telemetry_nights" ADD COLUMN IF NOT EXISTS "drinks" INTEGER NOT NULL DEFAULT 0;

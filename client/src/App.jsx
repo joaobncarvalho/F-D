@@ -335,6 +335,12 @@ export default function App() {
   const detetorMarca = useCallback((verdade) => socket.emit('detetor_marca', { verdade }), []);
   const detetorVota = useCallback((valor) => socket.emit('detetor_vota', { valor }), []);
   const julgamentoAoVoto = useCallback(() => socket.emit('julgamento_ao_voto'), []);
+  const tribunalAoVoto = useCallback(() => socket.emit('tribunal_ao_voto'), []);
+  // ⚖️ Tribunal no Tabuleiro (server/src/board/tribunal.js): tranca a mesa toda,
+  // por isso as três ações vivem ao nível da app, como as do resto do tabuleiro.
+  const boardTribunalAoVoto = useCallback(() => socket.emit('board_tribunal_ao_voto'), []);
+  const boardTribunalVota = useCallback((valor) => socket.emit('board_tribunal_vota', { valor }), []);
+  const boardTribunalFecha = useCallback(() => socket.emit('board_tribunal_fecha'), []);
   const contratoEscolhe = useCallback((parceiroId) => socket.emit('contrato_escolhe', { parceiroId }), []);
   const contratoAssina = useCallback((aceita) => socket.emit('contrato_assina', { aceita }), []);
   const escolheHerdeiro = useCallback((herdeiroId) => socket.emit('heranca_escolhe', { herdeiroId }), []);
@@ -557,6 +563,9 @@ export default function App() {
             onResolve={boardResolve}
             onGamble={boardGamble}
             onEventoPick={boardEventoPick}
+            onTribunalAoVoto={boardTribunalAoVoto}
+            onTribunalVota={boardTribunalVota}
+            onTribunalFecha={boardTribunalFecha}
             onBlackjack={boardBlackjack}
             onBeerpong={boardBeerpong}
             onPlayCard={boardPlayCard}
@@ -633,6 +642,7 @@ export default function App() {
             onDetetorMarca={detetorMarca}
             onDetetorVota={detetorVota}
             onJulgamentoAoVoto={julgamentoAoVoto}
+            onTribunalAoVoto={tribunalAoVoto}
             onContratoEscolhe={contratoEscolhe}
             onContratoAssina={contratoAssina}
             onChooseBuddy={chooseBuddy}

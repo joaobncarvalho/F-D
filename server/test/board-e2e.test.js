@@ -7,7 +7,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-delete process.env.DATABASE_URL; // conteúdo em memória
+delete process.env.DATABASE_URL;
+// A prisao tem de se aplicar JA: com o ⚖️ Tribunal pelo meio (board/tribunal.js)
+// a mesa fica trancada a espera de um veredito, e estes testes deixavam de ser
+// sobre o que testam. O Tribunal tem testes proprios em tribunal.test.js.
+process.env.TRIBUNAL = '0'; // conteúdo em memória
 
 const { RoomManager, serializeRoom } = await import('../src/rooms.js');
 const board = await import('../src/board.js');

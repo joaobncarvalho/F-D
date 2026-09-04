@@ -6,6 +6,7 @@ import { PlayingCard, BlackjackReveal } from './board/blackjack.jsx';
 import { GambleReveal, CardPlayReveal, OrderReveal } from './board/reveals.jsx';
 import { Beerpong } from './board/Beerpong.jsx';
 import { EventoOverlay } from './board/EventoOverlay.jsx';
+import TribunalBand from './board/TribunalBand.jsx';
 import { BotaoReacao } from './games/ReacaoCard.jsx';
 import Feed, { ShareResult } from '../components/Feed.jsx';
 
@@ -28,7 +29,7 @@ const ADVANCE = [
   { n: 3, golos: 6 },
 ];
 
-export default function Board({ room, youId, myHand, myTraps, onPickPawn, onRoll, onAdvance, onResolve, onGamble, onEventoPick, onBlackjack, onBeerpong, onPlayCard, onBid, onRuleFail, onReacaoTap, onSkip, onEnd, onKick, onReset, onLeave }) {
+export default function Board({ room, youId, myHand, myTraps, onPickPawn, onRoll, onAdvance, onResolve, onGamble, onEventoPick, onBlackjack, onBeerpong, onPlayCard, onBid, onRuleFail, onReacaoTap, onTribunalAoVoto, onTribunalVota, onTribunalFecha, onSkip, onEnd, onKick, onReset, onLeave }) {
   const b = room.board;
   const you = room.players.find((p) => p.id === youId);
   const isHost = you?.isHost;
@@ -352,6 +353,17 @@ export default function Board({ room, youId, myHand, myTraps, onPickPawn, onRoll
       </Header>
 
       <Feed feed={room.feed} />
+
+      {/* ⚖️ O julgamento vem ANTES de tudo o resto e tranca a jogada: enquanto
+          durar, o tabuleiro por baixo está suspenso (ver board/tribunal.js). */}
+      <TribunalBand
+        tribunal={b.tribunal}
+        room={room}
+        youId={youId}
+        onAoVoto={onTribunalAoVoto}
+        onVota={onTribunalVota}
+        onFecha={onTribunalFecha}
+      />
 
       {/* Casa ?? — overlay de 3 cartas viradas + flip */}
       <EventoOverlay

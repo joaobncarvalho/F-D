@@ -34,6 +34,9 @@ export const TYPES = [
   { key: 'detetor', label: 'Detetor', color: '#c084fc', emoji: '🕵️‍♂️' },
   { key: 'julgamento', label: 'Julgamento', color: '#94a3b8', emoji: '⚖️' },
   { key: 'contrato', label: 'Contrato', color: '#fb7185', emoji: '🤝' },
+  // ⚖️ Tribunal da Injustiça (2026-09-04): só sai em hardcore/caos, e no
+  // Tabuleiro é o que acontece a quem vai preso.
+  { key: 'tribunal', label: 'Tribunal', color: '#f59e0b', emoji: '⚖️' },
 ];
 
 /**

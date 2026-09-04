@@ -879,6 +879,60 @@ export const GAME_TYPES = [
       ['Ficam responsáveis um pelo outro: o castigo de um é dos dois.', 'hardcore'],
     ],
   },
+  {
+    // ⚖️ Tribunal da Injustiça — o réu tem 90s para defender uma tese
+    // indefensável, e a mesa é o júri (ver server/src/game/tribunal.js).
+    //
+    // O REGISTO DESTES TEMAS, que é o que os faz funcionar: a tese tem de ser
+    // INDEFENSÁVEL E INOFENSIVA. A graça está em ver alguém a defender com toda
+    // a cara séria uma coisa que não se defende — e isso exige que a mesa possa
+    // rir sem que ninguém à mesa seja o alvo. Uma tese que atinge alguém a
+    // sério deixa de ser um jogo de retórica e passa a ser um mau bocado com
+    // testemunhas, que é a única coisa que uma noite destas não recupera.
+    //
+    // Por isso: teses absurdas, mesquinhas, arrogantes, indefensáveis — e sobre
+    // COMPORTAMENTOS, manias e regras inventadas, nunca sobre o que as pessoas
+    // são. Ao escrever mais na /admin, é este o teste: "isto ainda é engraçado
+    // se a pessoa mais visada da mesa estiver a ouvir?"
+    key: 'tribunal',
+    label: 'Tribunal da Injustiça',
+    prompts: [
+      // ----- leve: manias e regras inventadas -----
+      ['Defende que dividir a conta ao meio é roubo e devia dar cadeia.', 'leve'],
+      ['Defende que há uma idade máxima para se andar de trotinete.', 'leve'],
+      ['Defende que os animais de estimação deviam pagar renda.', 'leve'],
+      ['Defende que ler livros em público é uma forma de exibicionismo.', 'leve'],
+      ['Defende que quem chega atrasado devia perder o direito a escolher música.', 'leve'],
+      ['Defende que o pequeno-almoço é a refeição mais sobrevalorizada da história.', 'leve'],
+      ['Defende que devia ser proibido tirar fotografias à comida.', 'leve'],
+      ['Defende que as segundas-feiras deviam ser opcionais e sem justificação.', 'leve'],
+      ['Defende que quem faz anos devia pagar a conta a toda a gente.', 'leve'],
+      ['Defende que os aniversários deviam acabar aos 25 anos.', 'leve'],
+      // ----- picante: mesquinhez com convicção -----
+      ['Defende que devias poder despedir um amigo, com pré-aviso de 30 dias.', 'picante'],
+      ['Defende que quem não bebe não devia ser convidado para sair.', 'picante'],
+      ['Defende que os grupos de amigos deviam ter avaliação de desempenho anual.', 'picante'],
+      ['Defende que ninguém devia poder recusar um convite sem apresentar prova.', 'picante'],
+      ['Defende que o casamento devia ser renovado de 5 em 5 anos, com entrevista.', 'picante'],
+      ['Defende que devia haver um limite legal de amigos por pessoa.', 'picante'],
+      ['Defende que quem propõe o jantar devia decidir tudo, sem votação.', 'picante'],
+      ['Defende que as amizades deviam ter período experimental de três meses.', 'picante'],
+      ['Defende que quem chora num filme devia perder o direito a escolher o próximo.', 'picante'],
+      // ----- hardcore: teses que só se defendem com lata -----
+      ['Defende que a tua ex (ou o teu ex) tinha razão em tudo. Em tudo.', 'hardcore'],
+      ['Defende que mentir aos amigos é um sinal de respeito por eles.', 'hardcore'],
+      ['Defende que o teu grupo de amigos era melhor sem uma pessoa — sem dizer quem.', 'hardcore'],
+      ['Defende que és, objetivamente, a pessoa mais interessante desta mesa.', 'hardcore'],
+      ['Defende que ninguém aqui te conhece verdadeiramente, e que a culpa é deles.', 'hardcore'],
+      ['Defende que ler as mensagens dos outros é um ato de cuidado.', 'hardcore'],
+      ['Defende que já fizeste mais por esta mesa do que esta mesa por ti.', 'hardcore'],
+      ['Defende que toda a gente aqui finge gostar de pelo menos uma pessoa presente.', 'hardcore'],
+      // ----- caos: indefensável até ao fim -----
+      ['Defende que a amizade é um esquema em pirâmide e que tu estás no topo.', 'caos'],
+      ['Defende que devias herdar tudo o que os teus amigos têm, por mérito.', 'caos'],
+      ['Defende que esta mesa devia ser dissolvida e recomeçada sem ti a decidir.', 'caos'],
+    ],
+  },
 ];
 
 // Mini-duelos simbólicos do Duelo 1v1 — resolvem-se FORA da app (presencial); a

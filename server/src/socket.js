@@ -938,6 +938,19 @@ export function registerSocketHandlers(io) {
       }
     });
 
+    // ⚖️ Tribunal: qualquer um dá a defesa por terminada (o réu está a falar para
+    // a mesa, não para o telemóvel). O voto do júri usa o `vota_veredito` normal.
+    socket.on('tribunal_ao_voto', (_payload, ack) => {
+      try {
+        const room = requireRoom(socket);
+        game.tribunalAoVoto(room, socket.data.playerId);
+        broadcastState(io, room.code);
+        if (typeof ack === 'function') ack({ ok: true });
+      } catch (err) {
+        handleError(socket, ack, err);
+      }
+    });
+
     socket.on('contrato_escolhe', ({ parceiroId } = {}, ack) => {
       try {
         const room = requireRoom(socket);

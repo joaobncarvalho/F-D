@@ -8,7 +8,7 @@
 -- Idempotente: os ids são derivados do texto (sempre iguais) e o ON CONFLICT
 -- atualiza em vez de duplicar. Correr DEPOIS de 01_schema.sql.
 --
--- 24 tipos de jogo · 681 prompts
+-- 25 tipos de jogo · 711 prompts
 -- =====================================================================
 
 BEGIN;
@@ -39,7 +39,8 @@ INSERT INTO game_types (id, key, label, active) VALUES
   ('b157a9d4-31f8-5247-8960-53aac717fa3e', 'sincronia', 'Sincronia', true),
   ('67973009-80c3-5322-8461-55a5bc1798bd', 'detetor', 'Detetor', true),
   ('90e2fa3f-4807-5b8c-8b68-31796ad5c07e', 'julgamento', 'Julgamento', true),
-  ('1ac38cb8-0cbd-5f60-8824-1da8be3507c3', 'contrato', 'Contrato', true)
+  ('1ac38cb8-0cbd-5f60-8824-1da8be3507c3', 'contrato', 'Contrato', true),
+  ('0b974e68-8516-5011-801d-1b50451aa20d', 'tribunal', 'Tribunal da Injustiça', true)
 ON CONFLICT (key) DO UPDATE SET label = EXCLUDED.label, active = true;
 
 -- Boca Calada (48)
@@ -843,8 +844,44 @@ ON CONFLICT (game_type_id, text) DO UPDATE SET
   intensity = EXCLUDED.intensity, active = true, buddy = EXCLUDED.buddy,
   duration = EXCLUDED.duration, tag = EXCLUDED.tag;
 
+-- Tribunal da Injustiça (30)
+INSERT INTO prompts (id, game_type_id, text, intensity, active, buddy, duration, tag) VALUES
+  ('48efffff-48f9-57f9-8a24-e690ba697917', '0b974e68-8516-5011-801d-1b50451aa20d', 'Defende que dividir a conta ao meio é roubo e devia dar cadeia.', 'leve', true, false, NULL, NULL),
+  ('043d786d-81cd-5ebd-8427-47f48cf3da46', '0b974e68-8516-5011-801d-1b50451aa20d', 'Defende que há uma idade máxima para se andar de trotinete.', 'leve', true, false, NULL, NULL),
+  ('b4ea6155-3c6b-5e0d-81ba-761e42f6eb73', '0b974e68-8516-5011-801d-1b50451aa20d', 'Defende que os animais de estimação deviam pagar renda.', 'leve', true, false, NULL, NULL),
+  ('f4eabf2b-9151-5aee-84ee-d404fdc269bf', '0b974e68-8516-5011-801d-1b50451aa20d', 'Defende que ler livros em público é uma forma de exibicionismo.', 'leve', true, false, NULL, NULL),
+  ('8b6dd081-b92a-54df-8086-634f564fbbf2', '0b974e68-8516-5011-801d-1b50451aa20d', 'Defende que quem chega atrasado devia perder o direito a escolher música.', 'leve', true, false, NULL, NULL),
+  ('b440212a-82fb-5a6a-8904-aa5e128350bf', '0b974e68-8516-5011-801d-1b50451aa20d', 'Defende que o pequeno-almoço é a refeição mais sobrevalorizada da história.', 'leve', true, false, NULL, NULL),
+  ('02749741-bd31-57f4-828e-c03907d20ef1', '0b974e68-8516-5011-801d-1b50451aa20d', 'Defende que devia ser proibido tirar fotografias à comida.', 'leve', true, false, NULL, NULL),
+  ('a1778273-bdd0-5965-8e32-71d9488b44b6', '0b974e68-8516-5011-801d-1b50451aa20d', 'Defende que as segundas-feiras deviam ser opcionais e sem justificação.', 'leve', true, false, NULL, NULL),
+  ('98e06bfe-3e76-5196-8428-8fb28e9a5a02', '0b974e68-8516-5011-801d-1b50451aa20d', 'Defende que quem faz anos devia pagar a conta a toda a gente.', 'leve', true, false, NULL, NULL),
+  ('4a6a4c6d-9eb4-58c0-8483-9e2ae387224a', '0b974e68-8516-5011-801d-1b50451aa20d', 'Defende que os aniversários deviam acabar aos 25 anos.', 'leve', true, false, NULL, NULL),
+  ('435d3f2e-2141-5027-8c54-dbd800fe3e83', '0b974e68-8516-5011-801d-1b50451aa20d', 'Defende que devias poder despedir um amigo, com pré-aviso de 30 dias.', 'picante', true, false, NULL, NULL),
+  ('dcf2aee7-a84b-546f-8a55-3c92a3f98838', '0b974e68-8516-5011-801d-1b50451aa20d', 'Defende que quem não bebe não devia ser convidado para sair.', 'picante', true, false, NULL, NULL),
+  ('f76e3754-e829-5e89-8d07-24b21e8c97ad', '0b974e68-8516-5011-801d-1b50451aa20d', 'Defende que os grupos de amigos deviam ter avaliação de desempenho anual.', 'picante', true, false, NULL, NULL),
+  ('2806b720-9e37-50f8-850c-a29bb99873a5', '0b974e68-8516-5011-801d-1b50451aa20d', 'Defende que ninguém devia poder recusar um convite sem apresentar prova.', 'picante', true, false, NULL, NULL),
+  ('47e3c068-522f-538c-8be6-d28b3a73bbe9', '0b974e68-8516-5011-801d-1b50451aa20d', 'Defende que o casamento devia ser renovado de 5 em 5 anos, com entrevista.', 'picante', true, false, NULL, NULL),
+  ('0b363799-85dd-5cb5-8559-949647411e6c', '0b974e68-8516-5011-801d-1b50451aa20d', 'Defende que devia haver um limite legal de amigos por pessoa.', 'picante', true, false, NULL, NULL),
+  ('b2289ce2-6785-5118-8926-c122e546893a', '0b974e68-8516-5011-801d-1b50451aa20d', 'Defende que quem propõe o jantar devia decidir tudo, sem votação.', 'picante', true, false, NULL, NULL),
+  ('2394d84c-e981-543e-8361-f07d6471ab41', '0b974e68-8516-5011-801d-1b50451aa20d', 'Defende que as amizades deviam ter período experimental de três meses.', 'picante', true, false, NULL, NULL),
+  ('b9de3744-79a4-53af-8864-6fca76a32f62', '0b974e68-8516-5011-801d-1b50451aa20d', 'Defende que quem chora num filme devia perder o direito a escolher o próximo.', 'picante', true, false, NULL, NULL),
+  ('c313872f-6989-5f7c-8c72-2d7e3ace7827', '0b974e68-8516-5011-801d-1b50451aa20d', 'Defende que a tua ex (ou o teu ex) tinha razão em tudo. Em tudo.', 'hardcore', true, false, NULL, NULL),
+  ('601b828b-a32c-501f-8404-cd6d7b61121b', '0b974e68-8516-5011-801d-1b50451aa20d', 'Defende que mentir aos amigos é um sinal de respeito por eles.', 'hardcore', true, false, NULL, NULL),
+  ('c90df58f-2df8-5bc6-81c4-3127f7353c50', '0b974e68-8516-5011-801d-1b50451aa20d', 'Defende que o teu grupo de amigos era melhor sem uma pessoa — sem dizer quem.', 'hardcore', true, false, NULL, NULL),
+  ('0f2fb746-1efc-5493-834c-17aff84ab965', '0b974e68-8516-5011-801d-1b50451aa20d', 'Defende que és, objetivamente, a pessoa mais interessante desta mesa.', 'hardcore', true, false, NULL, NULL),
+  ('305e5688-6f8a-59f0-8254-99fc7a59685e', '0b974e68-8516-5011-801d-1b50451aa20d', 'Defende que ninguém aqui te conhece verdadeiramente, e que a culpa é deles.', 'hardcore', true, false, NULL, NULL),
+  ('aaba4451-5f03-50da-8eff-3e9aed342bbb', '0b974e68-8516-5011-801d-1b50451aa20d', 'Defende que ler as mensagens dos outros é um ato de cuidado.', 'hardcore', true, false, NULL, NULL),
+  ('341c711a-4f51-52c5-8f7d-3b11450990f6', '0b974e68-8516-5011-801d-1b50451aa20d', 'Defende que já fizeste mais por esta mesa do que esta mesa por ti.', 'hardcore', true, false, NULL, NULL),
+  ('4911fd2b-0f80-5888-8c71-fa17af77760a', '0b974e68-8516-5011-801d-1b50451aa20d', 'Defende que toda a gente aqui finge gostar de pelo menos uma pessoa presente.', 'hardcore', true, false, NULL, NULL),
+  ('0fbb0147-2ade-58bf-82ee-390464181f06', '0b974e68-8516-5011-801d-1b50451aa20d', 'Defende que a amizade é um esquema em pirâmide e que tu estás no topo.', 'caos', true, false, NULL, NULL),
+  ('ab170238-ce88-5b1d-88ef-2e5982baca46', '0b974e68-8516-5011-801d-1b50451aa20d', 'Defende que devias herdar tudo o que os teus amigos têm, por mérito.', 'caos', true, false, NULL, NULL),
+  ('9601030d-d84d-590f-8007-399bae97ebd5', '0b974e68-8516-5011-801d-1b50451aa20d', 'Defende que esta mesa devia ser dissolvida e recomeçada sem ti a decidir.', 'caos', true, false, NULL, NULL)
+ON CONFLICT (game_type_id, text) DO UPDATE SET
+  intensity = EXCLUDED.intensity, active = true, buddy = EXCLUDED.buddy,
+  duration = EXCLUDED.duration, tag = EXCLUDED.tag;
+
 COMMIT;
 
--- Conferência rápida (deve dar 24 e 681):
+-- Conferência rápida (deve dar 25 e 711):
 --   SELECT count(*) FROM game_types;
 --   SELECT count(*) FROM prompts;

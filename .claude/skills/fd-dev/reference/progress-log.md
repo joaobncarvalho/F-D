@@ -5,6 +5,79 @@
 
 ---
 
+## 2026-09-04 (d) — ⚖️ Tribunal da Injustiça
+
+Ideia do João, construída com as duas decisões que ficaram por tomar já tomadas
+por ele: **90 segundos** de defesa, e teses **absurdas e provocadoras** em vez de
+defesas sinceras de racismo/misoginia (a graça é defender o indefensável e
+*inofensivo* com cara séria; o teste a aplicar ao escrever mais está no
+comentário do tipo em `content/prompts.data.js`).
+
+### O que é
+O réu tem 90 s para defender, a sério e em voz alta, uma tese indefensável. A
+mesa é o júri. É o primeiro tipo que pede a alguém para **falar bem** durante um
+bocado — todos os outros resolvem-se numa frase, num toque ou num voto.
+
+### O que o torna mais do que mais um tipo
+**No Tabuleiro, ir preso deixa de ser um resultado e passa a ser uma acusação.**
+80% julgamento, 20% condenação direta. A prisão ganha o que nunca teve —
+hipótese: absolvido, escapa à pena que estava guardada.
+
+### Decisões de construção que valem a pena registar
+- **`b.tribunal`, não `b.pending`** — três sítios (beerpong, casa ??, …) fazem
+  `pending = null` logo a seguir a mandar alguém preso, e apagavam o julgamento
+  sem se dar por isso. E o julgamento tranca a mesa TODA de propósito: não é a
+  vez de ninguém, é a mesa parada a ouvir. Não mexe na ordem das vezes.
+- **A pena é sorteada na acusação e fica escondida.** Se o júri soubesse o que
+  ele arrisca, votava por pena e não por defesa.
+- **`veredito.js` ganhou um `holder` opcional** em vez de um segundo sistema de
+  votação — a roda guarda a votação na `round`, o tabuleiro no seu objeto, e a
+  regra do empate (absolve) continua a existir num sítio só.
+- **`TYPE_PROFILE.intensidades`** — primeiro tipo restrito por intensidade; o
+  `pickWeightedType` passou a receber a intensidade em vigor.
+- **O saco de teses enche no `initBoard`**: o `applyPrison` é síncrono e tem seis
+  chamadores, e um `await` lá dentro tornava assíncrono meio motor do tabuleiro.
+- **Ciclo de imports evitado** — o `core.js` importa o `board/tribunal.js`, e por
+  isso é o tribunal que repete o `nameOf` de uma linha, não o contrário.
+
+### Um bug apanhado pelos testes
+O `bots-e2e` começou a falhar em ~50% das corridas: os bots **encravavam** na
+fase `tribunal` da Roda (eu só tinha tratado do Tabuleiro). Sem o `bots.js` saber
+fechar a defesa e votar, uma sala com bots ficava presa para sempre num
+julgamento que ninguém fechava. O teste passou a exigir o tipo novo na lista.
+
+### Ficheiros
+`server/src/game/tribunal.js` (**novo**), `server/src/board/tribunal.js` (**novo**),
+`server/test/tribunal.test.js` (**novo**), `client/src/pages/board/TribunalBand.jsx`
+(**novo**), `server/src/{game.js,board.js,bots.js,autoresolve.js,socket.js}`,
+`server/src/board/core.js`, `server/src/game/veredito.js`,
+`server/src/socket/boardHandlers.js`, `server/src/content/prompts.data.js`,
+`server/db/02_seed.sql`, `client/src/{App.jsx,pages/Game.jsx,pages/Board.jsx,
+pages/games/hardcoreCards.jsx,pages/games/shared.jsx,components/Rules.jsx}`.
+
+### Como foi verificado
+- `npm test` → **209/209** (11 testes novos), estável em corridas repetidas.
+- `/admin` no browser: o tipo aparece, criei um tema novo a sério (chegou à BD
+  com a intensidade certa) e apaguei-o a seguir.
+- Os quatro estados dos cartões (defesa e resultado, Roda e Tabuleiro) montados
+  com os componentes reais e conferidos no ecrã.
+
+### Nota
+`prisma db push` não era preciso (o tipo é dados, não schema), mas o `db:seed`
+sim — sem ele a /admin não mostrava o tipo novo. Já corrido: 30 temas na BD.
+
+---
+
+## 2026-09-04 (c) — A Bomba tinha o pavio a medir a coisa errada
+
+Ver o commit `87d037a`. Uma bomba chegou às 40 passagens à mesa: o pavio contava
+segundos e a tensão conta-se em VOLTAS. Passou a haver dois pavios (tempo e
+passagens, 2 a 3,5 voltas escaladas com a mesa) e rebenta o primeiro a acabar,
+com um chão de 12 s que a simulação mostrou ser preciso — sem ele, uma mesa de
+três a passar depressa tinha uma bomba de seis segundos.
+
+---
+
 ## 2026-09-04 (b) — A /admin passa a dizer se o conteúdo presta
 
 Pedido do João: estatísticas na admin "para nos podermos guiar".

@@ -20,6 +20,7 @@ import * as board from './board.js';
 import * as tournament from './tournament.js';
 import { pushFeed } from './feed.js';
 import * as morte from './game/morte.js';
+import * as tribunal from './game/tribunal.js';
 import { log } from './log.js';
 
 const DEFAULT_MS = Number(process.env.AUTO_RESOLVE_MS ?? 75_000);
@@ -47,13 +48,25 @@ function signature(room) {
     );
   }
   const b = room.board;
-  if (b) parts.push('b', b.turnIndex, b.turnCount, b.pending?.kind, Object.keys(b.pending?.bids || {}).length);
+  if (b) parts.push('b', b.turnIndex, b.turnCount, b.pending?.kind, Object.keys(b.pending?.bids || {}).length,
+    // ⚖️ Um voto do júri É progresso: sem isto a assinatura não mudava e o
+    // auto-resolve fechava o julgamento por cima de quem estava a votar.
+    b.tribunal?.substate, Object.keys(b.tribunal?.veredito?.votos || {}).length);
   const t = room.tournament;
   if (t) parts.push('t', t.phase, t.roundIdx, t.duel?.id, Object.keys(t.duel?.actions || t.duel?.votes || {}).length);
   return parts.join('|');
 }
 
 function timeoutFor(room) {
+  // ⚖️ TRIBUNAL: a defesa TEM os seus 90 segundos, e vem antes de tudo o resto.
+  // O prazo normal (75s) fechava-a antes do tempo, e o do Modo da Morte — que
+  // encurta de propósito — fechava-a a meio de uma frase. Aqui a duração não é
+  // um limite de paciência, é o jogo: são os 90s que fazem a defesa ser densa.
+  // A margem deixa o cronómetro do cliente chegar ao fim primeiro.
+  if (room.game?.phase === 'tribunal' && room.game.round?.substate === 'defesa') {
+    return (tribunal.SEGUNDOS_DEFESA + 8) * 1000;
+  }
+  if (room.board?.tribunal?.substate === 'defesa') return (tribunal.SEGUNDOS_DEFESA + 8) * 1000;
   // MODO DA MORTE: o relógio da ronda encurta a cada eliminação (game/morte.js).
   // É o que faz a mesa sentir a noite a fechar-se sem ninguém anunciar nada — e
   // por isso o prazo de auto-resolução tem mesmo de o seguir, senão o aperto era
@@ -271,6 +284,19 @@ async function resolveWheel(room) {
       }
       return continueOrAbandon(room);
 
+    case 'tribunal':
+      if (r?.substate === 'defesa') {
+        game.tribunalAoVoto(room, r.reuId);
+        pushFeed(room, '⏱️', 'Acabaram os 90 segundos — o júri vai decidir.');
+        return true;
+      }
+      if (r?.substate === 'votar') {
+        game.fechaVeredito(room);
+        pushFeed(room, '⏱️', 'O júri decidiu com os votos que houve.');
+        return true;
+      }
+      return continueOrAbandon(room);
+
     case 'contrato':
       // Um pacto que entra em vigor por silêncio não é um pacto: quem não
       // assinou, recusou. O `contrato.fecha` já trata disso.
@@ -339,6 +365,25 @@ function abandon(room) {
 // ----- Tabuleiro / Torneio ---------------------------------------------------
 
 function resolveBoard(room) {
+  // ⚖️ O julgamento tranca a mesa toda — se encravar, não é a vez que está
+  // parada, é o jogo. Resolve-se pelo seu próprio caminho (a defesa vai ao voto,
+  // o voto fecha com quem votou) em vez de se passar a vez, que não desbloqueava
+  // nada: o `b.tribunal` continuaria lá.
+  const t = room.board?.tribunal;
+  if (t) {
+    if (t.substate === 'defesa') {
+      board.boardTribunalAoVoto(room, t.reuId);
+      pushFeed(room, '⏱️', 'Acabaram os 90 segundos — o júri vai decidir.');
+      return true;
+    }
+    if (t.substate === 'votar') {
+      board.fechaTribunal(room);
+      pushFeed(room, '⏱️', 'O júri decidiu com os votos que houve.');
+      return true;
+    }
+    board.limpaTribunal(room); // resultado já lido: sai da frente
+    return true;
+  }
   pushFeed(room, '⏱️', 'Tempo esgotado no tabuleiro — passou-se a vez.');
   board.boardAutoAdvance(room);
   return true;

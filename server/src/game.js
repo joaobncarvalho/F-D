@@ -24,6 +24,7 @@ import { setupSincronia, serializeSincronia } from './game/sincronia.js';
 import { setupDetetor, serializeDetetor } from './game/detetor.js';
 import { setupJulgamento, serializeJulgamento, julgamentoVeredito } from './game/julgamento.js';
 import { setupContrato, serializeContrato, fecha as fechaContrato } from './game/contrato.js';
+import { setupTribunal, serializeTribunal, tribunalVeredito } from './game/tribunal.js';
 import { ganhaVida, elimina } from './game/helpers.js';
 import * as modificadores from './game/modificadores.js';
 import * as divida from './game/divida.js';
@@ -60,6 +61,7 @@ export { leilaoLicita, fecha as fechaLeilao } from './game/leilao.js';
 export { sincroniaResponde, fecha as fechaSincronia } from './game/sincronia.js';
 export { detetorMarca, detetorVota, fecha as fechaDetetor } from './game/detetor.js';
 export { julgamentoAoVoto } from './game/julgamento.js';
+export { tribunalAoVoto } from './game/tribunal.js';
 export { contratoEscolhe } from './game/contrato.js';
 import { contratoAssina as contratoAssinaRaw, contratoExpira as contratoExpiraRaw } from './game/contrato.js';
 
@@ -85,9 +87,11 @@ export function fechaVeredito(room) {
     ? dobroVeredito(room)
     : r.gameTypeKey === 'julgamento'
       ? julgamentoVeredito(room)
-      : r.gameTypeKey === 'mimica'
-        ? mimicaVeredito(room)
-        : relampagoVeredito(room);
+      : r.gameTypeKey === 'tribunal'
+        ? tribunalVeredito(room)
+        : r.gameTypeKey === 'mimica'
+          ? mimicaVeredito(room)
+          : relampagoVeredito(room);
   if (!res) return { fechado: false };
   pushFeed(
     room,
@@ -389,6 +393,10 @@ const TYPE_PROFILE = {
   detetor: { min: 3, peso: 6 },
   julgamento: { min: 4, peso: 4 }, // réu + advogado + júri
   contrato: { min: 3, peso: 4 }, // deixa uma regra ativa atrás de si
+  // ⚖️ Tribunal da Injustiça: 90s de defesa fazem dele um dos tipos mais longos
+  // da roda, daí o peso baixo. `intensidades` restringe-o ao Hardcore para cima
+  // — é o único tipo com essa marca, e é assim que o João o desenhou.
+  tribunal: { min: 3, peso: 4, intensidades: ['hardcore', 'caos'] },
 };
 const DEFAULT_PROFILE = { min: 2, peso: 6 };
 // Quantos tipos recentes se evitam. Com sorteio uniforme entre 18 tipos, o mesmo
@@ -413,10 +421,18 @@ const perfil = (key) => TYPE_PROFILE[key] || DEFAULT_PROFILE;
  * dispensável — se ao evitar os recentes ficasse quase nada, prefere-se repetir
  * um tipo a estreitar a roda a duas opções.
  */
-export function pickWeightedType(types, { jogadores = 99, recentes = [], pesos = null } = {}) {
+export function pickWeightedType(types, { jogadores = 99, recentes = [], pesos = null, intensidade = null } = {}) {
   if (!types?.length) return null;
 
-  const cabem = types.filter((t) => jogadores >= perfil(t.key).min);
+  const cabem = types.filter((t) => {
+    const p = perfil(t.key);
+    if (jogadores < p.min) return false;
+    // Tipos com intensidade marcada (hoje só o ⚖️ Tribunal) não entram no sorteio
+    // abaixo dela. Sem `intensidade` não se filtra nada: quem chama sem a passar
+    // — os testes, e qualquer chamador futuro — continua a ver a roda inteira.
+    if (p.intensidades && intensidade && !p.intensidades.includes(intensidade)) return false;
+    return true;
+  });
   // Mesa muito pequena (2 pessoas): fica o que houver, nem que seja tudo.
   let pool = cabem.length ? cabem : types;
 
@@ -582,18 +598,22 @@ export async function spinWheel(room, playerId) {
   // se a mesa acabou de aguentar três jogos longos, e em que ponto vai a noite.
   const l = director.leitura(room);
   const fase = director.faseDaNoite(room);
+  // A intensidade EM VIGOR (curva incluída) entra no sorteio, e não só na escolha
+  // do prompt: há tipos que não são conteúdo mais forte, são um jogo diferente, e
+  // esses só existem a partir de certo nível (ver `TYPE_PROFILE.tribunal`).
+  const inten = effectiveIntensity(g);
   let gt = pickWeightedType(types, {
     jogadores: l.jogadores,
     recentes: g.recentTypes || [],
     pesos: director.pesosDe(l, fase),
+    intensidade: inten,
   });
   // MODO DA MORTE: restam dois → o Diretor não escolhe nada. A noite acaba com
   // um duelo frente a frente, e não com o que a roda calhar a dar.
   if (g.morte?.dueloFinal) gt = types.find((t) => t.key === 'duelo') || gt;
   if (!gt) throw new AppError('Não há tipos de jogo disponíveis.');
   g.recentTypes = [gt.key, ...(g.recentTypes || [])].slice(0, 4);
-  director.registaFoco(room, playerId);
-  const inten = effectiveIntensity(g); // curva: leve no aquecimento, sobe até ao teto votado
+  director.registaFoco(room, playerId); // `inten` (a curva) já foi lido acima, para o sorteio
 
   const round = {
     id: randomUUID(),
@@ -715,6 +735,10 @@ export async function spinWheel(room, playerId) {
     const p = await pickPrompt(room, 'contrato', inten);
     if (setupContrato(room, round, p)) g.phase = 'contrato';
     else await fallbackDesafio(room, round, inten);
+  } else if (gt.key === 'tribunal') {
+    const p = await pickPrompt(room, 'tribunal', inten);
+    if (setupTribunal(room, round, p)) g.phase = 'tribunal';
+    else await fallbackDesafio(room, round, inten); // sem júri não há tribunal
   }
 
   // A segunda camada abre-se DEPOIS de a ronda estar montada — o Isto ou Aquilo
@@ -1031,7 +1055,7 @@ export function continueRound(room, playerId) {
       'choice', 'relampago', 'mimica', 'roleta', 'duelo', 'grupo', 'cascata', 'desenho', 'reacao',
       // Tipos da camada 3: todos fecham num ecrã de resultado que a mesa lê antes
       // de a vez passar — a mesma regra dos outros, e por isso a mesma lista.
-      'bomba', 'leilao', 'sincronia', 'detetor', 'julgamento', 'contrato',
+      'bomba', 'leilao', 'sincronia', 'detetor', 'julgamento', 'contrato', 'tribunal',
     ].includes(g.phase)
   ) {
     if (g.round?.status !== 'resolved') throw new AppError('Esta ronda ainda não terminou.');
@@ -1221,6 +1245,7 @@ function serializeRound(g) {
   if (r.gameTypeKey === 'detetor') serializeDetetor(base, r);
   if (r.gameTypeKey === 'julgamento') serializeJulgamento(base, r);
   if (r.gameTypeKey === 'contrato') serializeContrato(base, r);
+  if (r.gameTypeKey === 'tribunal') serializeTribunal(base, r);
   return base;
 }
 

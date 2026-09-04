@@ -18,7 +18,7 @@ const MODOS = {
   board: {
     titulo: '🎲 Tabuleiro',
     texto:
-      'Corrida à volta do tabuleiro: avanças 1, 2 ou 3 casas bebendo 2, 4 ou 6 golos. Ganha quem der a volta primeiro. Andar devagar três vezes seguidas = prisão. As cartas jogam-se contra os outros na tua vez.',
+      'Corrida à volta do tabuleiro: avanças 1, 2 ou 3 casas bebendo 2, 4 ou 6 golos. Ganha quem der a volta primeiro. Andar devagar três vezes seguidas = prisão — e ir preso é quase sempre ir a ⚖️ julgamento primeiro, com hipótese de escapar. As cartas jogam-se contra os outros na tua vez.',
   },
   tournament: {
     titulo: '🏆 Torneio',
@@ -57,6 +57,8 @@ const JOGOS = {
   detetor: 'Respondes em voz alta e podes mentir. A mesa vota se acreditou. Quem vota mal bebe 2; enganar toda a gente dá uma vida ❤️ e ser lido por todos tira uma.',
   julgamento: 'A mesa acusa-te; sorteia-se um advogado de defesa. Condenado, perdes uma vida ❤️ Absolvido, quem te condenou bebe 2 e o advogado ganha uma vida.',
   contrato: 'Um pacto entre dois, por 5 jogadas. Se assinarem os dois, ganham uma vida cada ❤️ Quem recusar bebe 2. Cumprir é por honra — a mesa fiscaliza.',
+  tribunal:
+    'Só em Hardcore para cima. Tens 90 segundos para defender, a sério e em voz alta, uma tese indefensável. A mesa é o júri: se convenceres, quem votou contra bebe 2; se não, perdes uma vida ❤️ No Tabuleiro é o que acontece a quem vai preso — na maior parte das vezes há julgamento antes da sentença, e uma absolvição livra-te dela.',
 };
 
 // Regras da noite. Não se escolhem: CALHAM, ponderadas pela intensidade votada,

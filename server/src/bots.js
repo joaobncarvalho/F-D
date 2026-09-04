@@ -365,6 +365,27 @@ export async function driveBots(room, hooks = {}) {
       return false;
     }
 
+    // ⚖️ TRIBUNAL: dar a defesa por terminada → o júri vota → continuar.
+    // Aqui o réu é o próprio a defender-se (não há advogado, ao contrário do
+    // Julgamento), por isso é ele quem fecha a defesa quando é bot.
+    if (g.phase === 'tribunal') {
+      const r = g.round;
+      if (r.substate === 'defesa') {
+        const reu = room.players.get(r.reuId);
+        if (reu?.isBot) { game.tribunalAoVoto(room, reu.id); return true; }
+        return false; // é uma pessoa a defender-se: os 90s são dela
+      }
+      if (r.substate === 'votar') {
+        const v = r.veredito;
+        const next = bots.find((b) => !v.atores.includes(b.id) && !v.votos[b.id] && !b.eliminated);
+        if (next) { game.votaVeredito(room, next.id, rand() < 0.5 ? 'sim' : 'nao'); return true; }
+        return false;
+      }
+      const cur = room.players.get(g.currentPlayerId);
+      if (cur?.isBot) { game.continueRound(room, cur.id); return true; }
+      return false;
+    }
+
     // CONTRATO: escolher parceiro → os dois assinam (ou não) → continuar.
     if (g.phase === 'contrato') {
       const r = g.round;
@@ -614,6 +635,29 @@ async function driveBoardBots(room) {
 
     // Corrida (fase playing): só age se for a vez de um bot.
     if (b.phase === 'playing') {
+      // ⚖️ TRIBUNAL: tranca a mesa toda, por isso vem antes de tudo — e agem
+      // TODOS os bots, não só quem está à vez (o réu pode nem ser bot). Sem
+      // isto, uma sala com bots ficava presa num julgamento que ninguém fecha.
+      if (b.tribunal) {
+        const t = b.tribunal;
+        if (t.substate === 'result') { board.limpaTribunal(room); return true; }
+        if (t.substate === 'defesa') {
+          // Só um bot dá a defesa por terminada, e só se o réu for bot: se for
+          // uma pessoa a defender-se, os 90s são dela (o auto-resolve fecha).
+          const reu = room.players.get(t.reuId);
+          if (reu?.isBot) { board.boardTribunalAoVoto(room, t.reuId); return true; }
+          return false;
+        }
+        if (t.substate === 'votar') {
+          for (const bot of bots) {
+            if (bot.id === t.reuId || t.veredito?.votos?.[bot.id]) continue;
+            board.boardTribunalVota(room, bot.id, rand() < 0.5 ? 'sim' : 'nao');
+            return true;
+          }
+          return false;
+        }
+        return false;
+      }
       // Leilão: licitam TODOS (não só quem está à vez) — senão o leilão encravava.
       if (b.pending?.kind === 'auction') {
         for (const bot of bots) {
