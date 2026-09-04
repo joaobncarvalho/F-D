@@ -16,15 +16,30 @@ export function EventoOverlay({ pending, reveal, isMyTurn, currentName, onPick }
 
   // Nova revelação: mostra flip, som/confetti e auto-esconde. Depende SÓ de revealKey
   // (string estável) — assim os broadcasts do room_state não re-armam/limpam o timer.
+  //
+  // O RELÓGIO QUE ESCONDE É ARMADO SEMPRE, e o guarda `shownKey` serve só ao som.
+  // Antes o guarda vinha primeiro e levava o relógio com ele: o React monta o
+  // efeito, limpa-o e volta a montá-lo (StrictMode, em dev — que é como se
+  // fazem os playtests), e a segunda passagem saía pelo guarda sem voltar a
+  // armar o relógio que a limpeza da primeira já tinha apagado. A carta do ??
+  // ficava no ecrã para sempre, por cima do tabuleiro. Mesmo defeito que o
+  // EventoDaNoite.jsx tinha — ver lá a explicação completa.
   useEffect(() => {
-    if (!revealKey || shownKey.current === revealKey) return;
-    shownKey.current = revealKey;
+    if (!revealKey) return;
     setVisibleReveal(reveal);
     setPicked(reveal.pickedIndex);
-    sfx.reveal();
-    haptic([25, 40, 70]);
-    if (reveal.emoji === '🚀' || reveal.card) confetti({ count: 90, power: 13 });
     const t = setTimeout(() => setVisibleReveal(null), 3600);
+
+    if (shownKey.current !== revealKey) {
+      shownKey.current = revealKey;
+      try {
+        sfx.reveal();
+        haptic([25, 40, 70]);
+        if (reveal.emoji === '🚀' || reveal.card) confetti({ count: 90, power: 13 });
+      } catch {
+        /* sem som a carta lê-se na mesma; presa no ecrã é que não pode ficar */
+      }
+    }
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [revealKey]);

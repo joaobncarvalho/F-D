@@ -28,12 +28,19 @@ export default function RegraNova({ regra, onDone }) {
   const feito = useRef(false);
 
   useEffect(() => {
-    if (feito.current) return;
-    feito.current = true;
-    sfx.shot();
-    haptic([60, 40, 140]);
-    abana('forte');
+    // O relógio de saída primeiro, e sempre — pela mesma razão explicada no
+    // EventoDaNoite.jsx: a saída não pode depender do guarda nem do som.
     const t = setTimeout(() => onDone?.(), DURACAO_MS);
+    if (!feito.current) {
+      feito.current = true;
+      try {
+        sfx.shot();
+        haptic([60, 40, 140]);
+        abana('forte');
+      } catch {
+        /* a regra tem de se ler à mesma; presa no ecrã é que não pode ficar */
+      }
+    }
     return () => clearTimeout(t);
   }, []);
 

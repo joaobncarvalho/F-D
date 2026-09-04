@@ -220,3 +220,33 @@ Estas vão além do FD — candidatas a diferenciar o jogo. Discutir prioridade.
 - [ ] Contas de utilizador e histórico pessoal
 - [ ] Loja/packs de conteúdo
 - [ ] Moderação de conteúdo submetido por utilizadores
+
+---
+
+## 🐛 Armadilha conhecida: o guarda `ref` que come o relógio
+
+Apanhado num playtest (2026-09-04): cartas de ecrã inteiro ficavam presas por
+cima do jogo e não saíam mais. Vale a pena reconhecer o padrão, porque ele
+apetece escrever e parece certo:
+
+```js
+useEffect(() => {
+  if (jaFiz.current) return;      // ⚠️ guarda à frente de tudo
+  jaFiz.current = true;
+  sfx.algo();
+  const t = setTimeout(fecha, 3000);
+  return () => clearTimeout(t);
+}, []);
+```
+
+O React monta o efeito, limpa-o e volta a montá-lo (StrictMode, em dev — e é em
+`npm run dev` que se fazem os playtests). A **primeira** passagem arma o relógio,
+a limpeza apaga-o, e a **segunda** sai pelo guarda sem voltar a armar nada. Fica
+uma carta no ecrã sem nada que a tire — e nenhuma delas responde a toques.
+
+**Regra:** o que fecha (relógio, subscrição, estado) é armado SEMPRE e limpo
+SEMPRE; o guarda serve só ao que não pode repetir-se — som, confetti, abanão. E
+esses vão dentro de `try/catch`, para um telemóvel sem vibração não prender nada.
+
+Corrigidos assim: `EventoDaNoite.jsx`, `RegraNova.jsx`, `board/EventoOverlay.jsx`
+(carta da casa ??) e `board/Beerpong.jsx` (a bola ficava no ar para sempre).

@@ -57,16 +57,34 @@ export function Beerpong({ pending, reveal, isMyTurn, currentLabel, onShoot }) {
   useEffect(() => {
     if (!reveal) return;
     const key = `${reveal.row}|${reveal.title}|${reveal.base}|${reveal.cupIdx}`;
-    if (shownRef.current === key) return;
+
+    // O voo da bola é ARMADO SEMPRE, e o guarda `shownRef` fica só para o som do
+    // arranque. Antes o guarda vinha à frente e levava o relógio com ele: o
+    // React monta o efeito, limpa-o e volta a montá-lo (StrictMode, em dev), e a
+    // segunda passagem saía pelo guarda sem voltar a armar o relógio que a
+    // limpeza da primeira já tinha apagado. Ficava `locked` sem nunca chegar a
+    // `landed` — a bola no ar para sempre e a jogada presa. Mesmo defeito que o
+    // EventoDaNoite.jsx tinha; ver lá a explicação completa.
+    const primeira = shownRef.current !== key;
     shownRef.current = key;
     setLocked(true);
     setLanded(false);
-    sfx.spin();
+    if (primeira) {
+      try {
+        sfx.spin();
+      } catch {
+        /* sem som joga-se na mesma; presa é que a jogada não pode ficar */
+      }
+    }
     const t = setTimeout(() => {
       setLanded(true);
-      sfx.reveal();
-      if (reveal.good) { confetti({ count: 70, power: 12 }); haptic([20, 40, 80]); }
-      else { sfx.shot(); haptic([80, 50, 120]); }
+      try {
+        sfx.reveal();
+        if (reveal.good) { confetti({ count: 70, power: 12 }); haptic([20, 40, 80]); }
+        else { sfx.shot(); haptic([80, 50, 120]); }
+      } catch {
+        /* idem: o copo tem de abrir mesmo sem som */
+      }
     }, 820);
     return () => clearTimeout(t);
   }, [reveal]);

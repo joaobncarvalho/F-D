@@ -30,25 +30,50 @@ export default function EventoDaNoite({ evento, onDone }) {
   const feito = useRef(false);
 
   useEffect(() => {
-    if (feito.current) return;
-    feito.current = true;
-    const bom = evento.tom === 'bom';
+    // O RELÓGIO DE SAÍDA É O PRIMEIRO, e é agendado SEMPRE.
+    //
+    // Antes vinha no fim, depois do guarda `feito` e depois do som. Duas formas
+    // de a carta ficar presa no ecrã por cima do jogo, e a mesa sem nada poder
+    // fazer — porque nada aqui responde a toques (`pointer-events-none`):
+    //
+    //   1. o React monta o efeito, limpa-o e volta a montá-lo (StrictMode, em
+    //      dev — e é em `npm run dev` que se fazem os playtests). A primeira
+    //      passagem marcava o relógio, a limpeza apagava-o, e a segunda saía
+    //      pelo guarda sem voltar a marcar nada. A carta nunca mais saía.
+    //   2. se o som ou a vibração rebentassem num telemóvel qualquer, o efeito
+    //      morria antes de chegar ao relógio — com o mesmo fim.
+    //
+    // Agendado primeiro e limpo sempre, a saída deixa de depender de tudo o que
+    // vem a seguir lhe correr bem.
+    const t = setTimeout(() => onDone?.(), DURACAO_MS);
+    let t2 = null;
 
-    if (bom) {
-      sfx.win();
-      confetti({ count: 140, power: 17 });
-      haptic([30, 50, 30]);
-    } else {
-      sfx.shot();
-      haptic([90, 60, 120, 60, 180]);
-      abana('forte');
-      // Segundo abanão a meio: uma tempestade que abana uma vez só parece um
-      // soluço. Dois, espaçados, leem-se como trovoada.
-      setTimeout(() => abana('forte'), 900);
+    // O guarda serve só ao que NÃO pode repetir-se: som, confetti e abanão.
+    if (!feito.current) {
+      feito.current = true;
+      const bom = evento.tom === 'bom';
+      try {
+        if (bom) {
+          sfx.win();
+          confetti({ count: 140, power: 17 });
+          haptic([30, 50, 30]);
+        } else {
+          sfx.shot();
+          haptic([90, 60, 120, 60, 180]);
+          abana('forte');
+          // Segundo abanão a meio: uma tempestade que abana uma vez só parece um
+          // soluço. Dois, espaçados, leem-se como trovoada.
+          t2 = setTimeout(() => abana('forte'), 900);
+        }
+      } catch {
+        /* sem som nem vibração a carta lê-se na mesma — presa é que não pode ficar */
+      }
     }
 
-    const t = setTimeout(() => onDone?.(), DURACAO_MS);
-    return () => clearTimeout(t);
+    return () => {
+      clearTimeout(t);
+      if (t2) clearTimeout(t2);
+    };
   }, []);
 
   const bom = evento.tom === 'bom';
