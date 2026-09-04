@@ -63,6 +63,11 @@ pages/games/hardcoreCards.jsx,pages/games/shared.jsx,components/Rules.jsx}`.
   com os componentes reais e conferidos no ecrã.
 
 ### Nota
+Entrou também no showroom (`/?demo=1`), com oito cenas — os quatro estados de
+cada lado. É o tipo mais difícil de apanhar ao vivo para se afinar: na Roda só
+sai em hardcore/caos, e no Tabuleiro é preciso alguém ir preso **e** calhar nos
+80%. O `boardHandlers` do Demo ganhou os três `noop` das ações do tribunal.
+
 `prisma db push` não era preciso (o tipo é dados, não schema), mas o `db:seed`
 sim — sem ele a /admin não mostrava o tipo novo. Já corrido: 30 temas na BD.
 

@@ -6,6 +6,7 @@ import { AnimatePresence } from 'framer-motion';
 import Board from './Board.jsx';
 import { PromptCard, ChoiceCard, IntrigasCard } from './games/cards.jsx';
 import { RelampagoCard, MimicaCard, RoletaCard, DueloCard } from './games/quickCards.jsx';
+import { TribunalCard } from './games/hardcoreCards.jsx';
 import Beat from '../components/Beat.jsx';
 import PalpiteBand from './games/PalpiteBand.jsx';
 import VereditoBand from './games/VereditoBand.jsx';
@@ -76,11 +77,53 @@ const boardHandlers = (back) => ({
   onPickPawn: noop, onRoll: noop, onAdvance: noop, onResolve: noop, onGamble: noop,
   onEventoPick: noop, onBlackjack: noop, onBeerpong: noop, onPlayCard: noop,
   onBid: noop, onRuleFail: noop,
+  onTribunalAoVoto: noop, onTribunalVota: noop, onTribunalFecha: noop,
   onSkip: noop, onEnd: noop, onKick: noop, onReset: noop, onLeave: back,
 });
 const renderBoard = (patch) => (back) => <Board room={boardMock(patch)} youId="me" {...boardHandlers(back)} />;
 
 const card = (rank, suit) => ({ rank, suit });
+
+// ⚖️ Tribunal da Injustiça (server/src/game/tribunal.js + board/tribunal.js).
+//
+// É o tipo mais difícil de apanhar ao vivo para se afinar: na Roda só sai em
+// hardcore/caos, e no Tabuleiro é preciso alguém ir preso E calhar nos 80%. Daí
+// estarem aqui os quatro estados dos dois lados — que é para o que o showroom
+// serve. A tese é uma das reais (`content/prompts.data.js`).
+const TESE = 'Defende que devias poder despedir um amigo, com pré-aviso de 30 dias.';
+const TESE_B = 'Defende que quem não bebe não devia ser convidado para sair.';
+const tribunalRound = (patch = {}) => ({
+  id: 'trib-' + (patch.substate || 'defesa'),
+  gameTypeKey: 'tribunal',
+  reuId: 'me',
+  reuName: 'Tu',
+  tese: TESE,
+  segundos: 90,
+  substate: 'defesa',
+  veredito: null,
+  custoCondenarMal: 2,
+  result: null,
+  ...patch,
+});
+const vereditoAberto = (jaVotaram = ['p2']) => ({
+  pergunta: `Tu: "${TESE}"`,
+  rotulos: { sim: '⚖️ Absolvido', nao: '🔨 Condenado', aviso: 'Se for absolvido, quem condenou bebe' },
+  atores: ['me'],
+  jaVotaram,
+  fechado: false,
+});
+const tribunalBoard = (patch = {}) => ({
+  reuId: 'p3',
+  reuName: 'Rui',
+  razao: 'abuso de bebida',
+  tese: TESE_B,
+  segundos: 90,
+  abertoEm: Date.now(),
+  substate: 'defesa',
+  veredito: null,
+  result: null,
+  ...patch,
+});
 
 // Cada cena: componente real + dados fictícios.
 const SCENARIOS = [
@@ -128,6 +171,39 @@ const SCENARIOS = [
     id: 'b-regras', kind: 'board', group: 'Tabuleiro', label: '📜 Roleta de Regras (regra ativa)',
     render: renderBoard({ activeRules: [{ id: 'r1', text: 'Ninguém pode dizer nomes próprios', remaining: 3, byName: 'Bea' }] }),
   },
+  // ⚖️ O julgamento de quem vai preso. Tranca a jogada — repare-se que o
+  // tabuleiro por baixo fica suspenso, que é o ponto.
+  {
+    id: 'b-trib-defesa', kind: 'board', group: 'Tabuleiro', label: '⚖️ Tribunal — defesa (90s)',
+    render: renderBoard({ tribunal: tribunalBoard() }),
+  },
+  {
+    id: 'b-trib-voto', kind: 'board', group: 'Tabuleiro', label: '⚖️ Tribunal — o júri vota',
+    render: renderBoard({
+      tribunal: tribunalBoard({
+        substate: 'votar',
+        veredito: { ...vereditoAberto(['me']), pergunta: `Rui: "${TESE_B}"`, atores: ['p3'] },
+      }),
+    }),
+  },
+  {
+    id: 'b-trib-absolvido', kind: 'board', group: 'Tabuleiro', label: '⚖️ Tribunal — absolvido',
+    render: renderBoard({
+      tribunal: tribunalBoard({
+        substate: 'result',
+        result: { absolvido: true, reuId: 'p3', reuName: 'Rui', absolvicoes: 2, condenacoes: 1, pena: null },
+      }),
+    }),
+  },
+  {
+    id: 'b-trib-condenado', kind: 'board', group: 'Tabuleiro', label: '⚖️ Tribunal — condenado 🔨',
+    render: renderBoard({
+      tribunal: tribunalBoard({
+        substate: 'result',
+        result: { absolvido: false, reuId: 'p3', reuName: 'Rui', absolvicoes: 0, condenacoes: 3, pena: 'salta 2 vezes e bebe 3' },
+      }),
+    }),
+  },
   {
     id: 'b-maldicao', kind: 'board', group: 'Tabuleiro', label: '☠️ Maldição disparada',
     render: renderBoard({ trapCount: 1, lastEvent: { text: '☠️ MALDIÇÃO na casa 14: Tu bebes 4 golos (deixada por Bea)', trap: { key: 'curse_drink', emoji: '☠️', square: 14, victim: 'Tu', owner: 'Bea' } } }),
@@ -171,6 +247,34 @@ const SCENARIOS = [
   {
     id: 'w-duelo', kind: 'wheel', group: 'Roda', label: '⚔️ Duelo 1v1',
     render: () => <DueloCard round={{ id: 'r4', gameTypeKey: 'duelo', currentPlayerId: 'me', currentPlayerName: 'Tu', opponentId: 'p2', opponentName: 'Bea', duel: { key: 'par_impar', emoji: '✌️', label: 'Par ou Ímpar', desc: 'Contagem até três e cada um mostra os dedos de uma mão.' }, substate: 'duelling', result: null }} youId="me" canControl onResult={noop} onCall={noop} onContinue={noop} />,
+  },
+  // ⚖️ Tribunal na Roda — os quatro estados. Só sai em hardcore/caos, por isso
+  // vê-lo a pedido é a única forma prática de lhe afinar o texto.
+  {
+    id: 'w-trib-defesa', kind: 'wheel', group: 'Roda', label: '⚖️ Tribunal — defesa (90s)',
+    render: () => <TribunalCard round={tribunalRound()} room={{ players: mkPlayers() }} youId="me" canControl onAoVoto={noop} onVota={noop} onContinue={noop} />,
+  },
+  {
+    id: 'w-trib-voto', kind: 'wheel', group: 'Roda', label: '⚖️ Tribunal — o júri vota',
+    render: () => <TribunalCard round={tribunalRound({ substate: 'votar', veredito: vereditoAberto() })} room={{ players: mkPlayers() }} youId="me" canControl onAoVoto={noop} onVota={noop} onContinue={noop} />,
+  },
+  {
+    id: 'w-trib-convenceu', kind: 'wheel', group: 'Roda', label: '⚖️ Tribunal — convenceu',
+    render: () => (
+      <TribunalCard
+        round={tribunalRound({ substate: 'result', result: { absolvido: true, reuId: 'me', reuName: 'Tu', absolvicoes: 2, condenacoes: 1, custo: 2, pagantes: [{ id: 'p2', name: 'Bea' }] } })}
+        room={{ players: mkPlayers() }} youId="me" canControl onAoVoto={noop} onVota={noop} onContinue={noop}
+      />
+    ),
+  },
+  {
+    id: 'w-trib-falhou', kind: 'wheel', group: 'Roda', label: '⚖️ Tribunal — não convenceu 🔨',
+    render: () => (
+      <TribunalCard
+        round={tribunalRound({ substate: 'result', result: { absolvido: false, reuId: 'me', reuName: 'Tu', absolvicoes: 0, condenacoes: 3, custo: 2, pagantes: [] } })}
+        room={{ players: mkPlayers() }} youId="me" canControl onAoVoto={noop} onVota={noop} onContinue={noop}
+      />
+    ),
   },
 ];
 
