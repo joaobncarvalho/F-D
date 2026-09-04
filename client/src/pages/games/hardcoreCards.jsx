@@ -83,8 +83,14 @@ export function BombaCard({ round, room, youId, canControl, onPassa, onContinue 
         <p className="text-lg">
           Rebentou nas mãos do <b>{r.quemName}</b> — menos uma vida.
         </p>
+        {/* A bomba tem dois pavios (tempo e passagens) e rebenta o primeiro a
+            acabar — ver server/src/game/bomba.js. No fim revela-se qual foi:
+            dizer sempre "o pavio era de Xs" numa que rebentou às voltas seria
+            mentir à mesa sobre o que a matou. */}
         <p className="text-sm text-white/45">
-          {r.passagens} passagens · o pavio era de {r.segundos}s
+          {r.porque === 'passagens'
+            ? `${r.passagens} passagens — não aguentou mais voltas`
+            : `${r.passagens} passagens · o pavio era de ${r.segundos}s`}
         </p>
         <Continuar canControl={canControl} onContinue={onContinue} />
       </CardShell>

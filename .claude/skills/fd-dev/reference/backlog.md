@@ -155,9 +155,15 @@ tudo mexe em vidas, em vez, em exposição e em risco de saída. Ver
 **Por testar à mesa** (playtest de 11 set): a cadência do sorteio (7–12 rondas), os
 tetos por intensidade, se o prazo de 3–5 rondas chega para a regra se fazer sentir, e
 o Modo da Morte com 5+ pessoas — é aí que os fantasmas ganham massa crítica.
-Perguntas em aberto para o playtest: o pavio da Bomba (18–62 s) está bem
-calibrado? Duas vidas no Modo da Morte é curto de mais? O teto de 10 goles da
-Conta chega para haver negociação a sério?
+Perguntas em aberto para o playtest: Duas vidas no Modo da Morte é curto de mais?
+O teto de 10 goles da Conta chega para haver negociação a sério?
+
+- [x] **O pavio da Bomba (2026-09-04)** — RESPONDIDO à mesa: uma bomba chegou às
+      **40 passagens**. Não era avaria — o pavio contava segundos e a tensão
+      conta-se em VOLTAS. Passou a haver um segundo pavio em passagens (2 a 3,5
+      voltas, escalado com a mesa), com o relógio encurtado para 14–42 s e um
+      chão de 12 s. Simulado: 27→13 passagens numa mesa de 5 a ritmo normal, e a
+      duração deixou de ser sempre ~40 s para acompanhar a velocidade da mesa.
 
 ---
 

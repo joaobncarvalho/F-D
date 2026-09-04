@@ -75,6 +75,56 @@ test('Bomba: passa-se à volta e rebenta em quem a segurou demais', async () => 
   assert.ok(publico(room).result.segundos > 0, 'só no fim se revela quanto era o pavio');
 });
 
+test('Bomba: o segundo pavio conta VOLTAS à mesa, e nunca sai no payload', async () => {
+  const { room } = start();
+  const r = await spinUntil(room, 'bomba');
+  const naMesa = r.ordem.length;
+  assert.ok(r.pavioPassagens >= 5, 'nunca rebenta antes de toda a gente lhe tocar');
+  assert.ok(
+    r.pavioPassagens <= Math.round(3.5 * naMesa),
+    `${r.pavioPassagens} passagens para ${naMesa} à mesa é mais do que três voltas e meia`
+  );
+  const pub = publico(room);
+  assert.equal('pavioPassagens' in pub, false, 'saber quantas faltam matava o jogo');
+  assert.ok('passagens' in pub, 'mas as que já foram são públicas');
+});
+
+test('Bomba: rebenta às voltas mesmo com o relógio por acabar', async () => {
+  const { room } = start();
+  const r = await spinUntil(room, 'bomba');
+  r.pavioMs = 10 * 60000; // dez minutos: o tempo não vai ser o culpado
+  r.pavioPassagens = 3;
+  r.acesaEm = Date.now() - 20000; // já passou do chão de 12s (ver o teste seguinte)
+
+  for (let i = 0; i < 3; i++) {
+    const res = game.bombaPassa(room, room.game.round.holderId);
+    assert.equal(res.rebentou, false, `passagem ${i + 1} ainda não rebenta`);
+  }
+  const vitima = room.game.round.holderId;
+  const res = game.bombaPassa(room, vitima);
+  assert.equal(res.rebentou, true, 'esgotadas as passagens, rebenta em quem a larga');
+  assert.equal(room.game.round.result.quemId, vitima);
+  assert.equal(room.game.round.result.porque, 'passagens');
+  assert.equal(room.game.round.result.segundos, null, 'não se anuncia um pavio de tempo que não acabou');
+});
+
+test('Bomba: as voltas não podem rebentar antes do chão de 12s', async () => {
+  const { room } = start();
+  const r = await spinUntil(room, 'bomba');
+  r.pavioMs = 10 * 60000;
+  r.pavioPassagens = 1;
+  r.acesaEm = Date.now(); // acabou de acender: uma mesa rápida esgota as voltas já
+
+  assert.equal(game.bombaPassa(room, room.game.round.holderId).rebentou, false);
+  const res = game.bombaPassa(room, room.game.round.holderId);
+  assert.equal(res.rebentou, false, 'passagens esgotadas, mas ainda não há jogo nenhum');
+
+  // O mesmo estado, com o chão já cumprido: agora sim.
+  room.game.round.acesaEm = Date.now() - 13000;
+  assert.equal(game.bombaPassa(room, room.game.round.holderId).rebentou, true);
+  assert.equal(room.game.round.result.porque, 'passagens');
+});
+
 test('Bomba: o auto-resolve rebenta em quem a tem, não passa por ele', async () => {
   const { room } = start();
   await spinUntil(room, 'bomba');
