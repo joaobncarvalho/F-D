@@ -61,14 +61,24 @@ test('normaliza: ignora chaves inventadas e não repete', () => {
   assert.deepEqual(modificadores.normaliza(null), []);
 });
 
-test('setModifiers: só o host, e só no lobby', () => {
+test('setVetados: só o host, e só no lobby', () => {
   const { rm, room, players } = makeRoom(['Ana', 'Rui']);
   const [ana, rui] = players;
-  assert.throws(() => rm.setModifiers(room.code, rui.id, ['sem_escape']), /host/i);
-  rm.setModifiers(room.code, ana.id, ['sem_escape']);
-  assert.deepEqual(room.modifiers, ['sem_escape']);
+  assert.throws(() => rm.setVetados(room.code, rui.id, ['sem_escape']), /host/i);
+  rm.setVetados(room.code, ana.id, ['sem_escape']);
+  assert.deepEqual(room.vetados, ['sem_escape']);
   room.status = 'playing';
-  assert.throws(() => rm.setModifiers(room.code, ana.id, []), /já começou/i);
+  assert.throws(() => rm.setVetados(room.code, ana.id, []), /já começou/i);
+});
+
+test('uma sala nova já nasce com o Sem Anonimato vetado', () => {
+  const { room } = makeRoom(['Ana', 'Rui']);
+  assert.deepEqual(room.vetados, ['sem_anonimato']);
+  // …e é isso que o mantém fora do sorteio sem ninguém tocar em nada.
+  for (let i = 0; i < 200; i++) {
+    const saiu = modificadores.sorteia({ intensity: 'caos', vetados: room.vetados });
+    assert.ok(!saiu.includes('sem_anonimato'));
+  }
 });
 
 test('Sem Escape: recusar custa duas vidas em vez de uma', async () => {
@@ -179,13 +189,138 @@ test('sem o modificador não se pode dobrar', async () => {
   assert.throws(() => game.resolveAction(room, ana.id, 'double'), /dobrar/i);
 });
 
-test('o payload da sala leva os modificadores e o catálogo', () => {
+test('o payload da sala leva o veto, o catálogo e o que está em vigor', () => {
   const { rm, room, players } = makeRoom(['Ana', 'Rui']);
-  rm.setModifiers(room.code, players[0].id, ['sem_anonimato']);
-  const s = serializeRoom(room);
-  assert.deepEqual(s.modifiers.ativos, ['sem_anonimato']);
-  assert.equal(s.modifiers.catalogo.length, modificadores.CATALOGO.length);
-  assert.ok(s.modifiers.catalogo.every((m) => m.label && m.desc && m.emoji));
+  rm.setVetados(room.code, players[0].id, ['sem_anonimato', 'divida']);
+  const noLobby = serializeRoom(room);
+  assert.deepEqual(noLobby.modifiers.vetados, ['sem_anonimato', 'divida']);
+  assert.deepEqual(noLobby.modifiers.ativos, [], 'no lobby ainda não há regras nenhumas');
+  assert.equal(noLobby.modifiers.catalogo.length, modificadores.CATALOGO.length);
+  assert.ok(noLobby.modifiers.catalogo.every((m) => m.label && m.desc && m.emoji));
+
+  game.initGame(room, { lives: 3, modifiers: ['sem_escape'] });
+  room.game.modifiersTemp = { sem_escape: 3 };
+  const aJogar = serializeRoom(room);
+  assert.deepEqual(aJogar.modifiers.ativos, ['sem_escape']);
+  assert.deepEqual(aJogar.modifiers.prazos, { sem_escape: 3 });
+});
+
+// ----- O sorteio ---------------------------------------------------------------
+
+test('sorteia: a intensidade decide quantas regras a noite apanha', () => {
+  for (const [nivel, plano] of Object.entries(modificadores.PLANO)) {
+    const vistos = new Set();
+    for (let i = 0; i < 400; i++) {
+      const saiu = modificadores.sorteia({ intensity: nivel });
+      assert.ok(
+        saiu.length >= plano.inicio[0] && saiu.length <= plano.inicio[1],
+        `${nivel}: saíram ${saiu.length}, esperado ${plano.inicio.join('–')}`
+      );
+      assert.equal(new Set(saiu).size, saiu.length, 'nunca repete');
+      saiu.forEach((k) => vistos.add(k));
+    }
+    // Em 400 noites o sorteio tem de ter mexido em mais do que uma regra —
+    // um sorteio que sai sempre no mesmo é um sorteio partido.
+    if (plano.inicio[1] > 0) assert.ok(vistos.size >= 3, `${nivel}: só saíram ${vistos.size} regras`);
+  }
+});
+
+test('sorteia: ⛓️ + 💀 juntos só em caos', () => {
+  for (const nivel of ['leve', 'picante', 'hardcore']) {
+    for (let i = 0; i < 500; i++) {
+      const saiu = modificadores.sorteia({ intensity: nivel });
+      assert.ok(
+        !(saiu.includes('sem_escape') && saiu.includes('morte_subita')),
+        `${nivel} não pode juntar Sem Escape com Morte Súbita`
+      );
+    }
+  }
+  // Em caos pode — e ao fim de muitas noites tem mesmo de acontecer.
+  let houve = false;
+  for (let i = 0; i < 800 && !houve; i++) {
+    const saiu = modificadores.sorteia({ intensity: 'caos' });
+    houve = saiu.includes('sem_escape') && saiu.includes('morte_subita');
+  }
+  assert.ok(houve, 'em caos a combinação tem de ser possível');
+});
+
+test('sorteia: o veto é absoluto', () => {
+  const veto = ['sem_escape', 'morte_subita', 'divida', 'sem_anonimato'];
+  for (let i = 0; i < 400; i++) {
+    const saiu = modificadores.sorteia({ intensity: 'caos', vetados: veto });
+    assert.ok(saiu.every((k) => !veto.includes(k)), `vetado saiu: ${saiu}`);
+  }
+  // Vetar tudo é legítimo: dá uma noite sem regras nenhumas, não um erro.
+  assert.deepEqual(modificadores.sorteia({ intensity: 'caos', vetados: modificadores.KEYS }), []);
+});
+
+test('a meio da noite: cai uma regra nova, com carta para o cliente', () => {
+  const { room } = start(['Ana', 'Rui', 'Zé'], { sorteio: true, modifiers: [] });
+  room.game.modifiers = []; // parte-se de zero para o teste ser sobre o que CAI
+  room.game.intensity = 'caos';
+  room.game.roundCount = 30;
+  room.game.proximoModificadorNa = 10;
+
+  assert.equal(modificadores.horaDeSorteio(room), true);
+  const nova = modificadores.sorteiaAMeio(room);
+  assert.ok(nova, 'tem de cair alguma coisa');
+  assert.ok(room.game.modifiers.includes(nova.key), 'e tem de ficar LIGADA');
+  assert.ok(nova.titulo && nova.desc && nova.emoji && nova.em);
+  // Só entram a meio as regras que não criam estado.
+  assert.ok(!['divida', 'sem_anonimato'].includes(nova.key));
+  // Reagendou-se — não pode voltar a cair na ronda seguinte.
+  assert.ok(room.game.proximoModificadorNa > room.game.roundCount);
+  assert.equal(modificadores.horaDeSorteio(room), false);
+});
+
+test('a meio da noite: nunca passa do teto da intensidade, nem na última ronda', () => {
+  const { room } = start(['Ana', 'Rui', 'Zé'], { sorteio: true });
+  const g = room.game;
+  g.intensity = 'leve'; // teto 1
+  g.modifiers = ['dobro_ou_nada'];
+  g.roundCount = 50;
+  g.proximoModificadorNa = 1;
+  assert.equal(modificadores.horaDeSorteio(room), false, 'teto cheio');
+
+  g.intensity = 'hardcore'; // teto 4
+  assert.equal(modificadores.horaDeSorteio(room), true);
+  g.finale = true;
+  assert.equal(modificadores.horaDeSorteio(room), false, 'não cai na última ronda');
+});
+
+test('sem sorteio ligado, nunca cai regra nenhuma a meio', () => {
+  const { room } = start(['Ana', 'Rui', 'Zé'], { modifiers: ['sem_escape'] });
+  room.game.roundCount = 999;
+  room.game.proximoModificadorNa = 1;
+  assert.equal(modificadores.horaDeSorteio(room), false);
+});
+
+test('regras com prazo: expiram sozinhas e largam a mira do Alvo Marcado', () => {
+  const { room, players } = start(['Ana', 'Rui', 'Zé'], { modifiers: ['alvo_marcado', 'sem_escape'] });
+  const g = room.game;
+  g.modifiersTemp = { alvo_marcado: 2 };
+  g.alvoMarcadoId = players[0].id;
+  g.alvoSeguidas = 1;
+
+  assert.deepEqual(modificadores.passaRonda(room), [], 'ainda falta uma ronda');
+  assert.ok(g.modifiers.includes('alvo_marcado'));
+
+  const fora = modificadores.passaRonda(room);
+  assert.deepEqual(fora.map((m) => m.key), ['alvo_marcado']);
+  assert.deepEqual(g.modifiers, ['sem_escape'], 'só sai a que tinha prazo');
+  assert.equal(g.alvoMarcadoId, null, 'a mira tem de cair com a regra');
+  assert.equal(g.alvoSeguidas, 0);
+
+  // …e não volta a sair: uma regra que vai e vem deixa de ser um acontecimento.
+  g.sorteio = true;
+  g.intensity = 'caos';
+  g.roundCount = 40;
+  for (let i = 0; i < 30; i++) {
+    g.proximoModificadorNa = 1;
+    const nova = modificadores.sorteiaAMeio(room);
+    if (!nova) break;
+    assert.notEqual(nova.key, 'alvo_marcado', 'a que já teve prazo não volta');
+  }
 });
 
 test('avisos: combinações que a mesa deve conhecer antes de começar', () => {

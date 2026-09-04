@@ -18,24 +18,24 @@ const INTENSITY_OPTS = [
 ];
 
 /**
- * Espelho do `modificadores.avisos` do servidor. Duplicado de propósito: é texto
- * de lobby, e mandá-lo pela rede obrigava a um round-trip a cada toque num chip.
- * O servidor continua a ser quem manda nas regras — isto só as explica.
+ * Espelho do `modificadores.PLANO` do servidor: quantas regras cada intensidade
+ * costuma trazer. Duplicado de propósito — é texto de lobby, e mandá-lo pela rede
+ * obrigava a um round-trip a cada voto. Quem sorteia a sério é o servidor.
  */
-function avisosModificadores(ativos = [], votos = {}) {
-  const out = [];
-  const tem = (k) => ativos.includes(k);
-  if (tem('sem_escape') && tem('morte_subita')) {
-    out.push('⛓️💀 No último terço, uma recusa põe-te fora à primeira.');
-  }
-  if (tem('alvo_marcado') && tem('sem_escape')) {
-    out.push('🎯⛓️ Quem começa a perder afunda depressa.');
-  }
-  const forte = Object.values(votos || {}).some((v) => v === 'hardcore' || v === 'caos');
-  if (ativos.length >= 3 && forte) {
-    out.push('⚠️ Três modificadores com intensidade alta é uma noite curta. Combinem antes de começar.');
-  }
-  return out;
+const PLANO_REGRAS = {
+  leve: 'até 1 regra',
+  picante: '1 a 2 à partida, até 3',
+  hardcore: '2 a 3 à partida, até 4',
+  caos: '3 a 4 à partida, até 6',
+};
+
+/** A intensidade que vai à frente na votação (só para prever o nº de regras). */
+function intensidadeALiderar(votos = {}) {
+  const counts = { leve: 0, picante: 0, hardcore: 0, caos: 0 };
+  for (const v of Object.values(votos)) if (counts[v] !== undefined) counts[v] += 1;
+  const max = Math.max(...Object.values(counts));
+  if (!max) return null;
+  return Object.keys(counts).find((k) => counts[k] === max);
 }
 
 // Modo dev: mostra atalhos de playtest (bots). Ativo em `npm run dev` ou com ?dev.
@@ -45,13 +45,14 @@ const DEV_MODE =
 
 export default function Lobby({
   room, youId, messages, error, onSendMessage, onStart, onVoteIntensity,
-  onSetMode, onSetIdentity, onSetCurve, onSetNightLength, onSetModifiers, onAddBots, onLeave,
+  onSetMode, onSetIdentity, onSetCurve, onSetNightLength, onSetVetados, onAddBots, onLeave,
 }) {
   const [draft, setDraft] = useState('');
   const [showQR, setShowQR] = useState(false);
   const [copied, setCopied] = useState(false);
   const [lives, setLives] = useState(3);
   const [showIdent, setShowIdent] = useState(false);
+  const [showVetos, setShowVetos] = useState(false); // veto das regras: fechado por omissão
   const chatEndRef = useRef(null);
   const identSent = useRef(false);
 
@@ -350,48 +351,95 @@ export default function Lobby({
         </div>
       )}
 
-      {/* Modificadores da noite — regras, não conteúdo. Todos veem o que está
-          ligado (uma regra que muda o custo de recusar tem de estar à vista
-          antes de alguém decidir recusar); só o host mexe. */}
+      {/* As REGRAS da noite. Já não se escolhem — calham, ponderadas pela
+          intensidade votada (server/src/game/modificadores.js). O que fica aqui
+          é o VETO: o que esta mesa não quer que possa sair. Colapsado por
+          omissão, porque o caso normal é ninguém tocar em nada. */}
       {(() => {
         const cat = room.modifiers?.catalogo || [];
-        const ativos = room.modifiers?.ativos || [];
-        if (!cat.length || (!isHost && !ativos.length)) return null;
-        const visiveis = isHost ? cat : cat.filter((m) => ativos.includes(m.key));
+        const vetados = room.modifiers?.vetados || [];
+        if (!cat.length) return null;
+        const lider = intensidadeALiderar(room.intensityVotes);
+        const quantas = PLANO_REGRAS[lider] || null;
         return (
           <div className="fd-card p-3 flex flex-col gap-2">
             <span className="text-sm text-white/60">
-              ⚡ Modificadores{' '}
-              <span className="text-white/40">— mudam as regras, não o conteúdo</span>
+              ⚡ Regras da noite{' '}
+              <span className="text-white/40">— calham durante o jogo, não se escolhem</span>
             </span>
-            {visiveis.map((m) => {
-              const on = ativos.includes(m.key);
-              return (
+            <p className="text-xs text-white/50 leading-snug">
+              Umas saem no arranque, outras caem a meio da noite.{' '}
+              {quantas ? (
+                <>
+                  Com a intensidade que vai à frente: <b>{quantas}</b>.
+                </>
+              ) : (
+                'Quantas depende da intensidade que votarem.'
+              )}
+            </p>
+
+            {isHost ? (
+              <>
                 <button
-                  key={m.key}
-                  disabled={!isHost}
                   onClick={() => {
                     sfx.click();
-                    onSetModifiers(on ? ativos.filter((k) => k !== m.key) : [...ativos, m.key]);
+                    setShowVetos((v) => !v);
                   }}
-                  className={`fd-chip flex flex-col items-start gap-0.5 text-left ${on ? 'fd-chip-on' : ''} ${
-                    !isHost ? 'opacity-70' : ''
-                  }`}
+                  className="fd-chip text-left text-sm"
                 >
-                  <span className="font-bold">
-                    {m.emoji} {m.label}
+                  🚫 O que esta mesa não quer{' '}
+                  <span className="opacity-60">
+                    ({vetados.length === 0 ? 'nada vetado' : `${vetados.length} vetadas`})
                   </span>
-                  <span className="text-xs opacity-70 font-normal leading-tight">{m.desc}</span>
+                  <span className="float-right opacity-60">{showVetos ? '▾' : '▸'}</span>
                 </button>
-              );
-            })}
-            {avisosModificadores(ativos, room.intensityVotes).map((a) => (
-              <p key={a} className="text-xs text-amber-300/80 leading-tight">
-                {a}
-              </p>
-            ))}
+
+                {showVetos &&
+                  cat.map((m) => {
+                    const off = vetados.includes(m.key);
+                    return (
+                      <button
+                        key={m.key}
+                        onClick={() => {
+                          sfx.click();
+                          onSetVetados(
+                            off ? vetados.filter((k) => k !== m.key) : [...vetados, m.key]
+                          );
+                        }}
+                        className={`fd-chip flex flex-col items-start gap-0.5 text-left ${
+                          off ? 'opacity-40' : ''
+                        }`}
+                      >
+                        <span className="font-bold">
+                          {off ? '🚫' : m.emoji} {m.label}
+                          {off && <span className="font-normal opacity-70"> — fora do sorteio</span>}
+                        </span>
+                        <span className="text-xs opacity-70 font-normal leading-tight">{m.desc}</span>
+                      </button>
+                    );
+                  })}
+                {showVetos && (
+                  <p className="text-xs text-white/40 leading-tight">
+                    🔒 O Sem Anonimato vem vetado de origem: quem escreve uma Intriga fá-lo a contar
+                    com o anonimato, e essa promessa não se tira à sorte.
+                  </p>
+                )}
+              </>
+            ) : (
+              vetados.length > 0 && (
+                <p className="text-xs text-white/40 leading-tight">
+                  Fora do sorteio nesta mesa:{' '}
+                  {cat
+                    .filter((m) => vetados.includes(m.key))
+                    .map((m) => m.label)
+                    .join(' · ')}
+                  .
+                </p>
+              )
+            )}
+
             <p className="text-xs text-white/40">
-              Nenhum destes manda beber mais — mexem em vidas, em vez e em exposição.
+              Nenhuma destas manda beber mais — mexem em vidas, em vez e em exposição.
             </p>
           </div>
         );

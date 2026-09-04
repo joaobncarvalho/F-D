@@ -59,8 +59,9 @@ const JOGOS = {
   contrato: 'Um pacto entre dois, por 5 jogadas. Se assinarem os dois, ganham uma vida cada ❤️ Quem recusar bebe 2. Cumprir é por honra — a mesa fiscaliza.',
 };
 
-// Modificadores da noite (o host liga-os no lobby). Nenhum manda beber mais:
-// mexem em vidas, em vez e em exposição. Ver server/src/game/modificadores.js.
+// Regras da noite. Não se escolhem: CALHAM, ponderadas pela intensidade votada,
+// e algumas caem a meio da noite. Nenhuma manda beber mais — mexem em vidas, em
+// vez e em exposição. Ver server/src/game/modificadores.js.
 const MODIFICADORES_REGRAS = {
   '⛓️ Sem Escape': 'Recusar custa duas vidas em vez de uma.',
   '🎯 Alvo Marcado': 'Quem perde uma vida volta a ser o alvo na ronda seguinte (no máximo duas vezes seguidas).',
@@ -111,7 +112,8 @@ export default function Rules({ mode = 'wheel', onClose }) {
             mini-jogos: quem abre isto a meio do jogo quer perceber porque é que
             recusar lhe custou duas vidas, e a resposta não está em nenhum jogo. */}
         <p className="text-sm font-semibold text-white/60 mt-1">
-          ⚡ Modificadores <span className="text-white/35">— o host liga-os no lobby</span>
+          ⚡ Regras da noite{' '}
+          <span className="text-white/35">— calham durante o jogo; podem sair mais do que uma</span>
         </p>
         <div className="fd-card p-4 flex flex-col gap-2">
           {Object.entries(MODIFICADORES_REGRAS).map(([nome, texto]) => (
@@ -120,7 +122,9 @@ export default function Rules({ mode = 'wheel', onClose }) {
             </p>
           ))}
           <p className="text-[11px] text-white/40 leading-snug">
-            Nenhum destes manda beber mais do que o jogo normal: mexem em vidas, em vez e em exposição.
+            Quantas saem depende da intensidade votada, e o host pode vetar no lobby o que a mesa não
+            quiser. Nenhuma manda beber mais do que o jogo normal: mexem em vidas, em vez e em
+            exposição.
           </p>
         </div>
 

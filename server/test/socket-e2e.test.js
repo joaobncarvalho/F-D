@@ -265,3 +265,35 @@ test('socket: no Desenha, a palavra vai por canal privado e os traços não vão
   assert.ok(fim.game.round.result.winner, 'quem acertou fica registado');
   assert.equal(fim.game.round.result.word, word, 'no fim a palavra é pública');
 });
+
+test('socket: o veto do host chega à sala, e as regras da noite sorteiam-se', async (t) => {
+  const { cliente, fechar } = await arranca();
+  t.after(fechar);
+  const s = await sala(cliente);
+
+  // Uma sala nova já nasce com o Sem Anonimato fora do sorteio — sem ninguém
+  // tocar em nada. É esta a promessa que substituiu a escolha do host.
+  assert.deepEqual(s.ultimo.modifiers.vetados, ['sem_anonimato']);
+  assert.deepEqual(s.ultimo.modifiers.ativos, [], 'no lobby ainda não há regras');
+  assert.ok(s.ultimo.modifiers.catalogo.length >= 6);
+
+  // Só o host mexe nos vetos.
+  const recusa = await pede(s.b, 'set_vetados', { vetados: [] });
+  assert.equal(recusa.ok, false);
+
+  // O host veta tudo menos o Dobro ou Nada: assim o sorteio é determinista e o
+  // teste pode afirmar o que saiu (sem isto, sortear é intestável pela rede).
+  const soUm = s.ultimo.modifiers.catalogo
+    .map((m) => m.key)
+    .filter((k) => k !== 'dobro_ou_nada');
+  assert.equal((await pede(s.a, 'set_vetados', { vetados: soUm })).ok, true);
+  const comVeto = await esperaEstado(s.c, (r) => r.modifiers.vetados.length === soUm.length, 'veto');
+  assert.ok(!comVeto.modifiers.vetados.includes('dobro_ou_nada'));
+
+  // Toda a mesa vota Caos: 3 a 4 regras à partida, mas só uma escapou ao veto.
+  for (const sock of [s.a, s.b, s.c]) await pede(sock, 'vote_intensity', { intensity: 'caos' });
+  await pede(s.a, 'start_game', { lives: 3 });
+  const aJogar = await esperaEstado(s.b, (r) => !!r.game, 'jogo a começar');
+  assert.deepEqual(aJogar.game.modifiers, ['dobro_ou_nada'], 'saiu a única que não estava vetada');
+  assert.deepEqual(aJogar.modifiers.ativos, ['dobro_ou_nada'], '…e o payload da sala concorda');
+});

@@ -293,9 +293,36 @@ function fecharRonda(room, { limpaRonda = true } = {}) {
   // O EVENTO DA NOITE cai ENTRE rondas, nunca a meio de uma: interromper uma
   // ronda a meio para anunciar um evento seria tirar a alguém a vez que já
   // estava a jogar. Aqui a mesa está entre coisas e pode olhar toda para o ecrã.
+  let caiuAlgo = false;
   if (eventos.horaDeEvento(room)) {
     const ev = eventos.dispara(room);
-    if (ev) pushFeed(room, ev.emoji, ev.texto);
+    if (ev) {
+      pushFeed(room, ev.emoji, ev.texto);
+      caiuAlgo = true;
+    }
+  }
+
+  // Regras com prazo que acabaram agora. Anuncia-se sempre: uma regra que se
+  // desliga em silêncio é pior do que nunca ter existido — a mesa continua a
+  // jogar com medo dela.
+  for (const m of modificadores.passaRonda(room)) {
+    pushFeed(room, m.emoji, `${m.label} acabou. Volta tudo ao normal.`);
+  }
+
+  // A REGRA NOVA cai entre rondas, pela mesma razão que o Evento — e nunca na
+  // mesma ronda que ele: duas cartas de ecrã inteiro seguidas anulam-se, e a
+  // segunda ninguém lê. Quem perde a vez é a regra, que fica agendada na mesma.
+  if (!caiuAlgo && modificadores.horaDeSorteio(room)) {
+    const nova = modificadores.sorteiaAMeio(room);
+    if (nova) {
+      pushFeed(
+        room,
+        nova.emoji,
+        nova.rondas
+          ? `Regra nova: ${nova.titulo} — durante ${nova.rondas} rondas. ${nova.desc}`
+          : `Regra nova: ${nova.titulo}. ${nova.desc}`
+      );
+    }
   }
 
   // Chegou a hora do final? Anuncia-se ANTES de girar, para a mesa saber que o
@@ -427,7 +454,19 @@ export function initGame(
   room,
   // `lives` sem valor por omissão AQUI: o número por omissão depende do modo (ver
   // abaixo), e um default no destructuring ganhava-lhe sempre.
-  { lives = null, intensity = 'leve', curve = true, duracaoMin = null, modifiers = [] } = {}
+  {
+    lives = null,
+    intensity = 'leve',
+    curve = true,
+    duracaoMin = null,
+    // Modificadores: ou SORTEADOS (`sorteio: true`, o caminho real — ver
+    // game/modificadores.js) ou dados à mão. A lista explícita continua a
+    // existir porque os testes precisam de ligar uma regra e só essa; sem ela,
+    // testar "Sem Escape" era esperar que o sorteio calhasse nele.
+    sorteio = false,
+    vetados = [],
+    modifiers = [],
+  } = {}
 ) {
   // O Modo da Morte começa com menos vidas: duas dão um estado de "ferido" antes
   // do fim, e três arrastavam uma noite que vive de fechar depressa.
@@ -466,7 +505,16 @@ export function initGame(
     ordemInvertida: false, // um evento pode virar a mesa ao contrário
     activeRules: [], // regras com duração: { id, playerId, playerName, text, remaining }
     // --- Modificadores da noite (game/modificadores.js) ---
-    modifiers: modificadores.normaliza(modifiers),
+    // A intensidade aqui é o TETO votado, não a da curva: o sorteio tem de saber
+    // a que noite a mesa se comprometeu, não em que ponto dela vai.
+    modifiers: sorteio
+      ? modificadores.sorteia({ intensity, vetados })
+      : modificadores.normaliza(modifiers),
+    sorteio: !!sorteio, // …e há mais regras por cair durante a noite?
+    vetados: modificadores.normaliza(vetados), // o que nunca pode calhar
+    modifiersTemp: {}, // key -> rondas que ainda faltam (regras com prazo)
+    modifiersFora: [], // regras cujo prazo já acabou: não voltam a sair
+    ultimoModificador: null, // a última regra que caiu (o cliente encena)
     alvoMarcadoId: null, // "Alvo Marcado": quem fica na mira da próxima ronda
     alvoSeguidas: 0, // …e há quantas rondas seguidas (travão de repetições)
     // --- A Conta (game/divida.js) ---
@@ -477,6 +525,7 @@ export function initGame(
     finalStats: null,
   };
   eventos.agendaProximo(room.game); // marca a ronda do primeiro evento
+  if (sorteio) modificadores.agendaProximo(room.game); // …e a da primeira regra nova
   return room.game;
 }
 
@@ -1148,6 +1197,8 @@ export function serializeGame(room) {
     tregua: g.tregua || 0,
     // --- Modificadores (game/modificadores.js) ---
     modifiers: g.modifiers || [],
+    modifiersTemp: { ...(g.modifiersTemp || {}) }, // key -> rondas que faltam
+    ultimoModificador: g.ultimoModificador || null, // a regra nova, para encenar
     morteSubita: modificadores.morteSubita(room), // já está a valer? (banner + botões)
     podeDobrar: modificadores.podeDobrar(room, g.round), // mostra o botão "dobrar"
     alvoMarcadoId: g.alvoMarcadoId || null,

@@ -220,10 +220,11 @@ export function registerSocketHandlers(io) {
       }
     });
 
-    socket.on('set_modifiers', ({ modifiers } = {}, ack) => {
+    // O host já não escolhe modificadores — veta (game/modificadores.js).
+    socket.on('set_vetados', ({ vetados } = {}, ack) => {
       try {
         const { code, playerId } = socket.data;
-        rooms.setModifiers(code, playerId, modifiers);
+        rooms.setVetados(code, playerId, vetados);
         broadcastState(io, code);
         if (typeof ack === 'function') ack({ ok: true });
       } catch (err) {
@@ -287,7 +288,10 @@ export function registerSocketHandlers(io) {
             intensity: intensityResult.intensity,
             curve: room.curve,
             duracaoMin: room.duracaoMin, // plano da noite → o Diretor monta o final
-            modifiers: room.modifiers, // regras da noite (game/modificadores.js)
+            // As regras da noite SORTEIAM-SE aqui (game/modificadores.js), a
+            // partir da intensidade votada e do que a mesa vetou no lobby.
+            sorteio: true,
+            vetados: room.vetados,
           }); // modo Roda
         }
         io.to(code).emit('game_started', { mode: room.mode, intensityResult });

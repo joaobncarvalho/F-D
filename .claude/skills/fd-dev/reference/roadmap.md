@@ -171,6 +171,8 @@ Legenda: ✅ feito · 🚧 em curso · ⬜ por fazer · 🔗 ponto de integraç�
       · **Modificadores** (`game/modificadores.js`): ⛓️ Sem Escape · 🎯 Alvo
         Marcado · 🔁 Dobro ou Nada · 🔒 Sem Anonimato · 📿 A Conta · 💀 Morte
         Súbita — mudam as REGRAS da noite, ortogonais à intensidade.
+        ⚠️ **Escolhidos pelo host até 2026-09-04; a partir daí sorteiam-se** (ver
+        entrada de 04 set abaixo).
       · **A Conta** (`game/divida.js`): adiar com juro, transferir (quem assume
         ganha uma vida), herdar de quem sai. Fecha no fim e no Cobrador.
       · **Seis tipos novos**: 💣 Bomba-Relógio · 🔨 Leilão · 🔗 Sincronia ·
@@ -182,6 +184,18 @@ Legenda: ✅ feito · 🚧 em curso · ⬜ por fazer · 🔗 ponto de integraç�
       — mexe em vidas, em vez, em exposição e em risco de saída.
       Verificado: `npm test` **167/167** em 25 corridas seguidas; build limpo.
       **Por validar à mesa no playtest de 11 set.**
+
+- [x] **As regras da noite passam a CALHAR (2026-09-04)** — pedido do João: em vez
+      de o host escolher os modificadores no lobby, eles **sorteiam-se**, ponderados
+      pela intensidade votada, muitas vezes mais do que um, e alguns caem **a meio
+      da noite** com uma carta de ecrã inteiro. O host deixa de escolher e passa a
+      **vetar** ("o que esta mesa não quer"), com o 🔒 Sem Anonimato vetado de
+      origem. Regras temporárias ("durante 4 rondas") para a noite respirar.
+      Ficheiros: `game/modificadores.js` (sorteio, veto, prazos), `game.js`
+      (`initGame` + gancho entre rondas), `rooms.js` (`setVetados`), `socket.js`
+      (`set_vetados`), `client/components/RegraNova.jsx` (novo), `Lobby.jsx`,
+      `Game.jsx`, `Rules.jsx`. Verificado: `npm test` **182/182**, build limpo,
+      smoke de 60 rondas a confirmar drops, prazos e expiração no feed.
 
 **Colega (BD)**
 - [ ] Troubleshooting de queries/performance durante os testes

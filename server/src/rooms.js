@@ -70,7 +70,10 @@ export class RoomManager {
       mode: 'wheel', // 'wheel' (roda) | 'board' (tabuleiro) | 'tournament' (torneio)
         curve: true, // curva de intensidade (leve → teto votado ao longo da noite)
     duracaoMin: null, // duração planeada da noite (min) — null = sem fim previsto
-      modifiers: [], // modificadores da noite (game/modificadores.js), escolhidos pelo host
+      // Modificadores da noite (game/modificadores.js): já não se escolhem —
+      // sorteiam-se no `initGame` a partir da intensidade votada. O que a sala
+      // guarda é o VETO: o que esta mesa não quer que possa calhar.
+      vetados: [...modificadores.VETADOS_POR_OMISSAO],
       paused: false, // pausa do host: congela ações e cronómetros
       feed: [], // feed de eventos da sala (feed.js)
     };
@@ -272,17 +275,20 @@ export class RoomManager {
   }
 
   /**
-   * Modificadores da noite (game/modificadores.js). Só o host, e só no lobby:
-   * ligá-los a meio mudava as regras a quem já tinha decidido o que fazer com as
-   * vidas que tem.
+   * O VETO da mesa (game/modificadores.js). Só o host, e só no lobby.
+   *
+   * Não liga nada: marca o que o sorteio nunca pode tirar. Só no lobby porque o
+   * sorteio de arranque acontece no `initGame` — vetar depois de a noite começar
+   * seria pedir para desligar uma regra que já está a valer, e isso é outra
+   * conversa (a resposta é a pausa do host, não o veto).
    */
-  setModifiers(code, playerId, lista) {
+  setVetados(code, playerId, lista) {
     const room = this.getRoom(code);
     if (!room) throw new AppError('Sala não encontrada.');
     const player = room.players.get(playerId);
-    if (!player || !player.isHost) throw new AppError('Só o host escolhe os modificadores.');
+    if (!player || !player.isHost) throw new AppError('Só o host mexe nos vetos.');
     if (room.status !== 'lobby') throw new AppError('O jogo já começou.');
-    room.modifiers = modificadores.normaliza(lista);
+    room.vetados = modificadores.normaliza(lista);
     return room;
   }
 
@@ -387,7 +393,7 @@ export function serializeRoom(room) {
     mode: room.mode || 'wheel',
     curve: room.curve !== false,
     duracaoMin: room.duracaoMin || null,
-    modifiers: modificadores.serialize(room.modifiers || []),
+    modifiers: modificadores.serialize(room),
     paused: !!room.paused,
     feed: serializeFeed(room),
     // Estado de jogo (null enquanto no lobby). Serialização/anonimização em game.js/board.js.

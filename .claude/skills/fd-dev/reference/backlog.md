@@ -131,7 +131,11 @@ tudo mexe em vidas, em vez, em exposição e em risco de saída. Ver
 
 - [x] **Modificadores da noite** (`game/modificadores.js`) — ⛓️ Sem Escape ·
       🎯 Alvo Marcado · 🔁 Dobro ou Nada · 🔒 Sem Anonimato · 📿 A Conta ·
-      💀 Morte Súbita. Ortogonais à intensidade, ligam-se à unidade no lobby.
+      💀 Morte Súbita. Ortogonais à intensidade.
+- [x] **…e a partir de 2026-09-04 CALHAM em vez de se escolherem** — sorteados
+      pela intensidade votada, vários por noite, alguns a cair a meio com carta
+      de ecrã inteiro e prazo. O host passa a vetar; 🔒 Sem Anonimato vetado de
+      origem. Ver `progress-log.md` de 04 set.
 - [x] **A Conta** (`game/divida.js`) — adiar (com juro), transferir (quem assume
       ganha uma vida) e herdar. Fecha no fim da noite e no evento do Cobrador.
 - [x] **Seis tipos novos** — 💣 Bomba-Relógio · 🔨 Leilão · 🔗 Sincronia ·
@@ -148,7 +152,8 @@ tudo mexe em vidas, em vez, em exposição e em risco de saída. Ver
       ferro. +8 resolvidos à mesa (pedra-papel-tesoura, olhares, gatilho, dedos,
       quem ri primeiro, numa perna só, à vez sem repetir, memória).
 
-**Por testar à mesa** (playtest de 11 set): poucos modificadores de cada vez, e
+**Por testar à mesa** (playtest de 11 set): a cadência do sorteio (7–12 rondas), os
+tetos por intensidade, se o prazo de 3–5 rondas chega para a regra se fazer sentir, e
 o Modo da Morte com 5+ pessoas — é aí que os fantasmas ganham massa crítica.
 Perguntas em aberto para o playtest: o pavio da Bomba (18–62 s) está bem
 calibrado? Duas vidas no Modo da Morte é curto de mais? O teto de 10 goles da

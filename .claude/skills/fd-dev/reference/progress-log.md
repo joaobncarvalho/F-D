@@ -5,6 +5,72 @@
 
 ---
 
+## 2026-09-04 — As regras da noite deixam de se escolher: calham
+
+Ideia do João: em vez de o host ligar os modificadores no lobby, eles **calham**,
+dependendo da intensidade escolhida, e muitas vezes mais do que um.
+
+### Porquê (o que estava mal na versão anterior)
+1. O pior momento do jogo era o host a ler seis descrições em voz alta enquanto
+   sete pessoas esperavam. O lobby tinha dois botões grandes (intensidade e
+   modificadores) quando só devia ter um.
+2. Escolhidos, os modificadores são **conhecidos**: a mesa calibra-se a eles na
+   primeira ronda e a partir daí são só mais uma regra na lista.
+3. Não havia forma de o jogo mudar de regras a meio — o que é o momento mais
+   memorável que este motor podia ter e não tinha.
+
+### A ressalva, e como foi resolvida
+O cabeçalho do módulo justificava os interruptores com o inverso: *"há mesas para
+quem 'sem anonimato' é o limite"*. Sortear às cegas tirava essa proteção. A
+solução não foi "aleatório em vez de escolhido" mas **aleatório dentro do que a
+mesa deixou**: o host passa a **vetar** (um painel colapsado, "o que esta mesa não
+quer"), e o 🔒 **Sem Anonimato vem vetado de origem** — é o único cujo sorteio
+quebraria uma promessa **já feita** a quem escreveu uma Intriga a contar com o
+anonimato. Decisão do João. Os outros cinco só endurecem decisões por tomar.
+
+### O que ficou feito
+- **Sorteio ponderado pela intensidade** (`modificadores.PLANO`): leve 0–1 (teto
+  1) · picante 1–2 (teto 3) · hardcore 2–3 (teto 4) · caos 3–4 (teto 6). A
+  intensidade volta a ser o único botão do lobby.
+- **Regras que caem a meio da noite**, de 7 a 12 rondas, com carta de ecrã inteiro
+  (`RegraNova.jsx`). Nunca na mesma ronda que um Evento da Noite (duas cartas
+  seguidas anulam-se) nem na última ronda. Entram só as regras sem estado — 📿 A
+  Conta e 🔒 Sem Anonimato são `quando: 'inicio'`.
+- **Regras temporárias** ("durante 4 rondas", 50% dos drops elegíveis): é a única
+  coisa no jogo que sabe tornar a noite mais leve. Expiram sozinhas, anunciadas no
+  feed, e **não voltam a sair** — uma regra que vai e vem deixa de ser um
+  acontecimento. A expiração do 🎯 Alvo Marcado larga a mira (`alvoMarcadoId`).
+- **Os `avisos()` passaram de texto a travão**: ⛓️ + 💀 juntos só em caos. Escolhidos
+  à mão isto era um aviso que alguém lia antes de aceitar; sorteados tem de ser uma
+  restrição do próprio sorteio.
+- **Veto**: `room.vetados` (nasce com `['sem_anonimato']`), `rooms.setVetados`,
+  evento `set_vetados`. O antigo `set_modifiers`/`setModifiers` desapareceu.
+- `initGame` aceita `{ sorteio: true, vetados }` **ou** `modifiers` explícitos — a
+  lista à mão fica para os testes, senão testar "Sem Escape" era esperar que o
+  sorteio calhasse nele.
+
+### Ficheiros
+`server/src/game/modificadores.js` (reescrito), `server/src/game.js` (initGame +
+gancho entre rondas + serialização), `server/src/rooms.js`, `server/src/socket.js`,
+`client/src/components/RegraNova.jsx` (**novo**), `client/src/App.jsx`,
+`client/src/pages/Lobby.jsx`, `client/src/pages/Game.jsx`,
+`client/src/components/Rules.jsx`, `server/test/modificadores.test.js`,
+`server/test/socket-e2e.test.js`.
+
+### Como foi verificado
+- `npm test` → **182/182** (era 181; +8 testes novos do sorteio, veto, teto,
+  prazos e reentrada, e um e2e de rede que veta cinco das seis regras para o
+  sorteio ficar determinista e poder afirmar o que saiu).
+- `npm run build` no cliente, limpo.
+- Smoke de 60 rondas em caos, corrido várias vezes: confirma o sorteio de
+  arranque, drops a meio, prazos a expirar e as duas linhas no feed.
+
+### Por decidir à mesa (playtest de 11 set)
+A janela de 7–12 rondas está bem? Os tetos por intensidade? E o prazo de 3–5
+rondas é longo que chegue para a regra se fazer sentir?
+
+---
+
 ## 2026-09-03 (b) — Playtest: o duelo final não acabava a noite; e onze duelos em vez de três
 
 Dois achados do João a jogar o Modo da Morte.

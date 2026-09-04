@@ -14,6 +14,7 @@ import Display from './pages/Display.jsx';
 import Settings from './components/Settings.jsx';
 import Rules from './components/Rules.jsx';
 import EventoDaNoite from './components/EventoDaNoite.jsx';
+import RegraNova from './components/RegraNova.jsx';
 import { keepScreenAwake, loadA11y, applyA11y, registerServiceWorker, rememberRoom } from './device.js';
 import { aplicaHumor, humorDaSala } from './mood.js';
 import { setPaused } from './clock.js';
@@ -66,6 +67,7 @@ export default function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [showRules, setShowRules] = useState(false);
   const [evento, setEvento] = useState(null); // Evento da Noite a encenar
+  const [regraNova, setRegraNova] = useState(null); // modificador que caiu a meio
 
   const sessionRef = useRef(loadSession());
 
@@ -134,6 +136,17 @@ export default function App() {
     eventoVistoRef.current = eventoDaSala.em;
     setEvento(eventoDaSala);
   }, [eventoDaSala?.em]);
+
+  // A REGRA NOVA (server/src/game/modificadores.js). Mesmo mecanismo do Evento —
+  // o carimbo `em` é que separa uma regra acabada de cair de uma que já se viu —
+  // mas só existe na Roda: é lá que os modificadores valem.
+  const regraDaSala = room?.game?.ultimoModificador || null;
+  const regraVistaRef = useRef(null);
+  useEffect(() => {
+    if (!regraDaSala || regraVistaRef.current === regraDaSala.em) return;
+    regraVistaRef.current = regraDaSala.em;
+    setRegraNova(regraDaSala);
+  }, [regraDaSala?.em]);
 
   useEffect(() => {
     function onRoomJoined({ room, you, token }) {
@@ -310,7 +323,7 @@ export default function App() {
   const setIdentity = useCallback((ident) => socket.emit('set_identity', ident), []);
   const setCurve = useCallback((on) => socket.emit('set_curve', { on }), []);
   const setNightLength = useCallback((minutos) => socket.emit('set_night_length', { minutos }), []);
-  const setModifiers = useCallback((modifiers) => socket.emit('set_modifiers', { modifiers }), []);
+  const setVetados = useCallback((vetados) => socket.emit('set_vetados', { vetados }), []);
   const transfereDivida = useCallback((paraId) => socket.emit('divida_transfere', { paraId }), []);
   // Tipos "hardcore" (ver server/src/game/{bomba,leilao,sincronia,detetor,julgamento,contrato}.js)
   // Modo da Morte (ver server/src/game/morte.js)
@@ -488,6 +501,11 @@ export default function App() {
         {evento && (
           <EventoDaNoite key={`ev-${evento.em}`} evento={evento} onDone={() => setEvento(null)} />
         )}
+        {/* Nunca sai ao mesmo tempo que o evento: o servidor já garante que os
+            dois não caem na mesma ronda (game.js, `caiuAlgo`). */}
+        {regraNova && (
+          <RegraNova key={`mod-${regraNova.em}`} regra={regraNova} onDone={() => setRegraNova(null)} />
+        )}
       </AnimatePresence>
 
       {room?.paused && screen !== 'home' && (
@@ -521,7 +539,7 @@ export default function App() {
             onSetIdentity={setIdentity}
             onSetCurve={setCurve}
             onSetNightLength={setNightLength}
-            onSetModifiers={setModifiers}
+            onSetVetados={setVetados}
             onAddBots={addBots}
             onLeave={leaveRoom}
           />

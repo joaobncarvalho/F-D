@@ -208,10 +208,18 @@ Três camadas transversais e um modo, todos por cima do MESMO motor da Roda. A
 regra de desenho que os une, e que tem testes dedicados: **nada disto manda beber
 mais** — mexe em vidas, em vez, em exposição e em risco de saída.
 
-**Modificadores** (`game/modificadores.js`) — seis interruptores de REGRAS, que o
-host liga no lobby (`set_modifiers`) e que são ortogonais à intensidade (essa só
-mexe no conteúdo). Chegam a todos em `room.modifiers = { ativos, catalogo }` e
-ficam em `game.modifiers` a partir do `start_game`. Pontos de leitura:
+**Modificadores** (`game/modificadores.js`) — seis interruptores de REGRAS,
+ortogonais à intensidade (essa só mexe no conteúdo). Desde **2026-09-04 não se
+escolhem: sorteiam-se** (ver o progress-log desse dia). O host só **veta**
+(`set_vetados` → `room.vetados`, que nasce com `['sem_anonimato']`); o sorteio de
+arranque acontece no `initGame` (`{ sorteio: true, vetados }`) ponderado pela
+intensidade votada (`PLANO`), e mais regras caem entre rondas (`horaDeSorteio` /
+`sorteiaAMeio`, gancho no `nextRound`, ao lado do Evento da Noite e nunca na mesma
+ronda que ele). Algumas saem com prazo (`game.modifiersTemp`, key → rondas), que
+`passaRonda` consome; o que expira entra em `game.modifiersFora` e não volta.
+Chegam a todos em `room.modifiers = { catalogo, vetados, ativos, prazos }` e em
+`game.modifiers`; a carta a encenar vai em `game.ultimoModificador`. Pontos de
+leitura:
 `custoRecusa` e `morteSubita` no `resolveAction`, `podeDobrar` na serialização,
 `revelaRazao` no handler do `submit_rps`. O **Alvo Marcado** é registado dentro do
 `helpers.perdeVida` (e não no `resolveAction`) porque há cinco caminhos que tiram

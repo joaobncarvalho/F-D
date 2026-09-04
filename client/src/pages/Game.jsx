@@ -242,8 +242,11 @@ export default function Game(props) {
       <Feed feed={room.feed} />
 
       {/* Modificadores em vigor. Uma regra que muda o custo de recusar tem de
-          estar à vista de quem vai decidir recusar — não só no lobby, onde foi
-          ligada há uma hora. A Morte Súbita destaca-se quando começa a valer. */}
+          estar à vista de quem vai decidir recusar — e agora ainda mais, porque
+          as regras CALHAM a meio da noite (game/modificadores.js) em vez de
+          serem lidas no lobby: esta faixa é o único sítio onde a mesa pode
+          confirmar com o que está a jogar. A Morte Súbita destaca-se quando
+          começa a valer; as regras com prazo mostram quantas rondas faltam. */}
       {g.modifiers?.length > 0 && (
         <div
           className="fd-card p-2.5 flex flex-wrap items-center gap-x-3 gap-y-1"
@@ -261,6 +264,12 @@ export default function Game(props) {
               >
                 {m.emoji} {m.label}
                 {k === 'morte_subita' && !g.morteSubita && ' (ainda não)'}
+                {g.modifiersTemp?.[k] > 0 && (
+                  <span className="text-amber-300/80">
+                    {' '}
+                    · ⏳{g.modifiersTemp[k]} {g.modifiersTemp[k] === 1 ? 'ronda' : 'rondas'}
+                  </span>
+                )}
               </span>
             );
           })}
