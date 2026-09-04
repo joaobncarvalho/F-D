@@ -28,6 +28,7 @@ export function pickSecret(game, excludeAuthorId) {
 /** Prepara a ronda Segredos (o autor é privado — nunca serializado antes do reveal). */
 export function setupSegredos(round, secret) {
   round.prompt = { text: secret.text };
+  round.promptDaMesa = true; // é um segredo da mesa — nunca entra em contador nenhum
   round.secretAuthorId = secret.authorPlayerId; // NUNCA serializado antes do reveal
   round.guesses = {};
   round.revealed = false;

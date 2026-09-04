@@ -204,3 +204,59 @@ model LifeEvent {
   @@index([roomId])
   @@map("life_events")
 }
+
+// ---------------------------------------------------------------------------
+// Telemetria (server/src/telemetria.js): o que a mesa fez com o conteúdo.
+//
+// Só AGREGADOS — nunca quem fez o quê. Ver o cabeçalho do módulo: um registo
+// que dissesse "a Ana recusou o desafio X" é exatamente aquilo que este jogo
+// passou o tempo todo a não fazer.
+//
+// A fonte de verdade em runtime é o ficheiro `.data/telemetria.json`; estas
+// tabelas são o que sobrevive a um deploy que troque de máquina (o disco do
+// container não vai com ela). Sem elas criadas, o servidor funciona na mesma.
+// ---------------------------------------------------------------------------
+
+// Um contador por (scope, key), com as métricas em JSON.
+//
+// `metrics` é JSON de propósito: medir uma coisa nova (uma métrica por prompt,
+// um estado novo de uma regra) passa a não precisar de migração nenhuma — que é
+// o que permite isto acompanhar o jogo em vez de o travar.
+//   scope 'prompt'       key = hash(tipo|texto)  metrics: visto/aceite/recusado/saltado
+//   scope 'tipo'         key = tipo da roda      metrics: saiu/aceite/recusado/saltado
+//   scope 'intensidade'  key = leve|picante|…    metrics: saiu/aceite/recusado
+//   scope 'regra'        key = modificador       metrics: arranque/meio/vetada/expirou
+//   scope 'regra_efeito' key = '<regra>:on|off'  metrics: aceite/recusado
+//   scope 'noite'        key = total|modo:x|…    metrics: n/rondas/minutos/jogadores/goles
+model TelemetryCounter {
+  scope     String
+  key       String
+  label     String? // texto legível (ex.: o prompt), para a admin não ter de juntar
+  metrics   Json     @default("{}")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@id([scope, key], name: "scope_key")
+  @@index([scope])
+  @@map("telemetry_counters")
+}
+
+// Uma linha por noite jogada. Guarda a FORMA da noite, não quem lá esteve.
+// `outcome`: 'fim' (chegou ao fim de jogo) | 'abandonada' (a sala esvaziou-se a
+// meio) — a diferença entre as duas é o sinal mais forte que o jogo pode dar.
+model TelemetryNight {
+  id         String   @id @default(uuid()) @db.Uuid
+  endedAt    DateTime @map("ended_at")
+  mode       String // wheel | board | tournament | morte
+  intensity  String? // teto votado
+  players    Int      @default(0)
+  rounds     Int      @default(0)
+  minutes    Int      @default(0)
+  outcome    String   @default("fim")
+  modifiers  String[] @default([]) // regras em vigor quando acabou
+  eliminated Int      @default(0)
+  drinks     Int      @default(0)
+
+  @@unique([endedAt, mode]) // torna o reenvio idempotente (skipDuplicates)
+  @@index([endedAt])
+  @@map("telemetry_nights")
+}

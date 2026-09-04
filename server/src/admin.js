@@ -5,6 +5,7 @@
 import express from 'express';
 import { fileURLToPath } from 'node:url';
 import * as repo from './repo.js';
+import * as telemetria from './telemetria.js';
 
 export function createAdminRouter() {
   const router = express.Router();
@@ -31,6 +32,50 @@ export function createAdminRouter() {
   };
 
   router.get('/api/check', (_req, res) => res.json({ ok: true }));
+
+  // ----- Estatísticas (server/src/telemetria.js) -----
+  //
+  // A admin deixava escrever conteúdo sem nunca dizer se ele prestava. Isto é o
+  // retorno: o que saiu, o que foi aceite, o que toda a gente recusou. Vem já
+  // calculado do módulo — as regras de leitura (o que é amostra suficiente) são
+  // decisões de produto e ficam onde há testes, não no JavaScript da página.
+  router.get('/api/stats', wrap(async (req, res) => {
+    const min = Math.max(1, parseInt(req.query.min, 10) || 4);
+    res.json(telemetria.resumo({ minAmostra: min }));
+  }));
+
+  /**
+   * O cruzamento que dá as decisões de conteúdo: cada prompt com o que lhe
+   * aconteceu à mesa. Feito no servidor porque só ele sabe a chave de hash com
+   * que a telemetria arruma os prompts — e porque assim inclui os que NUNCA
+   * saíram, que são metade da informação e não estão em contador nenhum.
+   */
+  router.get('/api/stats/conteudo', wrap(async (_req, res) => {
+    const prompts = await repo.allPromptsForStats();
+    res.json(
+      prompts.map((p) => ({
+        id: p.id,
+        text: p.text,
+        intensity: p.intensity,
+        typeKey: p.typeKey,
+        typeLabel: p.typeLabel,
+        ...telemetria.porPrompt(p.typeKey, p.text),
+      }))
+    );
+  }));
+
+  // Contagem limpa antes de um playtest: sem isto, os números de uma noite a
+  // sério ficavam misturados com os das dezenas de salas de teste.
+  router.post('/api/stats/reset', wrap(async (_req, res) => {
+    await telemetria.limpa();
+    res.json({ ok: true });
+  }));
+
+  // Força a gravação (ficheiro + BD). A gravação normal é periódica; isto existe
+  // para poder confirmar à mão que a BD está mesmo a receber.
+  router.post('/api/stats/flush', wrap(async (_req, res) => {
+    res.json({ ok: await telemetria.flush({ db: true }) });
+  }));
 
   router.get('/api/game-types', wrap(async (_req, res) => {
     res.json(await repo.adminGameTypes());

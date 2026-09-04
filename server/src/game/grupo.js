@@ -52,6 +52,7 @@ export function setupGrupo(room, round, kind, prompt) {
     q.usedAsQuemDisse = true;
     round.authorId = q.authorPlayerId; // NUNCA serializado antes do reveal
     round.prompt = { text: q.text };
+    round.promptDaMesa = true; // escrito por alguém à mesa — fora da telemetria
     return true;
   }
 

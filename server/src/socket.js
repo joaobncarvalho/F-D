@@ -11,6 +11,7 @@ import * as autoresolve from './autoresolve.js';
 import * as director from './game/director.js';
 import * as modificadores from './game/modificadores.js';
 import * as snapshot from './snapshot.js';
+import * as telemetria from './telemetria.js';
 
 const rooms = new RoomManager();
 const botTicks = new Map(); // code -> intervalId (tick dos bots de playtest)
@@ -43,6 +44,10 @@ const ALLOWED_WHILE_PAUSED = new Set([
 export async function restoreRooms() {
   const n = await snapshot.restore(rooms);
   snapshot.startAutosave(rooms); // só depois: senão gravava por cima com a memória vazia
+  // As contagens da /admin (telemetria.js) seguem o mesmo caminho e pela mesma
+  // razão: sem as carregar primeiro, o autosave apagava-as com a memória vazia.
+  await telemetria.restore();
+  telemetria.startAutosave();
   return n;
 }
 

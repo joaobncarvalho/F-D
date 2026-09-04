@@ -197,7 +197,21 @@ Legenda: ✅ feito · 🚧 em curso · ⬜ por fazer · 🔗 ponto de integraç�
       `Game.jsx`, `Rules.jsx`. Verificado: `npm test` **182/182**, build limpo,
       smoke de 60 rondas a confirmar drops, prazos e expiração no feed.
 
+- [x] **Telemetria + separador 📊 na /admin (2026-09-04)** — pedido do João:
+      estatísticas "para nos podermos guiar". Descoberta a caminho: **nada do
+      jogo era persistido** (as tabelas `Room`/`GameRound`/`LifeEvent` existem no
+      schema e ninguém escreve nelas), por isso a maior parte do trabalho é a
+      RECOLHA. `server/src/telemetria.js` conta, em agregado e sem nomes: por
+      prompt, por tipo, por intensidade, por regra da noite (com o lado "sem"
+      para comparar) e por noite (`fim` vs `abandonada`). Ficheiro + BD
+      (`db/04_telemetria.sql`), degrada para só-ficheiro sem as tabelas. A página
+      abre com **o que pede atenção** — decisões à espera — antes dos gráficos.
+      Verificado: `npm test` **195/195** em 12 corridas + `/admin` real no Chrome
+      com 14 noites simuladas.
+
 **Colega (BD)**
+- [ ] **Correr `db/04_telemetria.sql`** (ou `prisma db push`) — sem isso as
+      contagens da /admin vivem no disco do container e morrem a cada deploy.
 - [ ] Troubleshooting de queries/performance durante os testes
 - [ ] Validar estratégia de limpeza/arquivo de salas antigas
 - [ ] Correr `db push` + seed com os 6 tipos novos (`db/02_seed.sql` já regenerado)

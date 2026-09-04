@@ -32,6 +32,7 @@ import * as director from './game/director.js';
 import * as palpites from './game/palpites.js';
 import * as veredito from './game/veredito.js';
 import * as eventos from './game/eventos.js';
+import * as telemetria from './telemetria.js';
 // Importados (e não só re-exportados): o `export { x } from` não cria binding
 // local, e o fechaVeredito abaixo precisa mesmo de lhes chamar.
 import { mimicaVeredito } from './game/mimica.js';
@@ -609,8 +610,14 @@ export async function spinWheel(room, playerId) {
   };
 
   if (gt.key === 'boca_calada') {
-    const q = pickQuestion(g, playerId) || (await pickPrompt(room, 'boca_calada', inten));
+    const daMesa = pickQuestion(g, playerId);
+    const q = daMesa || (await pickPrompt(room, 'boca_calada', inten));
     round.prompt = q ? { text: q.text } : null;
+    // Marca de origem, lida só pela telemetria: uma pergunta escrita pela mesa
+    // não é conteúdo nosso e NUNCA pode entrar em contador nenhum (ver
+    // telemetria.js). O `pickQuestion` devolve o que alguém escreveu sobre outra
+    // pessoa naquela sala — contá-lo seria guardá-lo.
+    round.promptDaMesa = !!daMesa;
     round.needsBuddy = !!q?.buddy;
     round.ruleDuration = q?.duration || null;
     g.phase = 'prompt';
@@ -717,6 +724,11 @@ export async function spinWheel(room, playerId) {
 
   g.round = round;
   g.roundCount += 1;
+  // A intensidade da ronda fica GRAVADA nela e não recalculada depois: a curva
+  // sobe durante a noite, e uma recusa tem de contar para o nível em que o
+  // prompt saiu, não para aquele em que a mesa já vai. Só a telemetria a lê.
+  round.intensity = inten;
+  telemetria.rondaAbriu(round, inten);
   morte.abreRonda(room); // fotografa as vidas (a carta 💀 Condenar precisa disto)
   pushFeed(room, '🎡', `${player.name} girou a roda → ${round.gameTypeLabel}`);
   return round;
@@ -815,6 +827,16 @@ export function resolveAction(room, playerId, action) {
   // aconteceu de facto, sem uma segunda fonte de verdade sobre a ronda. Adiar
   // conta como beber: a mesa apostou que ele não ia cumprir, e não cumpriu.
   palpites.resolve(room, action === 'refuse' || adiou ? 'bebe' : 'aceita');
+
+  // Telemetria (agregada, sem nomes — ver telemetria.js). É daqui que sai a
+  // resposta a "este desafio presta?": um prompt que toda a gente recusa é para
+  // reescrever, e sem isto ninguém saberia qual.
+  telemetria.rondaFechou(g.round, {
+    intensidade: g.round.intensity,
+    desfecho: action === 'refuse' || adiou ? 'recusado' : 'aceite',
+    modifiers: g.modifiers || [],
+    catalogo: modificadores.KEYS,
+  });
 
   // Aceitar um desafio com duração → passa a regra ativa (N jogadas).
   const dur = action !== 'refuse' && !adiou ? g.round.ruleDuration : null;
@@ -1047,6 +1069,9 @@ export function skipTurn(room, playerId) {
   const g = room.game;
   if (!g || g.phase === 'prep' || g.phase === 'gameover')
     throw new AppError('Não há vez para saltar.');
+  // Um salto é o sinal mais barato que existe: o host só salta o que a mesa não
+  // percebeu ou não quis. Conta-se antes de fechar, que é quando ainda há ronda.
+  telemetria.rondaFechou(g.round, { intensidade: g.round?.intensity, desfecho: 'saltado' });
   fecharRonda(room);
   return g;
 }
@@ -1120,6 +1145,26 @@ function buildStats(room) {
     rows.reduce((best, r) => (r[key] > (best?.[key] ?? -1) && r[key] > 0 ? r : best), null);
   const alive = rows.filter((r) => !r.eliminated);
   const survivor = alive.length === 1 ? alive[0] : null; // último de pé
+
+  // A noite fica contada (telemetria.js). Aqui e não no `endGame` porque há três
+  // caminhos para o fim (o Diretor, o host, e ficar só um de pé) e todos passam
+  // por este `buildStats` — contar em três sítios era contar a dobrar num deles.
+  // `contada` trava a repetição: o `buildStats` pode correr outra vez se alguém
+  // religar depois do fim.
+  if (!g.noiteContada) {
+    g.noiteContada = true;
+    telemetria.noiteAcabou({
+      modo: room.mode || 'wheel',
+      intensidade: g.intensity,
+      jogadores: rows.length,
+      rondas: g.roundCount,
+      minutos: (Date.now() - (g.startedAt || Date.now())) / 60000,
+      outcome: 'fim',
+      modifiers: g.modifiers || [],
+      eliminados: rows.filter((r) => r.eliminated).length,
+      goles: rows.reduce((s, r) => s + (r.drinks || 0), 0),
+    });
+  }
   return {
     rows,
     roundCount: g.roundCount,

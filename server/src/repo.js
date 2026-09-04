@@ -178,6 +178,43 @@ export async function adminListPrompts(gameTypeKey) {
   });
 }
 
+/**
+ * TODOS os prompts, com fallback para o conteúdo em código.
+ *
+ * O `adminListPrompts` exige BD (é para editar, e editar sem BD não faz sentido).
+ * Isto não: serve para CRUZAR com a telemetria — e um playtest em casa, sem
+ * Supabase ligada, é precisamente onde se quer saber que desafios nunca saíram.
+ * Sem BD devolve os do ficheiro, sem `id` (não há nada para editar nesse caso).
+ */
+export async function allPromptsForStats() {
+  const prisma = await client();
+  if (prisma) {
+    try {
+      const rows = await prisma.prompt.findMany({ where: { active: true }, select: PROMPT_SELECT });
+      if (rows.length) {
+        return rows.map((p) => ({
+          id: p.id,
+          text: p.text,
+          intensity: p.intensity,
+          typeKey: p.gameType.key,
+          typeLabel: p.gameType.label,
+        }));
+      }
+    } catch (e) {
+      log.warn('repo: allPromptsForStats DB falhou, uso memória:', { error: e.message });
+    }
+  }
+  return GAME_TYPES.flatMap((gt) =>
+    gt.prompts.map(([text, intensity]) => ({
+      id: null,
+      text,
+      intensity,
+      typeKey: gt.key,
+      typeLabel: gt.label,
+    }))
+  );
+}
+
 export async function adminCreatePrompt({ gameTypeKey, text, intensity = 'leve', buddy = false, duration = null, tag = null }) {
   const prisma = await requirePrisma();
   const gt = await prisma.gameType.findUnique({ where: { key: gameTypeKey } });

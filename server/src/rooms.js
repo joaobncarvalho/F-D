@@ -6,6 +6,7 @@ import { serializeTournament } from './tournament.js';
 import { sanitizeText } from './util.js';
 import { serializeFeed } from './feed.js';
 import * as modificadores from './game/modificadores.js';
+import * as telemetria from './telemetria.js';
 import { EMOJIS, COLORS, defaultIdentity } from './content/identity.js';
 
 export { AppError }; // re-exportado para compatibilidade (socket.js importa daqui)
@@ -168,7 +169,10 @@ export class RoomManager {
       if (!cur) return;
       cur.cleanupTimer = null;
       const stillEmpty = ![...cur.players.values()].some((p) => p.connected);
-      if (stillEmpty) this.rooms.delete(cur.code);
+      if (stillEmpty) {
+        contaNoiteAbandonada(cur);
+        this.rooms.delete(cur.code);
+      }
     }, EMPTY_ROOM_GRACE_MS);
     room.cleanupTimer.unref?.(); // não segurar o processo por causa deste timer
   }
@@ -401,6 +405,32 @@ export function serializeRoom(room) {
     board: serializeBoard(room),
     tournament: serializeTournament(room),
   };
+}
+
+/**
+ * A noite que se esvaziou sem chegar ao fim (telemetria.js).
+ *
+ * É o registo mais importante que este ficheiro faz, e o único que nenhum ecrã
+ * de fim de jogo podia dar: uma sala que morre à oitava ronda diz que a noite
+ * estava a correr mal, e sem isto ficava indistinguível de uma que nunca existiu.
+ * Só conta noites que chegaram a jogar-se — uma sala criada e abandonada no
+ * lobby não é uma noite, é um engano a escrever o código.
+ */
+function contaNoiteAbandonada(room) {
+  const g = room.game;
+  if (!g || g.noiteContada || !g.roundCount) return;
+  g.noiteContada = true;
+  telemetria.noiteAcabou({
+    modo: room.mode || 'wheel',
+    intensidade: g.intensity,
+    jogadores: room.players.size,
+    rondas: g.roundCount,
+    minutos: (Date.now() - (g.startedAt || Date.now())) / 60000,
+    outcome: 'abandonada',
+    modifiers: g.modifiers || [],
+    eliminados: [...room.players.values()].filter((p) => p.eliminated).length,
+    goles: Object.values(g.stats || {}).reduce((s, x) => s + (x.drinks || 0), 0),
+  });
 }
 
 function normalizeName(name) {

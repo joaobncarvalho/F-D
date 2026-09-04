@@ -262,6 +262,34 @@ conta ativos) e o cliente mostra um **overlay de telemóvel partido**
 `resolveAction` termina o jogo (último de pé = `finalStats.survivor`) e emite
 `game_over`.
 
+### Telemetria e /admin (2026-09-04)
+
+**`telemetria.js`** — contadores AGREGADOS do que a mesa faz com o conteúdo. É o
+que alimenta o separador 📊 da `/admin`, que até aqui deixava escrever prompts
+sem nunca dizer se prestavam. Nota importante para quem vier a este ficheiro à
+procura de histórico: as tabelas `Room`/`Player`/`GameRound`/`LifeEvent` do
+schema **continuam sem ninguém a escrever nelas** — a telemetria não as usa.
+
+- **Nunca guarda pessoas.** Sem nomes, ids, códigos de sala ou texto escrito pela
+  mesa. Os três tipos que põem texto da mesa em `round.prompt` (Boca Calada com
+  pergunta da preparação, Quem Disse, Segredos) marcam-no na origem com
+  `round.promptDaMesa`, e o `textoNosso()` para aí: conta-se o TIPO, nunca o
+  texto. Há um teste que procura os nomes no payload inteiro.
+- **Escrita:** `rondaAbriu` (no fim do `spinWheel`), `rondaFechou` (no
+  `resolveAction` e no `skipTurn`), `regra`/`vetos` (em `modificadores.js`),
+  `noiteAcabou` (no `buildStats` com `outcome:'fim'`, e no cleanup do `rooms.js`
+  com `'abandonada'`; `game.noiteContada` trava a repetição).
+- **Estado:** `scope → key → { metrics, label }`, com `metrics` em JSON de
+  propósito — medir uma coisa nova não pede migração nenhuma.
+- **Persistência:** ficheiro `.data/telemetria.json` (fonte de verdade em runtime)
+  + `telemetry_counters`/`telemetry_nights` (`db/04_telemetria.sql`), como o
+  `snapshot.js`. Sem as tabelas, `temTabelas()` deteta e degrada em silêncio.
+  Arranca no `restoreRooms` do `socket.js`. Desliga-se com `TELEMETRIA=0`.
+- **API:** `GET /admin/api/stats` (resumo já calculado — as regras de leitura
+  vivem no módulo, onde há testes), `GET /admin/api/stats/conteudo` (cruza os
+  prompts todos com as contagens, e por isso inclui os que NUNCA saíram),
+  `POST /admin/api/stats/{reset,flush}`.
+
 ### A adicionar (Semana 3 — motor de jogo) — proposta
 
 > `start_game` e `game_started` já implementados (ver tabelas acima). Falta o

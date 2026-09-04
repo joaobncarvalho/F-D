@@ -133,6 +133,44 @@
       .demobar input { flex: 1 1 220px; }
       .phone { margin: 14px auto 0; width: 100%; max-width: 412px; }
       .phone iframe { display: block; width: 100%; height: 76vh; border: 1px solid var(--border); border-radius: 26px; background: var(--bg); box-shadow: 0 20px 50px -18px rgba(0, 0, 0, 0.8); }
+
+      /* ----- Estatísticas -------------------------------------------------
+         Sem biblioteca de gráficos: tudo o que aqui se mostra é uma comparação
+         entre poucas linhas, e para isso uma barra em CSS lê-se tão bem como um
+         canvas — e não custa 90 kB a uma página servida do próprio servidor. */
+      .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; }
+      .kpi { background: rgba(255, 255, 255, 0.05); border: 1px solid var(--border); border-radius: 14px; padding: 12px 14px; }
+      .kpi .v { font-family: "Baloo 2", sans-serif; font-weight: 800; font-size: 1.55rem; line-height: 1.1; }
+      .kpi .k { font-size: 0.74rem; color: rgba(255, 255, 255, 0.5); margin-top: 2px; }
+      .kpi .sub { font-size: 0.72rem; color: rgba(255, 255, 255, 0.35); margin-top: 2px; }
+
+      .bars { display: flex; flex-direction: column; gap: 7px; }
+      .bar { display: grid; grid-template-columns: minmax(96px, 30%) 1fr auto; gap: 10px; align-items: center; font-size: 0.85rem; }
+      .bar .name { color: rgba(255, 255, 255, 0.75); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .bar .track { background: rgba(255, 255, 255, 0.07); border-radius: 999px; height: 10px; overflow: hidden; }
+      .bar .fill { height: 100%; border-radius: 999px; background: linear-gradient(90deg, var(--purple), var(--pink)); transition: width 0.4s; }
+      .bar .val { color: rgba(255, 255, 255, 0.55); font-variant-numeric: tabular-nums; font-size: 0.8rem; min-width: 62px; text-align: right; }
+      .fill.good { background: linear-gradient(90deg, #14b884, var(--teal)); }
+      .fill.warn { background: linear-gradient(90deg, #c98411, var(--amber)); }
+      .fill.bad { background: linear-gradient(90deg, #b5254a, var(--red)); }
+
+      .stat-row { display: flex; gap: 10px; align-items: baseline; padding: 9px 0; border-bottom: 1px solid rgba(255, 255, 255, 0.06); }
+      .stat-row:last-child { border-bottom: none; }
+      .stat-row .txt { flex: 1; min-width: 0; }
+      .stat-row .txt b { font-weight: 600; }
+      .stat-row .why { font-size: 0.76rem; color: rgba(255, 255, 255, 0.42); margin-top: 2px; }
+      .pill { font-size: 0.72rem; font-weight: 700; padding: 3px 9px; border-radius: 999px; white-space: nowrap; }
+      .pill.bad { background: rgba(255, 77, 109, 0.18); color: #ff9db0; }
+      .pill.warn { background: rgba(255, 176, 32, 0.18); color: #ffd382; }
+      .pill.good { background: rgba(31, 211, 182, 0.18); color: #8ff2e2; }
+      .pill.dim { background: rgba(255, 255, 255, 0.08); color: rgba(255, 255, 255, 0.55); }
+
+      .mini { font-size: 0.78rem; color: rgba(255, 255, 255, 0.45); }
+      .sec-title { font-family: "Baloo 2", sans-serif; font-size: 1.05rem; margin: 0 0 4px; }
+      .nights { display: flex; flex-direction: column; gap: 4px; font-size: 0.8rem; }
+      .night { display: flex; gap: 8px; align-items: center; padding: 6px 0; border-bottom: 1px solid rgba(255, 255, 255, 0.05); }
+      .night .when { color: rgba(255, 255, 255, 0.4); min-width: 92px; font-variant-numeric: tabular-nums; }
+      .scroll { max-height: 420px; overflow-y: auto; }
     </style>
   </head>
   <body>
@@ -154,18 +192,125 @@
         <header style="display: flex; align-items: center; justify-content: space-between; gap: 10px">
           <div>
             <h1 class="grad">F&D · Dashboard</h1>
-            <p class="muted">Conteúdo dos desafios + showroom de mini-jogos.</p>
+            <p class="muted">O que a mesa fez com o conteúdo · edição dos desafios · showroom.</p>
           </div>
           <button id="logout" class="btn-ghost small">Sair</button>
         </header>
 
         <nav class="tabs">
-          <button id="tabbtn-content" class="tab active">📋 Conteúdo</button>
+          <button id="tabbtn-stats" class="tab active">📊 Estatísticas</button>
+          <button id="tabbtn-content" class="tab">📋 Conteúdo</button>
           <button id="tabbtn-board" class="tab">🎲 Tabuleiro</button>
           <button id="tabbtn-demos" class="tab">🎮 Demos</button>
         </nav>
 
-        <section id="tab-content">
+        <!-- ============ 📊 ESTATÍSTICAS ============
+             A parte de cima responde "como correram as noites"; a do meio,
+             "o que é preciso arranjar" — e é essa que existe para se agir, por
+             isso vem antes das tabelas de onde saiu. -->
+        <section id="tab-stats">
+          <div class="card">
+            <div class="row" style="align-items: center">
+              <div class="grow">
+                <h2 style="margin: 0">📊 Como correram as noites</h2>
+                <p class="muted" id="statsSince">a carregar…</p>
+              </div>
+              <button id="statsReload" class="btn-ghost small">↻ Atualizar</button>
+              <button id="statsFlush" class="btn-ghost small">💾 Gravar</button>
+              <button id="statsReset" class="btn-danger small">Recomeçar contagem</button>
+            </div>
+            <div id="kpis" class="kpis" style="margin-top: 14px"></div>
+            <p class="mini" style="margin: 12px 0 0">
+              Contagens agregadas: sem nomes, sem quem fez o quê, sem o que a mesa escreveu.
+            </p>
+          </div>
+
+          <div id="statsEmpty" class="card hidden">
+            <h2>Ainda não há noites contadas</h2>
+            <p class="muted" style="margin: 0">
+              Joga uma noite até ao fim (ou deixa a sala esvaziar-se) e os números aparecem aqui.
+              Se estiveres a preparar um playtest, carrega em <b>Recomeçar contagem</b> antes de
+              começar para não misturares com as salas de teste.
+            </p>
+          </div>
+
+          <div id="statsBody" class="hidden">
+            <div class="card">
+              <h2>⚠️ O que pede atenção</h2>
+              <p class="muted" style="margin: -6px 0 12px">
+                Lido dos números, por ordem de urgência. Cada linha é uma decisão à espera.
+              </p>
+              <div id="acoes"></div>
+            </div>
+
+            <div class="card">
+              <h2>🌙 A forma da noite</h2>
+              <div class="row">
+                <div class="grow" style="min-width: 240px">
+                  <p class="sec-title">Como acabaram</p>
+                  <div id="barsOutcome" class="bars"></div>
+                </div>
+                <div class="grow" style="min-width: 240px">
+                  <p class="sec-title">Modo jogado</p>
+                  <div id="barsModo" class="bars"></div>
+                </div>
+              </div>
+              <div style="margin-top: 16px">
+                <p class="sec-title">Intensidade votada</p>
+                <div id="barsIntNoite" class="bars"></div>
+              </div>
+            </div>
+
+            <div class="card">
+              <h2>⚡ As regras da noite valem alguma coisa?</h2>
+              <p class="muted" style="margin: -6px 0 12px">
+                Taxa de recusa com a regra ligada <b>vs</b> sem ela. Se a diferença for zero, a
+                regra está a mudar o ecrã e não o comportamento.
+              </p>
+              <div id="regras"></div>
+            </div>
+
+            <div class="card">
+              <h2>🎡 Tipos da roda</h2>
+              <p class="muted" style="margin: -6px 0 12px">
+                Ordenado por taxa de recusa. A coluna do fim é quantas vezes o tipo saiu.
+              </p>
+              <div id="tipos" class="bars"></div>
+              <div id="tiposSem"></div>
+            </div>
+
+            <div class="card">
+              <h2>🌶️ A curva de intensidade</h2>
+              <p class="muted" style="margin: -6px 0 12px">
+                A recusa deve subir com o nível. Se não subir, o conteúdo forte não é mais forte —
+                é só mais comprido.
+              </p>
+              <div id="intensidades" class="bars"></div>
+            </div>
+
+            <div class="card">
+              <h2>📋 Conteúdo, um a um</h2>
+              <div class="row" style="align-items: center; margin: -4px 0 12px">
+                <select id="promptsOrder" style="max-width: 240px">
+                  <option value="recusa">Mais recusados primeiro</option>
+                  <option value="nunca">Nunca saíram primeiro</option>
+                  <option value="visto">Mais vistos primeiro</option>
+                </select>
+                <select id="promptsType" style="max-width: 220px"></select>
+                <span class="spacer"></span>
+                <span id="promptsCount" class="count"></span>
+              </div>
+              <div id="promptsStats" class="scroll"></div>
+            </div>
+
+            <div class="card">
+              <h2>🕘 Últimas noites</h2>
+              <div id="nights" class="nights scroll"></div>
+            </div>
+          </div>
+        </section>
+
+        <section id="tab-content" class="hidden">
         <!-- Novo -->
         <div class="card">
           <h2>➕ Novo desafio</h2>
@@ -276,7 +421,8 @@
       // A password NÃO é persistida (sem localStorage/sessionStorage): fica só em
       // memória enquanto a página está aberta → cada abertura/refresh exige login.
       let pass = "";
-      let types = [];
+      let types = []; // os que têm prompts editáveis (o formulário usa estes)
+      let allTypes = []; // todos, incluindo os de mecânica — para dar nome nas estatísticas
       let cache = []; // prompts do tipo filtrado (todas intensidades)
       let intFilter = "all";
 
@@ -347,7 +493,8 @@
         try { $("demoUrl").value = localStorage.getItem("fd_demo_client") || location.origin; }
         catch { $("demoUrl").value = location.origin; }
 
-        types = (await api("/game-types")).filter((t) => !HIDE_TYPES.includes(t.key));
+        allTypes = await api("/game-types");
+        types = allTypes.filter((t) => !HIDE_TYPES.includes(t.key));
         $("newType").innerHTML = types.map((t) => `<option value="${t.key}">${t.label}</option>`).join("");
         $("newType").onchange = togglePair;
         togglePair();
@@ -360,7 +507,15 @@
         const intF = segmented("all", (v) => { intFilter = v; render(); }, { withAll: true });
         $("filterIntensity").replaceChildren(intF.node);
 
-        await load();
+        // O conteúdo precisa de BD; as estatísticas não. Uma coisa não pode
+        // levar a outra abaixo: sem Supabase ligada, um playtest em casa ainda
+        // tem de conseguir ver os números.
+        try {
+          await load();
+        } catch (e) {
+          $("list").replaceChildren(el("div", { className: "empty", textContent: e.message }));
+        }
+        await loadStats();
       }
 
       async function load() {
@@ -426,13 +581,15 @@
         demoLoaded = true;
       }
       function switchTab(name) {
-        for (const t of ["content", "board", "demos"]) {
+        for (const t of ["stats", "content", "board", "demos"]) {
           $("tab-" + t).classList.toggle("hidden", name !== t);
           $("tabbtn-" + t).classList.toggle("active", name === t);
         }
         if (name === "demos" && !demoLoaded) loadDemo();
         if (name === "board" && !boardLoaded) loadBoard();
+        if (name === "stats" && !statsLoaded) loadStats();
       }
+      $("tabbtn-stats").onclick = () => switchTab("stats");
       $("tabbtn-content").onclick = () => switchTab("content");
       $("tabbtn-board").onclick = () => switchTab("board");
       $("tabbtn-demos").onclick = () => switchTab("demos");
@@ -638,6 +795,403 @@
           toast("Desafio adicionado ✓");
           await load();
         } catch (e) { $("addErr").textContent = e.message; }
+      };
+
+      // ================= 📊 ESTATÍSTICAS =================
+      //
+      // Tudo o que se calcula aqui é APRESENTAÇÃO (ordenar, agrupar, escolher a
+      // cor da barra). As decisões de leitura que valem alguma coisa — o que é
+      // amostra suficiente, o que conta como taxa de recusa — estão no
+      // server/src/telemetria.js, onde há testes. Uma regra de produto escrita
+      // dentro de uma <script> de página é uma regra que ninguém volta a ver.
+
+      let statsLoaded = false;
+      let stats = null; // resposta de /stats
+      let promptStats = []; // resposta de /stats/conteudo
+
+      const MOD_NOMES = {
+        sem_escape: "⛓️ Sem Escape",
+        alvo_marcado: "🎯 Alvo Marcado",
+        dobro_ou_nada: "🔁 Dobro ou Nada",
+        sem_anonimato: "🔒 Sem Anonimato",
+        divida: "📿 A Conta",
+        morte_subita: "💀 Morte Súbita",
+      };
+      const MODO_NOMES = { wheel: "🎡 Roda", board: "🎲 Tabuleiro", tournament: "🏆 Torneio", morte: "💀 Morte" };
+      const INT_NOMES = { leve: "🍃 Leve", picante: "🌶️ Picante", hardcore: "🔥 Hardcore", caos: "💥 Caos" };
+      const nomeTipo = (k) => (allTypes.find((t) => t.key === k) || {}).label || k;
+
+      /** Cor de uma taxa de recusa: quanto mais gente recusa, mais vermelho. */
+      function corRecusa(pct) {
+        if (pct == null) return "";
+        if (pct >= 55) return "bad";
+        if (pct >= 35) return "warn";
+        return "good";
+      }
+
+      function kpi(v, k, sub) {
+        return el("div", { className: "kpi" }, [
+          el("div", { className: "v", textContent: v }),
+          el("div", { className: "k", textContent: k }),
+          sub ? el("div", { className: "sub", textContent: sub }) : null,
+        ]);
+      }
+
+      /** Uma barra proporcional ao máximo da série (e não a 100%). */
+      function barras(node, linhas, { max = null, cor = () => "" } = {}) {
+        const top = max ?? Math.max(1, ...linhas.map((l) => l.valor || 0));
+        node.replaceChildren(
+          ...linhas.map((l) =>
+            el("div", { className: "bar" }, [
+              el("div", { className: "name", textContent: l.nome, title: l.nome }),
+              el("div", { className: "track" }, [
+                el("div", {
+                  className: "fill " + cor(l),
+                  style: `width:${Math.round(((l.valor || 0) / top) * 100)}%`,
+                }),
+              ]),
+              el("div", { className: "val", textContent: l.texto }),
+            ])
+          )
+        );
+        if (!linhas.length) node.replaceChildren(el("p", { className: "mini", textContent: "Sem dados ainda." }));
+      }
+
+      /**
+       * A lista de ações. É a única parte desta página que diz o que FAZER, e
+       * por isso é a que vem primeiro: um número que ninguém sabe ler não muda
+       * nada. Cada linha traz o motivo, para se poder discordar dele.
+       */
+      function construirAcoes() {
+        const out = [];
+        const min = stats.minAmostra;
+
+        for (const p of promptStats) {
+          if (p.taxaRecusa != null && p.taxaRecusa >= 60 && p.aceite + p.recusado >= min) {
+            out.push({
+              peso: 100 + p.taxaRecusa,
+              pill: p.taxaRecusa + "% recusa",
+              cls: "bad",
+              txt: p.text,
+              why: `${nomeTipo(p.typeKey)} · ${INT_NOMES[p.intensity] || p.intensity} — recusado ${p.recusado} de ${p.aceite + p.recusado} vezes. Reescrever, ou subir de intensidade.`,
+            });
+          }
+        }
+
+        const nunca = promptStats.filter((p) => !p.visto);
+        if (nunca.length) {
+          const porTipo = {};
+          for (const p of nunca) porTipo[p.typeKey] = (porTipo[p.typeKey] || 0) + 1;
+          const pior = Object.entries(porTipo).sort((a, b) => b[1] - a[1])[0];
+          out.push({
+            peso: 60,
+            pill: nunca.length + " por sair",
+            cls: "dim",
+            txt: "Há conteúdo que nunca saiu à mesa",
+            why: `${nunca.length} de ${promptStats.length} prompts ainda não apareceram — o pior é ${nomeTipo(pior[0])} (${pior[1]}). Ou há conteúdo a mais para as noites que se jogam, ou os pesos da roda não lhe dão vez.`,
+          });
+        }
+
+        for (const t of stats.tipos) {
+          if (t.taxaSalto != null && t.taxaSalto >= 30 && t.saiu >= min) {
+            out.push({
+              peso: 80 + t.taxaSalto,
+              pill: t.taxaSalto + "% saltado",
+              cls: "warn",
+              txt: nomeTipo(t.key),
+              why: `Saiu ${t.saiu} vezes e o host saltou ${t.saltado}. Um tipo que se salta é um tipo que a mesa não percebe — ou que demora de mais.`,
+            });
+          }
+        }
+
+        for (const r of stats.regras) {
+          if (r.recusaCom == null || r.recusaSem == null) continue;
+          const delta = r.recusaCom - r.recusaSem;
+          if (Math.abs(delta) <= 3) {
+            out.push({
+              peso: 50,
+              pill: "sem efeito",
+              cls: "dim",
+              txt: MOD_NOMES[r.key] || r.key,
+              why: `Com a regra recusa-se ${r.recusaCom}%, sem ela ${r.recusaSem}%. A regra está a mudar o ecrã e não o comportamento — ou o efeito é pequeno de mais, ou não se percebe que está ligada.`,
+            });
+          }
+        }
+
+        const ab = (stats.noites.porOutcome.find((o) => o.key === "abandonada") || {}).n || 0;
+        if (stats.noites.total >= 3 && ab / stats.noites.total >= 0.4) {
+          out.push({
+            peso: 300,
+            pill: Math.round((ab / stats.noites.total) * 100) + "% largadas",
+            cls: "bad",
+            txt: "As noites estão a ser abandonadas a meio",
+            why: `${ab} de ${stats.noites.total} salas esvaziaram-se antes do fim, com ${stats.noites.mediaRondas} rondas de média. É o sinal mais forte que este jogo dá: alguma coisa cansa antes de a noite acabar.`,
+          });
+        }
+
+        const curva = ["leve", "picante", "hardcore", "caos"]
+          .map((k) => stats.intensidades.find((i) => i.key === k))
+          .filter((i) => i && i.taxaRecusa != null && i.aceite + i.recusado >= min);
+        if (curva.length >= 2 && curva[curva.length - 1].taxaRecusa <= curva[0].taxaRecusa) {
+          out.push({
+            peso: 200,
+            pill: "curva plana",
+            cls: "warn",
+            txt: "Subir de intensidade não está a custar mais a ninguém",
+            why: `Em ${INT_NOMES[curva[0].key]} recusa-se ${curva[0].taxaRecusa}% e em ${INT_NOMES[curva[curva.length - 1].key]} ${curva[curva.length - 1].taxaRecusa}%. O conteúdo forte não está a ser mais forte.`,
+          });
+        }
+
+        out.sort((a, b) => b.peso - a.peso);
+        const node = $("acoes");
+        if (!out.length) {
+          node.replaceChildren(
+            el("p", { className: "muted", style: "margin:0", textContent: "Nada a apontar — ou ainda não há noites que cheguem para ler alguma coisa." })
+          );
+          return;
+        }
+        node.replaceChildren(
+          ...out.slice(0, 14).map((a) =>
+            el("div", { className: "stat-row" }, [
+              el("div", { className: "txt" }, [
+                el("b", { textContent: a.txt }),
+                el("div", { className: "why", textContent: a.why }),
+              ]),
+              el("span", { className: "pill " + a.cls, textContent: a.pill }),
+            ])
+          )
+        );
+      }
+
+      function renderRegras() {
+        const node = $("regras");
+        const linhas = stats.regras.filter((r) => r.arranque + r.meio + r.vetada > 0);
+        if (!linhas.length) {
+          node.replaceChildren(el("p", { className: "mini", textContent: "Nenhuma regra saiu ainda." }));
+          return;
+        }
+        node.replaceChildren(
+          ...linhas
+            .sort((a, b) => b.arranque + b.meio - (a.arranque + a.meio))
+            .map((r) => {
+              const temAmbos = r.recusaCom != null && r.recusaSem != null;
+              const delta = temAmbos ? r.recusaCom - r.recusaSem : null;
+              return el("div", { className: "stat-row" }, [
+                el("div", { className: "txt" }, [
+                  el("b", { textContent: MOD_NOMES[r.key] || r.key }),
+                  el("div", {
+                    className: "why",
+                    textContent:
+                      (r.arranque + r.meio
+                        ? `saiu ${r.arranque + r.meio}× (${r.arranque} no arranque, ${r.meio} a meio)`
+                        : "nunca saiu") +
+                      (r.vetada ? ` · vetada ${r.vetada}×` : "") +
+                      (r.expirou ? ` · o prazo acabou ${r.expirou}×` : "") +
+                      (temAmbos
+                        ? ` · recusa ${r.recusaCom}% com / ${r.recusaSem}% sem`
+                        : " · ainda sem rondas que cheguem para comparar"),
+                  }),
+                ]),
+                el("span", {
+                  className: "pill " + (delta == null ? "dim" : Math.abs(delta) <= 3 ? "dim" : delta < 0 ? "good" : "bad"),
+                  textContent: delta == null ? "—" : (delta > 0 ? "+" : "") + delta + " pts",
+                }),
+              ]);
+            })
+        );
+      }
+
+      function renderPrompts() {
+        const ordem = $("promptsOrder").value;
+        const tipo = $("promptsType").value;
+        const doTipo = promptStats.filter((p) => !tipo || p.typeKey === tipo);
+        let lista = doTipo;
+        if (ordem === "recusa") {
+          lista = lista
+            .filter((p) => p.taxaRecusa != null)
+            .sort((a, b) => b.taxaRecusa - a.taxaRecusa || b.visto - a.visto);
+        } else if (ordem === "nunca") {
+          lista = lista.sort((a, b) => a.visto - b.visto);
+        } else {
+          lista = lista.sort((a, b) => b.visto - a.visto);
+        }
+        $("promptsCount").textContent = `${lista.length} de ${doTipo.length}`;
+        $("promptsStats").replaceChildren(
+          ...lista.slice(0, 300).map((p) =>
+            el("div", { className: "stat-row" }, [
+              el("div", { className: "txt" }, [
+                el("span", { textContent: p.text }),
+                el("div", {
+                  className: "why",
+                  textContent:
+                    `${nomeTipo(p.typeKey)} · ${INT_NOMES[p.intensity] || p.intensity} — ` +
+                    (p.visto
+                      ? `visto ${p.visto}× · aceite ${p.aceite} · recusado ${p.recusado}` +
+                        (p.saltado ? ` · saltado ${p.saltado}` : "")
+                      : "nunca saiu à mesa"),
+                }),
+              ]),
+              el("span", {
+                className: "pill " + (p.taxaRecusa == null ? "dim" : corRecusa(p.taxaRecusa)),
+                textContent: p.taxaRecusa == null ? (p.visto ? "sem decisão" : "por sair") : p.taxaRecusa + "%",
+              }),
+            ])
+          )
+        );
+        if (!lista.length) {
+          $("promptsStats").replaceChildren(el("p", { className: "empty", textContent: "Nada com estes filtros." }));
+        }
+      }
+
+      function renderStats() {
+        const n = stats.noites;
+        $("statsSince").textContent =
+          (stats.ligada ? "" : "⚠️ TELEMETRIA=0 — a recolha está desligada. ") +
+          `A contar desde ${new Date(stats.desde).toLocaleString("pt-PT")}.`;
+
+        const fim = (n.porOutcome.find((o) => o.key === "fim") || {}).n || 0;
+        $("kpis").replaceChildren(
+          kpi(n.total, "noites contadas"),
+          kpi(n.mediaRondas, "rondas por noite", "média"),
+          kpi(n.mediaMinutos + "m", "duração", "média"),
+          kpi(n.mediaJogadores, "pessoas à mesa", "média"),
+          kpi(n.total ? Math.round((fim / n.total) * 100) + "%" : "—", "chegou ao fim"),
+          kpi(n.mediaGoles, "goles por noite", "somados na mesa")
+        );
+
+        const vazio = !n.total;
+        $("statsEmpty").classList.toggle("hidden", !vazio);
+        $("statsBody").classList.toggle("hidden", vazio);
+        if (vazio) return;
+
+        construirAcoes();
+        renderRegras();
+
+        barras(
+          $("barsOutcome"),
+          n.porOutcome.map((o) => ({
+            nome: o.key === "fim" ? "✅ Até ao fim" : "🚪 Largada a meio",
+            valor: o.n,
+            texto: `${o.n} (${Math.round((o.n / n.total) * 100)}%)`,
+          })),
+          { max: n.total, cor: (l) => (l.nome.startsWith("✅") ? "good" : "bad") }
+        );
+        barras(
+          $("barsModo"),
+          n.porModo.map((m) => ({ nome: MODO_NOMES[m.key] || m.key, valor: m.n, texto: String(m.n) })),
+          { max: n.total }
+        );
+        barras(
+          $("barsIntNoite"),
+          n.porIntensidade.map((i) => ({ nome: INT_NOMES[i.key] || i.key, valor: i.n, texto: String(i.n) })),
+          { max: n.total }
+        );
+
+        // Só os tipos com aceita/recusa entram no gráfico de recusa. Os outros
+        // (Mímica, Duelo, Cascata…) resolvem-se por dentro e nunca passam por
+        // uma decisão de aceitar — pô-los aqui a zero era inventar um número.
+        // Para esses, o que se pode ler é quantas vezes o host os salta.
+        const comDecisao = stats.tipos.filter((t) => t.taxaRecusa != null);
+        const semDecisao = stats.tipos.filter((t) => t.taxaRecusa == null && t.saiu > 0);
+        barras(
+          $("tipos"),
+          comDecisao
+            .sort((a, b) => b.taxaRecusa - a.taxaRecusa)
+            .map((t) => ({
+              nome: nomeTipo(t.key),
+              valor: t.taxaRecusa,
+              texto: t.taxaRecusa + "% · " + t.saiu + "×",
+              pct: t.taxaRecusa,
+            })),
+          { max: 100, cor: (l) => corRecusa(l.pct) }
+        );
+        $("tiposSem").replaceChildren(
+          ...(semDecisao.length
+            ? [
+                el("p", {
+                  className: "mini",
+                  style: "margin:14px 0 6px",
+                  textContent:
+                    "Estes resolvem-se por dentro e não passam por aceitar/recusar — aqui lê-se quanto foram saltados:",
+                }),
+                ...semDecisao
+                  .sort((a, b) => (b.taxaSalto ?? 0) - (a.taxaSalto ?? 0))
+                  .map((t) =>
+                    el("span", {
+                      className: "pill " + (t.taxaSalto >= 30 ? "warn" : "dim"),
+                      style: "margin:0 6px 6px 0; display:inline-block",
+                      textContent: `${nomeTipo(t.key)} ${t.taxaSalto || 0}% · ${t.saiu}×`,
+                    })
+                  ),
+              ]
+            : [])
+        );
+
+        barras(
+          $("intensidades"),
+          stats.intensidades
+            .filter((i) => i.saiu > 0)
+            .map((i) => ({
+              nome: INT_NOMES[i.key] || i.key,
+              valor: i.taxaRecusa ?? 0,
+              texto: (i.taxaRecusa == null ? "—" : i.taxaRecusa + "%") + ` · ${i.saiu}×`,
+              pct: i.taxaRecusa,
+            })),
+          // Sem cor de alarme, ao contrário dos outros gráficos: aqui uma recusa
+          // ALTA em Caos é o objetivo, não um problema. O que se lê é a FORMA —
+          // se sobe da esquerda para a direita — e pintar o topo de vermelho
+          // dizia exatamente o contrário do que o cartão pede para ver.
+          { max: 100 }
+        );
+
+        $("nights").replaceChildren(
+          ...n.recentes.map((x) =>
+            el("div", { className: "night" }, [
+              el("span", { className: "when", textContent: new Date(x.em).toLocaleDateString("pt-PT", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) }),
+              el("span", { className: "grow", textContent:
+                `${MODO_NOMES[x.modo] || x.modo} · ${x.jogadores}p · ${x.rondas} rondas · ${x.minutos}m` +
+                (x.modifiers.length ? " · " + x.modifiers.map((k) => (MOD_NOMES[k] || k).split(" ")[0]).join("") : ""),
+              }),
+              el("span", {
+                className: "pill " + (x.outcome === "fim" ? "good" : "warn"),
+                textContent: x.outcome === "fim" ? "fim" : "largada",
+              }),
+            ])
+          )
+        );
+      }
+
+      async function loadStats() {
+        try {
+          [stats, promptStats] = await Promise.all([api("/stats"), api("/stats/conteudo")]);
+          statsLoaded = true;
+          if (!$("promptsType").options.length) {
+            $("promptsType").innerHTML =
+              '<option value="">Todos os tipos</option>' +
+              types.map((t) => `<option value="${t.key}">${t.label}</option>`).join("");
+            $("promptsType").onchange = renderPrompts;
+            $("promptsOrder").onchange = renderPrompts;
+          }
+          renderStats();
+          if (stats.noites.total) renderPrompts();
+        } catch (e) {
+          toast(e.message, false);
+        }
+      }
+
+      $("statsReload").onclick = () => { statsLoaded = false; loadStats(); };
+      $("statsFlush").onclick = async () => {
+        try { await api("/stats/flush", { method: "POST" }); toast("Gravado ✓"); }
+        catch (e) { toast(e.message, false); }
+      };
+      $("statsReset").onclick = async () => {
+        if (!confirm("Apagar TODAS as contagens? Não há como voltar atrás.")) return;
+        try {
+          await api("/stats/reset", { method: "POST" });
+          toast("Contagem a zero ✓");
+          statsLoaded = false;
+          loadStats();
+        } catch (e) { toast(e.message, false); }
       };
 
       if (pass) boot(); else $("login").classList.remove("hidden");

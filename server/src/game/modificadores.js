@@ -47,6 +47,7 @@
 // sem perguntar: uma regra que caia sozinha nunca pode mandar ninguém beber.
 
 import { LEVELS } from './intensity.js';
+import * as telemetria from '../telemetria.js';
 
 /**
  * O catálogo. `desc` é o que a mesa lê — tem de descrever a REGRA, não vender o
@@ -234,7 +235,10 @@ export function sorteia({ intensity = 'leve', vetados = [] } = {}) {
     if (!permitido(out, m.key, intensity)) continue;
     out.push(m.key);
   }
-  return KEYS.filter((k) => out.includes(k));
+  const saiu = KEYS.filter((k) => out.includes(k));
+  for (const k of saiu) telemetria.regra(k, 'arranque');
+  telemetria.vetos(veto); // o que a mesa cortou conta tanto como o que saiu
+  return saiu;
 }
 
 /** Marca a ronda em que se tenta a próxima regra nova. */
@@ -282,6 +286,7 @@ export function sorteiaAMeio(room) {
   if (!m) return null;
 
   g.modifiers = KEYS.filter((k) => k === m.key || g.modifiers.includes(k));
+  telemetria.regra(m.key, 'meio');
 
   // Prazo, se a regra o admitir. Uma regra temporária é a única forma de a noite
   // ficar mais leve por si — tudo o resto no jogo só sabe apertar.
@@ -323,6 +328,7 @@ export function passaRonda(room) {
       g.alvoMarcadoId = null;
       g.alvoSeguidas = 0;
     }
+    telemetria.regra(key, 'expirou');
     expirados.push(porChave(key));
   }
   return expirados.filter(Boolean);

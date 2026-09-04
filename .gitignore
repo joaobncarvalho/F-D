@@ -6,5 +6,6 @@ dist/
 .DS_Store
 .vite/
 
-# Snapshot das salas em memoria (server/src/snapshot.js) — estado efemero de runtime
+# Estado de runtime do servidor: snapshot das salas (snapshot.js) e contagens da
+# telemetria (telemetria.js). Efemero e local — a copia duravel vive na BD.
 server/.data/

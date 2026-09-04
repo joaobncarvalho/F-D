@@ -5,6 +5,78 @@
 
 ---
 
+## 2026-09-04 (b) — A /admin passa a dizer se o conteúdo presta
+
+Pedido do João: estatísticas na admin "para nos podermos guiar".
+
+### O que se descobriu primeiro
+**Nada do jogo era persistido.** As tabelas `Room`, `Player`, `GameRound` e
+`LifeEvent` existem no `schema.prisma` desde o início e **ninguém escreve nelas**
+— só o `room_snapshots`, que é estado efémero e se apaga quando a sala acaba.
+Ou seja: a admin deixava escrever conteúdo há semanas e nunca teve como dizer se
+algum prompt prestava. Pôr um separador de estatísticas sem recolher nada seria
+decorar a página, por isso a maior parte deste trabalho é a **recolha**.
+
+### `server/src/telemetria.js` (novo)
+Contadores agregados em memória, gravados de tempos a tempos — nunca no caminho
+crítico de uma ronda. Dois destinos, pela mesma razão que o `snapshot.js` tem
+dois: ficheiro (`.data/telemetria.json`, fonte de verdade em runtime, e o que
+salva um playtest em casa sem Supabase) e Postgres (`telemetry_counters` +
+`telemetry_nights`, o único que sobrevive a um deploy que troque de máquina).
+**Sem as tabelas criadas degrada em silêncio para só-ficheiro** — `db/04_telemetria.sql`
+é autocontido e o colega corre-o quando quiser.
+
+O que se mede, e a decisão que cada coisa informa:
+- **por prompt** (visto/aceite/recusado/saltado) → o que reescrever ou apagar;
+- **por tipo da roda** (+ taxa de salto) → que tipo a mesa não percebe;
+- **por intensidade** → a curva está calibrada?
+- **por regra da noite**, com o lado `:on` e o lado `:off` → o ⛓️ Sem Escape faz
+  mesmo alguém aceitar o que não aceitaria? Sem o lado "sem" não há comparação;
+- **por noite**: modo, pessoas, rondas, minutos, e sobretudo `fim` vs
+  `abandonada` — uma sala que morre à oitava ronda é o sinal mais forte que este
+  jogo dá, e era o único que nenhum ecrã de fim de jogo mostrava a ninguém.
+
+### A regra de privacidade, e um bug que ela apanhou
+Só agregados: sem nomes, sem ids, sem códigos de sala, sem texto escrito pela
+mesa. O teste que procura os nomes dos jogadores no payload **apanhou um bug
+real**: três tipos põem texto da MESA em `round.prompt` — o Boca Calada quando
+usa uma pergunta da preparação, o Quem Disse, e os Segredos. Sem marca, esses
+textos iam para o ficheiro de estatísticas. Passaram a vir marcados na origem
+(`round.promptDaMesa`) e a telemetria conta o TIPO mas nunca o texto.
+
+### A página (separador 📊, agora o primeiro)
+Sem biblioteca de gráficos — barras em CSS. A ordem é deliberada: primeiro
+**⚠️ O que pede atenção**, uma lista de decisões à espera lida dos números
+(prompts com ≥60% de recusa, conteúdo que nunca saiu, tipos muito saltados,
+regras sem efeito medível, noites largadas a meio, curva de intensidade plana),
+cada linha com o motivo para se poder discordar dele. Só depois os gráficos de
+onde isso saiu. Mais: **Recomeçar contagem**, para o playtest de 11 set começar
+com números limpos em vez de misturados com dezenas de salas de teste.
+
+As regras de leitura (o que é amostra suficiente, o que conta como taxa) vivem no
+`telemetria.js`, onde há testes — não no JavaScript da página.
+
+### Ficheiros
+`server/src/telemetria.js` (**novo**), `server/db/04_telemetria.sql` (**novo**),
+`server/test/telemetria.test.js` (**novo**), `server/prisma/schema.prisma`,
+`server/src/{admin.js,admin.html,game.js,rooms.js,repo.js,socket.js}`,
+`server/src/game/{modificadores.js,grupo.js,segredos.js}`, `.gitignore`.
+
+### Como foi verificado
+- `npm test` → **195/195** em 12 corridas (13 testes novos; um flake de helper
+  apanhado e fechado à décima corrida).
+- Servidor real + Chrome na `/admin`: login, os seis KPIs, a lista de ações, os
+  quatro gráficos, os filtros do conteúdo, o **Recomeçar contagem** e o estado
+  vazio — tudo com dados de 14 noites simuladas, apagados no fim.
+- Sem BD: os avisos deixaram de aparecer (o client Prisma sem estes modelos é
+  detetado em vez de rebentar) e as estatísticas funcionam à mesma.
+
+### Em aberto
+O colega tem de correr o `db/04_telemetria.sql` (ou `prisma db push`) para as
+contagens sobreviverem a um deploy. Até lá vivem no disco do container.
+
+---
+
 ## 2026-09-04 — As regras da noite deixam de se escolher: calham
 
 Ideia do João: em vez de o host ligar os modificadores no lobby, eles **calham**,
