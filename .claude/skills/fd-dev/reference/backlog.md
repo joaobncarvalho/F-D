@@ -167,6 +167,64 @@ O teto de 10 goles da Conta chega para haver negociação a sério?
 
 ---
 
+## ⚖️ Tribunal da Injustiça (ideia do João, 2026-09-04) — POR CONSTRUIR · P1
+
+Tipo novo, **exclusivo do Hardcore e do Tabuleiro**. O acusado tem tempo para
+defender uma teoria/ideologia ridícula; a mesa é o júri e decide a sentença.
+
+**Porque é boa:** é a primeira coisa no jogo que pede a alguém para *falar bem*
+durante um bocado, e a graça está em ver uma pessoa a defender com toda a
+seriedade uma coisa indefensável. Encaixa exatamente onde o Tabuleiro tinha um
+buraco — a prisão, que hoje é uma sentença anónima tirada do banco `prisao` e à
+qual ninguém pode reagir.
+
+**A integração (o ponto que a torna mais do que mais um tipo):**
+ir preso deixa de ser um resultado e passa a ser uma **acusação**. No
+`board/core.js` → `applyPrison` (três chamadores: streak lento, casa de prisão,
+carta `curse_prison`), sorteia-se:
+
+| | |
+|---|---|
+| **80%** | ⚖️ vai a **julgamento** — defende-se e o júri decide |
+| **20%** | 🚔 **condenação direta** — o azar, o que já existe hoje |
+
+Isto dá à prisão uma coisa que não tinha: **hipótese**. Uma absolvição tem de
+ser possível, senão o julgamento é teatro e a mesa aprende a ignorá-lo.
+
+**Notas de construção (para quando for feito):**
+- O júri vota pelo `game/veredito.js` que JÁ EXISTE (rótulos configuráveis — o
+  Julgamento e a Mímica já o usam). Não montar um segundo sistema de votação.
+- A sentença sai do banco `prisao` (`board_items`) que já existe: absolvido ·
+  pena do banco · pena a dobrar. Nada de tabela nova.
+- Prompts em `content/prompts.data.js` + `/admin`, com `intensity: 'hardcore'`,
+  como todo o conteúdo.
+- Contabilizar na telemetria como qualquer tipo (sai/aceite/recusado).
+
+**⚠️ Duas decisões por tomar antes de construir:**
+
+1. **Os 3 minutos.** É muito para este jogo: são 3 minutos com uma pessoa a
+   falar e sete a ouvir, exatamente o que o Diretor passa a vida a evitar (a
+   Pirâmide e o Vasco já são os tipos que mais cansam, e são de ~5 min). Sugiro
+   **60–90 s**, com o `Timer.jsx` à vista. A dizer à mesa "tens um minuto e meio"
+   também force a defesa a ser densa, que é onde está a piada. **Decisão do João.**
+2. **O registo do conteúdo.** O João disse "pode ser misógina, racista, tu
+   percebes". Escrevo os prompts como **posições absurdas e provocadoras**, não
+   como defesas sinceras de racismo ou misoginia — e não por escrúpulo, por
+   desenho: a graça é defender algo *indefensível e inofensivo* com cara séria.
+   Pedir a alguém para argumentar a sério, durante um minuto e meio e em voz
+   alta, que as mulheres são inferiores, numa mesa onde está a namorada dela, é
+   o único prompt do jogo capaz de acabar com a noite em vez de a fazer. Registo
+   provocador que funciona:
+   - *Defende que dividir a conta ao meio é roubo e devia dar cadeia.*
+   - *Defende que devias poder despedir um amigo, com pré-aviso de 30 dias.*
+   - *Defende que quem não bebe não devia ser convidado para sair.*
+   - *Defende que o casamento devia ser renovado de 5 em 5 anos, com entrevista.*
+   - *Defende que a tua ex tinha razão em tudo.*
+   - *Defende que ler livros em público é uma forma de exibicionismo.*
+   - *Defende que os animais de estimação deviam pagar renda.*
+
+---
+
 ## 💡 Ideias novas (a validar)
 
 Estas vão além do FD — candidatas a diferenciar o jogo. Discutir prioridade.
