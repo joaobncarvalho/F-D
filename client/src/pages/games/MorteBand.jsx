@@ -35,8 +35,25 @@ export default function MorteBand({ morte, mao, room, youId, onCarta, onTestamen
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
         transition={MOLA.pop}
-        className="fd-card px-4 py-3 flex flex-col gap-2"
-        style={{ borderColor: 'rgba(244,63,94,0.55)' }}
+        // `relative z-50` — POR CIMA DO VIDRO PARTIDO.
+        //
+        // Quem acaba de sair tem o overlay de telemóvel partido (BrokenScreen,
+        // `fixed z-40`) a cobrir o ecrã todo. Os dois são irmãos dentro do mesmo
+        // motion.div do Game.jsx, e sem z-index este cartão ficava por baixo das
+        // fissuras: era preciso escrever o testamento através do vidro. O
+        // testamento é a última coisa que aquela pessoa faz no jogo e tem um
+        // campo para escrever — tem de estar à frente, e ler-se de longe.
+        // Fica abaixo das cartas de ecrã inteiro (z-[70]), que são momentos da
+        // mesa inteira e continuam a mandar neste.
+        className="relative z-50 fd-card px-4 py-3 flex flex-col gap-2"
+        style={{
+          borderColor: 'rgba(244,63,94,0.75)',
+          // Sombra e desfoque próprios: por cima do vidro estilhaçado, um cartão
+          // translúcido lê-se com as fissuras a atravessar-lhe o texto.
+          background: 'rgba(10,6,10,0.92)',
+          backdropFilter: 'blur(6px)',
+          boxShadow: '0 18px 50px -12px rgba(244,63,94,0.55)',
+        }}
       >
         <p className="text-xs uppercase tracking-widest text-rose-300/80 text-center">📜 O teu testamento</p>
         <p className="text-sm text-center text-white/70 leading-snug">
@@ -109,9 +126,16 @@ export default function MorteBand({ morte, mao, room, youId, onCarta, onTestamen
         </div>
       )}
 
-      {/* ----- 2. A minha mão, se já saí ---------------------------------------- */}
+      {/* ----- 2. A minha mão, se já saí ----------------------------------------
+          Também POR CIMA do vidro partido (ver o testamento, acima): é aqui que
+          um fantasma toca nas cartas, e é para o resto da noite. Só estes dois
+          painéis sobem — os de cima são informação para a mesa toda, e vê-los
+          através das fissuras é justamente o que se quer para quem já saiu. */}
       {souFantasma && (
-        <div className="fd-card p-3 flex flex-col gap-2">
+        <div
+          className="relative z-50 fd-card p-3 flex flex-col gap-2"
+          style={{ background: 'rgba(10,6,10,0.92)', backdropFilter: 'blur(6px)' }}
+        >
           <p className="text-sm font-bold text-rose-300">👻 És um fantasma</p>
           {cartas.length === 0 ? (
             <p className="text-xs text-white/45">

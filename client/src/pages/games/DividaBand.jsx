@@ -30,8 +30,18 @@ export default function DividaBand({ divida, room, youId, onTransfere, onHerdeir
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
         transition={MOLA.pop}
-        className="fd-card px-4 py-3 flex flex-col gap-2"
-        style={{ borderColor: 'rgba(255,176,32,0.55)' }}
+        // `relative z-50` — por cima do vidro partido (BrokenScreen, `fixed
+        // z-40`), pela mesma razão do testamento em MorteBand.jsx: quem escolhe
+        // o herdeiro é precisamente quem acabou de ser eliminado, e tem o ecrã
+        // coberto de fissuras. Escolher a quem se deixa a conta através do vidro
+        // era o mesmo problema, no mesmo instante.
+        className="relative z-50 fd-card px-4 py-3 flex flex-col gap-2"
+        style={{
+          borderColor: 'rgba(255,176,32,0.75)',
+          background: 'rgba(10,8,4,0.92)',
+          backdropFilter: 'blur(6px)',
+          boxShadow: '0 18px 50px -12px rgba(255,176,32,0.5)',
+        }}
       >
         <p className="text-xs uppercase tracking-widest text-amber-300/80 text-center">👑 Herança</p>
         <p className="text-center text-sm">
