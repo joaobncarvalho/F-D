@@ -1,6 +1,15 @@
 // F&D — Showroom de mini-jogos/eventos. Renderiza os COMPONENTES REAIS (Board e os
 // cartões da roda) com dados fictícios, para confirmar o aspeto sem começar um jogo.
 // Acede-se via ?demo na app; embebido na dashboard /admin.
+//
+// A VITRINE E A SALA DE TESTE
+//
+// Isto aqui é a vitrine: mostra num segundo estados que numa noite a sério são
+// raros (absolvido e condenado lado a lado), mas os botões não fazem nada — não
+// há servidor por trás. Para testar a LÓGICA de uma feature nova há o outro
+// caminho, o "▶ jogar", que abre a app a sério numa sala com bots já dentro do
+// jogo que se quer ver, e essa joga-se até ao fim (ver playtest.js). Os dois
+// servem coisas diferentes e por isso vivem os dois nesta página.
 import { useState, useEffect } from 'react';
 import { AnimatePresence } from 'framer-motion';
 import Board from './Board.jsx';
@@ -13,6 +22,7 @@ import VereditoBand from './games/VereditoBand.jsx';
 import EventoDaNoite from '../components/EventoDaNoite.jsx';
 import { aplicaHumor, humorAtual, NIVEIS } from '../mood.js';
 import { confetti } from '../confetti.js';
+import { linkPlaytest } from '../playtest.js';
 
 const PAWNS = ['🦊', '🐸', '🐵', '🦄', '🐙', '🐝', '🦁', '🐨', '🐼', '🐷', '🐧', '🐢', '🐔', '🦖'];
 const CARD_META = {
@@ -124,6 +134,83 @@ const tribunalBoard = (patch = {}) => ({
   result: null,
   ...patch,
 });
+
+// A sala de teste que corresponde a cada cena (ver playtest.js). Onde não há
+// entrada, a cena é um estado que não se encomenda — o "▶ jogar" leva na mesma
+// ao modo certo, e o resto acontece a jogar.
+const PLAY = {
+  // ---------- Tabuleiro ----------
+  'b-pawn': { mode: 'board' },
+  'b-order': { mode: 'board' },
+  'b-turn': { mode: 'board' },
+  'b-card': { mode: 'board' },
+  'b-greed': { mode: 'board' },
+  'b-over': { mode: 'board' },
+  'b-regras': { mode: 'board' },
+  'b-maldicao': { mode: 'board' },
+  'b-mini-dare': { mode: 'board', casa: 'mini', gameKey: 'desafio' },
+  'b-mini-choice': { mode: 'board', casa: 'mini', gameKey: 'isto_ou_aquilo' },
+  'b-evento-pick': { mode: 'board', casa: 'evento' },
+  'b-evento-sorte': { mode: 'board', casa: 'evento' },
+  'b-evento-carta': { mode: 'board', casa: 'evento' },
+  'b-evento-preso': { mode: 'board', casa: 'evento' },
+  'b-gamble': { mode: 'board', casa: 'gamble' },
+  'b-gamble-win': { mode: 'board', casa: 'gamble' },
+  'b-gamble-lose': { mode: 'board', casa: 'gamble' },
+  'b-bj': { mode: 'board', casa: 'blackjack' },
+  'b-bj-win': { mode: 'board', casa: 'blackjack' },
+  'b-bj-lose': { mode: 'board', casa: 'blackjack' },
+  'b-bp': { mode: 'board', casa: 'beerpong' },
+  'b-bp-jack': { mode: 'board', casa: 'beerpong' },
+  'b-bp-bad': { mode: 'board', casa: 'beerpong' },
+  'b-leilao': { mode: 'board', casa: 'leilao' },
+  'b-trib-defesa': { mode: 'board', casa: 'tribunal' },
+  'b-trib-voto': { mode: 'board', casa: 'tribunal' },
+  'b-trib-absolvido': { mode: 'board', casa: 'tribunal' },
+  'b-trib-condenado': { mode: 'board', casa: 'tribunal' },
+  // ---------- Roda ----------
+  'w-boca': { mode: 'wheel', tipo: 'boca_calada' },
+  'w-desafio': { mode: 'wheel', tipo: 'desafio' },
+  'w-iaq': { mode: 'wheel', tipo: 'isto_ou_aquilo' },
+  'w-intrigas': { mode: 'wheel', tipo: 'intrigas' },
+  'w-relampago': { mode: 'wheel', tipo: 'categoria_relampago' },
+  'w-mimica': { mode: 'wheel', tipo: 'mimica' },
+  'w-roleta': { mode: 'wheel', tipo: 'roleta_russa' },
+  'w-moeda': { mode: 'wheel', tipo: 'duelo' },
+  'w-duelo': { mode: 'wheel', tipo: 'duelo' },
+  'w-trib-defesa': { mode: 'wheel', tipo: 'tribunal' },
+  'w-trib-voto': { mode: 'wheel', tipo: 'tribunal' },
+  'w-trib-convenceu': { mode: 'wheel', tipo: 'tribunal' },
+  'w-trib-falhou': { mode: 'wheel', tipo: 'tribunal' },
+};
+
+/**
+ * Abre a sala de teste desta cena.
+ *
+ * Dentro do iframe da /admin, `_top` não serve (levava a dashboard inteira) e
+ * ficar no iframe também não (o jogo é vertical e a mesa é uma só). Vai sempre
+ * para separador novo — o showroom fica onde está, para se voltar a ele.
+ */
+function abrePlaytest(spec) {
+  window.open(linkPlaytest(spec), '_blank', 'noopener');
+}
+
+/** O botão "▶ jogar" — só aparece nas cenas que têm sala de teste. */
+function BotaoJogar({ spec, className = '' }) {
+  if (!spec) return null;
+  return (
+    <button
+      onClick={(e) => {
+        e.stopPropagation(); // está dentro do cartão que abre a vitrine
+        abrePlaytest(spec);
+      }}
+      title="Abrir a app a sério, com bots, já neste jogo"
+      className={`fd-chip text-xs shrink-0 border border-fuchsia-400/40 ${className}`}
+    >
+      ▶ jogar
+    </button>
+  );
+}
 
 // Cada cena: componente real + dados fictícios.
 const SCENARIOS = [
@@ -502,12 +589,25 @@ export default function Demo() {
   if (sel?.kind === 'eventos') return <PalcoEventos onBack={back} />;
 
   if (sel?.kind === 'board') {
-    return <div className="min-h-full mx-auto max-w-md px-5 py-6 flex flex-col relative">{sel.render(back)}</div>;
+    return (
+      <div className="min-h-full mx-auto max-w-md px-5 py-6 flex flex-col relative">
+        {sel.render(back)}
+        {PLAY[sel.id] && (
+          <div className="mt-4 flex items-center justify-between gap-2 text-xs text-white/40">
+            <span>Os botões aqui são só visuais.</span>
+            <BotaoJogar spec={PLAY[sel.id]} />
+          </div>
+        )}
+      </div>
+    );
   }
   if (sel?.kind === 'wheel') {
     return (
       <div className="min-h-full mx-auto max-w-md px-5 py-6 flex flex-col gap-4">
-        <button onClick={back} className="text-sm text-white/50 self-start">← voltar aos demos</button>
+        <div className="flex items-center justify-between gap-2">
+          <button onClick={back} className="text-sm text-white/50">← voltar aos demos</button>
+          <BotaoJogar spec={PLAY[sel.id]} />
+        </div>
         <p className="text-center text-xs uppercase tracking-widest text-white/40">Roda · {sel.label}</p>
         {sel.render()}
       </div>
@@ -522,8 +622,35 @@ export default function Demo() {
     <div className="min-h-full mx-auto max-w-md px-5 py-6 flex flex-col gap-5">
       <header className="text-center">
         <h1 className="fd-title fd-neon text-2xl font-extrabold">🎮 F&D · Demos</h1>
-        <p className="text-xs text-white/45 mt-1">Pré-visualização dos mini-jogos e eventos (dados fictícios).</p>
+        <p className="text-xs text-white/45 mt-1">
+          Toca no cartão para ver o ecrã (dados fictícios). Toca em <b>▶ jogar</b> para o jogar a
+          sério, com bots, até ao fim.
+        </p>
       </header>
+
+      {/* A sala de teste sem cena nenhuma: entrar no modo e jogar o que vier. */}
+      <div className="flex flex-col gap-2">
+        <p className="text-[11px] uppercase tracking-widest text-white/40 px-1">🧪 Sala de teste (bots)</p>
+        <div className="grid grid-cols-2 gap-2">
+          <button onClick={() => abrePlaytest({ mode: 'wheel' })} className="fd-card px-4 py-3 text-sm">
+            🎡 Roda
+          </button>
+          <button onClick={() => abrePlaytest({ mode: 'board' })} className="fd-card px-4 py-3 text-sm">
+            🎲 Tabuleiro
+          </button>
+          <button onClick={() => abrePlaytest({ mode: 'morte' })} className="fd-card px-4 py-3 text-sm">
+            💀 Modo da Morte
+          </button>
+          <button onClick={() => abrePlaytest({ mode: 'tournament' })} className="fd-card px-4 py-3 text-sm">
+            🏆 Torneio
+          </button>
+        </div>
+        <p className="text-[11px] text-white/35 px-1">
+          Abre a app a sério em separador novo: tu + 3 bots, intensidade Caos, já dentro do jogo.
+          Lá dentro, a barra 🧪 encomenda o jogo seguinte. Precisa de{' '}
+          <code className="text-white/50">ENABLE_DEV_BOTS=1</code> no servidor.
+        </p>
+      </div>
       <div className="flex flex-col gap-2">
         <p className="text-[11px] uppercase tracking-widest text-white/40 px-1">✨ Ambiente</p>
         <button onClick={() => setSel(ambiente)} className="fd-card text-left px-4 py-3 text-sm">
@@ -541,15 +668,19 @@ export default function Demo() {
           <p className="text-[11px] uppercase tracking-widest text-white/40 px-1">{g === 'Roda' ? '🎡 Roda' : '🎲 Tabuleiro'}</p>
           <div className="grid grid-cols-1 gap-2">
             {SCENARIOS.filter((s) => s.group === g).map((s) => (
-              <button key={s.id} onClick={() => setSel(s)} className="fd-card text-left px-4 py-3 text-sm">
-                {s.label}
-              </button>
+              <div key={s.id} className="fd-card flex items-center gap-2 pr-3">
+                <button onClick={() => setSel(s)} className="flex-1 text-left px-4 py-3 text-sm">
+                  {s.label}
+                </button>
+                <BotaoJogar spec={PLAY[s.id]} />
+              </div>
             ))}
           </div>
         </div>
       ))}
       <p className="text-center text-[11px] text-white/30 mt-2">
-        Nos ecrãs do tabuleiro, o "← Sair" volta aqui. Os botões de ação são só visuais (não mudam estado).
+        Nos ecrãs do tabuleiro, o "← Sair" volta aqui. Os botões de ação são só visuais (não mudam
+        estado) — para os exercer a sério é o ▶ jogar.
       </p>
     </div>
   );

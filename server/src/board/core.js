@@ -106,7 +106,7 @@ export function checkWin(room, playerId) {
 }
 
 /** Prisão: consequência aleatória do banco (salta vezes / bebe / recua / perde carta). */
-export function applyPrison(room, playerId, reason = 'prisão') {
+export function applyPrison(room, playerId, reason = 'prisão', { forcarJulgamento = false } = {}) {
   const b = room.board;
   const me = b.players[playerId];
   const nm = nameOf(room, playerId);
@@ -120,7 +120,11 @@ export function applyPrison(room, playerId, reason = 'prisão') {
   // uma mesa a julgar duas pessoas por dois motivos) nem se não houver ninguém
   // para ser júri. Nesses casos cai-se na condenação direta, que é o caminho
   // que este ficheiro sempre teve.
-  if (TRIBUNAL_ON && !b.tribunal && Math.random() < HIPOTESE_JULGAMENTO && haJuri(room, playerId)) {
+  // `forcarJulgamento` é do playtest (board.js → forcaProximaCasa): salta o
+  // sorteio dos 80%, mas não as condições — sem júri, ou com um julgamento já a
+  // decorrer, o caminho continua a ser a condenação direta.
+  const sorteio = forcarJulgamento || Math.random() < HIPOTESE_JULGAMENTO;
+  if (TRIBUNAL_ON && !b.tribunal && sorteio && haJuri(room, playerId)) {
     me.slowStreak = 0; // a streak zera na acusação: já pagou por ela
     abreTribunal(room, playerId, reason, p, sorteiaTese(b));
     return { julgamento: true };

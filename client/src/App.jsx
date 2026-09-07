@@ -18,6 +18,8 @@ import RegraNova from './components/RegraNova.jsx';
 import { keepScreenAwake, loadA11y, applyA11y, registerServiceWorker, rememberRoom } from './device.js';
 import { aplicaHumor, humorDaSala } from './mood.js';
 import { setPaused } from './clock.js';
+import { PLAYTEST } from './playtest.js';
+import PlaytestBar from './components/PlaytestBar.jsx';
 
 const SESSION_KEY = 'fd_session';
 
@@ -86,6 +88,19 @@ export default function App() {
       /* modo privado / storage cheio — a sessão fica só em memória */
     }
   }
+
+  // SALA DE TESTE (`?playtest`, ver playtest.js): monta a sala com bots e entra
+  // já no jogo pedido. Corre uma vez, e só quando o URL o pede — numa noite a
+  // sério isto nunca acontece (e o servidor recusa sem ENABLE_DEV_BOTS).
+  useEffect(() => {
+    if (!PLAYTEST) return;
+    saveSession(null); // sala nova de raiz: uma sessão antiga só ia religar à anterior
+    setMessages([]);
+    if (!socket.connected) socket.connect();
+    socket.emit('dev_playtest', PLAYTEST, (r) => {
+      if (!r?.ok) setError(r?.message || 'Não deu para montar a sala de teste.');
+    });
+  }, []);
 
   // Desbloqueia o áudio no primeiro toque (política de autoplay dos browsers) e
   // arranca a música ambiente se estiver ligada — só pode ser aqui, num gesto.
@@ -519,6 +534,9 @@ export default function App() {
           ⏸️ Jogo em pausa {isHost ? '— toca em ▶️ para retomar' : '— o host já volta'}
         </div>
       )}
+
+      {/* Sala de teste: a barra que encomenda o próximo jogo. Só em `?playtest`. */}
+      {PLAYTEST && room && screen !== 'home' && <PlaytestBar room={room} youId={youId} />}
 
       {conn === 'reconnecting' && screen !== 'home' && (
         <div className="mb-3 rounded-lg bg-amber-500/15 text-amber-300 text-center text-sm py-2">

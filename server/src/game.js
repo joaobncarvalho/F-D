@@ -583,6 +583,28 @@ export function beginPlay(room, playerId) {
   return g;
 }
 
+/**
+ * PLAYTEST (dev): encomenda o tipo da PRÓXIMA volta da roda. O `spinWheel`
+ * consome-o e o sorteio do Diretor volta ao normal a seguir. No socket isto está
+ * atrás do ENABLE_DEV_BOTS — nunca chega a uma noite a sério.
+ */
+export function forcaProximoTipo(room, key, playerId = null) {
+  if (!room.game) throw new AppError('O jogo ainda não começou.');
+  // `playerId` guarda a encomenda para QUEM a pediu: com bots na mesa, sem isto o
+  // primeiro bot a girar levava o jogo que se queria jogar.
+  room.game.tipoForcado = key ? { key, playerId } : null;
+  return room.game.tipoForcado;
+}
+
+/** Lê e consome o tipo encomendado (uma volta, e só de quem o pediu). */
+function tomaTipoForcado(g, playerId) {
+  const f = g.tipoForcado;
+  if (!f) return null;
+  if (f.playerId && f.playerId !== playerId) return null; // fica à espera do dono
+  g.tipoForcado = null;
+  return f.key;
+}
+
 /** O jogador da vez gira a roda: decide o TIPO e prepara a mecânica. */
 export async function spinWheel(room, playerId) {
   const g = room.game;
@@ -608,6 +630,11 @@ export async function spinWheel(room, playerId) {
     pesos: director.pesosDe(l, fase),
     intensidade: inten,
   });
+  // PLAYTEST (dev): o showroom pode encomendar o próximo tipo. Consome-se aqui,
+  // uma vez só — a volta seguinte já é do Diretor outra vez. Sem isto, testar um
+  // jogo novo era girar até calhar (e há tipos que só saem de hardcore para cima).
+  const encomendado = tomaTipoForcado(g, playerId);
+  if (encomendado) gt = types.find((t) => t.key === encomendado) || gt;
   // MODO DA MORTE: restam dois → o Diretor não escolhe nada. A noite acaba com
   // um duelo frente a frente, e não com o que a roda calhar a dar.
   if (g.morte?.dueloFinal) gt = types.find((t) => t.key === 'duelo') || gt;
@@ -1255,6 +1282,9 @@ export function serializeGame(room) {
   if (!g) return null;
   return {
     phase: g.phase,
+    // PLAYTEST (dev): o jogo encomendado para a próxima volta, para a barra de
+    // playtest o poder mostrar. Fora de um playtest é sempre null.
+    tipoForcado: g.tipoForcado?.key || null,
     intensity: effectiveIntensity(g), // a que está em vigor AGORA (curva)
     intensityCeiling: g.intensity, // a votada no lobby (teto da noite)
     curve: !!g.curve,

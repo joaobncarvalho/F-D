@@ -217,6 +217,23 @@ Legenda: ✅ feito · 🚧 em curso · ⬜ por fazer · 🔗 ponto de integraç�
       como todo o conteúdo. Verificado: `npm test` **209/209**, build limpo, e a
       /admin exercida no browser (criar e apagar um tema a sério).
 
+- [x] **A sala de teste no showroom (2026-09-07)** — pedido do João: os demos
+      mostravam os ecrãs, mas os botões não faziam nada, e para testar a sério uma
+      feature nova era preciso montar uma noite. Agora cada cena tem um "▶ jogar"
+      que abre a app REAL numa sala com bots, já dentro daquele jogo, e joga-se
+      até ao fim. O que faltava não era a capacidade de jogar sozinho (os bots já
+      existiam desde 09-01) — era a PONTARIA: encomendar o jogo que se quer ver.
+      · `game.js`/`board.js`: `forcaProximoTipo` / `forcaProximaCasa`, consumidas
+        no `spinWheel` e no `advance`, uma vez e só por quem as pediu
+      · `socket.js`: `dev_playtest` (sala + bots + arranque num evento),
+        `dev_force_next`, `dev_catalogo` — tudo atrás do `ENABLE_DEV_BOTS=1`
+      · cliente: `playtest.js` (contrato no URL), `PlaytestBar.jsx` (encomendar o
+        jogo seguinte sem sair da sala), botões no showroom e /admin com
+        Vitrine ↔ Jogar
+      Verificado: `npm test` **217/217** (`test/playtest.test.js` novo, 8 casos
+      incluindo um e2e pela rede) e os quatro modos exercidos no Chrome — o
+      Tribunal encomendado saiu, foi a votos e custou uma vida.
+
 **Colega (BD)**
 - [ ] **Correr `db/04_telemetria.sql`** (ou `prisma db push`) — sem isso as
       contagens da /admin vivem no disco do container e morrem a cada deploy.

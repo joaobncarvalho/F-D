@@ -12,6 +12,24 @@ import * as director from './game/director.js';
 import * as modificadores from './game/modificadores.js';
 import * as snapshot from './snapshot.js';
 import * as telemetria from './telemetria.js';
+import * as repo from './repo.js';
+
+// As casas do Tabuleiro que a sala de teste sabe encomendar (ver
+// board.js → forcaProximaCasa). 'prisao' e 'tribunal' não são casas: são o que a
+// prisão dá, e estão aqui porque é a única forma de as apanhar à vontade.
+const CASAS_TABULEIRO = [
+  { kind: 'mini', gameKey: 'desafio', label: '🔥 Casa: Desafio' },
+  { kind: 'mini', gameKey: 'boca_calada', label: '🤐 Casa: Boca Calada' },
+  { kind: 'mini', gameKey: 'isto_ou_aquilo', label: '⚖️ Casa: Isto ou Aquilo' },
+  { kind: 'evento', label: '❓ Casa ?? (3 cartas)' },
+  { kind: 'gamble', label: '🎲 Gamble' },
+  { kind: 'blackjack', label: '🃏 Blackjack' },
+  { kind: 'beerpong', label: '🏓 Beer Pinga' },
+  { kind: 'leilao', label: '🔨 Leilão' },
+  { kind: 'reacao', label: '⚡ Reação' },
+  { kind: 'prisao', label: '🚔 Prisão (80% dá julgamento)' },
+  { kind: 'tribunal', label: '⚖️ Tribunal da Injustiça' },
+];
 
 const rooms = new RoomManager();
 const botTicks = new Map(); // code -> intervalId (tick dos bots de playtest)
@@ -279,28 +297,85 @@ export function registerSocketHandlers(io) {
       try {
         const { code, playerId } = socket.data;
         const room = rooms.startGame(code, playerId);
-        // Intensidade decidida pela VOTAÇÃO (maioria; empate → sorteio/randomizer).
-        const intensityResult = game.tallyIntensity(room);
-        if (room.mode === 'board') {
-          await board.initBoard(room, { intensity: intensityResult.intensity }); // modo Tabuleiro
-        } else if (room.mode === 'tournament') {
-          tournament.initTournament(room, { intensity: intensityResult.intensity }); // modo Torneio
-        } else {
-          // `curve` vem do lobby (rooms.setCurve). Sem isto o motor ficava com o
-          // seu valor por omissão (ligada) e o interruptor do host não fazia nada.
-          game.initGame(room, {
-            lives,
-            intensity: intensityResult.intensity,
-            curve: room.curve,
-            duracaoMin: room.duracaoMin, // plano da noite → o Diretor monta o final
-            // As regras da noite SORTEIAM-SE aqui (game/modificadores.js), a
-            // partir da intensidade votada e do que a mesa vetou no lobby.
-            sorteio: true,
-            vetados: room.vetados,
-          }); // modo Roda
-        }
-        io.to(code).emit('game_started', { mode: room.mode, intensityResult });
-        broadcastState(io, code);
+        await arrancaJogo(io, room, { lives });
+        if (typeof ack === 'function') ack({ ok: true });
+      } catch (err) {
+        handleError(socket, ack, err);
+      }
+    });
+
+    // ----- PLAYTEST (dev) -----------------------------------------------------
+    // Sala de teste num toque: cria a sala, enche-a de bots, arranca o modo
+    // pedido e (se for caso disso) encomenda o jogo que se quer ver. É o que o
+    // showroom usa no botão "jogar a sério" — o mesmo motor de uma noite real,
+    // só que sem esperar por seis telemóveis nem pelo sorteio.
+    socket.on('dev_playtest', async (opts = {}, ack) => {
+      try {
+        if (!bots.ENABLED) throw new AppError('Bots de dev não estão ativos no servidor (ENABLE_DEV_BOTS=1).');
+        const {
+          name = 'Tu',
+          mode = 'wheel',
+          intensity = 'picante',
+          bots: quantos = 3,
+          gameTypeKey = null,
+          casa = null,
+          lives = null,
+          curve = false, // playtest quer a intensidade PEDIDA, não a curva a subir
+        } = opts;
+
+        leavePreviousRoom(io, socket); // um clique novo no showroom não deixa a sala anterior com um fantasma
+        const { room, player } = rooms.createRoom(name);
+        bindSocketToRoom(socket, room.code, player.id);
+        rooms.setMode(room.code, player.id, mode);
+        rooms.setCurve(room.code, player.id, curve);
+
+        const n = Math.max(1, Math.min(7, Number(quantos) || 3));
+        for (let i = 0; i < n; i++) rooms.addBot(room.code);
+        // A intensidade impõe-se pelo caminho normal (os votos do lobby), para o
+        // apuramento ser o mesmo que numa sala a sério.
+        for (const p of room.players.values()) rooms.voteIntensity(room.code, p.id, intensity);
+
+        respond(ack, socket, 'room_joined', {
+          room: serializeRoom(room),
+          you: player.id,
+          token: player.token,
+        });
+
+        rooms.startGame(room.code, player.id);
+        await arrancaJogo(io, room, { lives });
+        // A Roda começa na fase de escrever perguntas/segredos. Num playtest isso
+        // é uma paragem no caminho do que se quer ver — salta-se.
+        if (room.game?.phase === 'prep') game.beginPlay(room, player.id);
+        aplicaEncomenda(room, { gameTypeKey, casa, playerId: player.id });
+
+        ensureBotTick(io, room.code);
+        broadcastState(io, room.code);
+      } catch (err) {
+        handleError(socket, ack, err);
+      }
+    });
+
+    // O que há para encomendar. Vem do servidor (repo.getGameTypes) e não de uma
+    // lista no cliente — uma segunda lista era uma lista para ficar desatualizada
+    // no dia em que se acrescentasse um tipo.
+    socket.on('dev_catalogo', async (_payload, ack) => {
+      try {
+        if (!bots.ENABLED) throw new AppError('Bots de dev não estão ativos no servidor (ENABLE_DEV_BOTS=1).');
+        const tipos = await repo.getGameTypes();
+        if (typeof ack === 'function') ack({ ok: true, tipos, casas: CASAS_TABULEIRO });
+      } catch (err) {
+        handleError(socket, ack, err);
+      }
+    });
+
+    // Encomendar o PRÓXIMO jogo/casa sem sair da sala — a barra de playtest
+    // dentro do jogo. Vale para uma volta; a seguir o sorteio volta ao normal.
+    socket.on('dev_force_next', ({ gameTypeKey = null, casa = null } = {}, ack) => {
+      try {
+        if (!bots.ENABLED) throw new AppError('Bots de dev não estão ativos no servidor (ENABLE_DEV_BOTS=1).');
+        const room = requireRoom(socket);
+        aplicaEncomenda(room, { gameTypeKey, casa, playerId: socket.data.playerId });
+        broadcastState(io, room.code);
         if (typeof ack === 'function') ack({ ok: true });
       } catch (err) {
         handleError(socket, ack, err);
@@ -1176,6 +1251,51 @@ function announceIntrigasReason(io, room, round) {
     if (p.connected && !p.isBot && p.id !== round.currentPlayerId && p.id !== round.accusedId) {
       io.to(p.id).emit('intrigas_reason', { roundId: round.id, reason: round.reason });
     }
+  }
+}
+
+/**
+ * Arranca o motor do modo escolhido e avisa a sala. Partilhado pelo `start_game`
+ * (o caminho de uma noite a sério) e pelo `dev_playtest` — se divergissem, o
+ * playtest deixava de testar o que a mesa vai jogar.
+ */
+async function arrancaJogo(io, room, { lives } = {}) {
+  // Intensidade decidida pela VOTAÇÃO (maioria; empate → sorteio/randomizer).
+  const intensityResult = game.tallyIntensity(room);
+  if (room.mode === 'board') {
+    await board.initBoard(room, { intensity: intensityResult.intensity }); // modo Tabuleiro
+  } else if (room.mode === 'tournament') {
+    tournament.initTournament(room, { intensity: intensityResult.intensity }); // modo Torneio
+  } else {
+    // `curve` vem do lobby (rooms.setCurve). Sem isto o motor ficava com o
+    // seu valor por omissão (ligada) e o interruptor do host não fazia nada.
+    game.initGame(room, {
+      lives,
+      intensity: intensityResult.intensity,
+      curve: room.curve,
+      duracaoMin: room.duracaoMin, // plano da noite → o Diretor monta o final
+      // As regras da noite SORTEIAM-SE aqui (game/modificadores.js), a
+      // partir da intensidade votada e do que a mesa vetou no lobby.
+      sorteio: true,
+      vetados: room.vetados,
+    }); // modo Roda
+  }
+  io.to(room.code).emit('game_started', { mode: room.mode, intensityResult });
+  broadcastState(io, room.code);
+  return intensityResult;
+}
+
+/**
+ * PLAYTEST (dev): encomenda o próximo jogo. Na Roda é o TIPO que vai sair; no
+ * Tabuleiro é a CASA onde o próximo lançamento cai (incluindo 'prisao' e
+ * 'tribunal', que não são casas mas é onde a prisão dá). Ignora em silêncio o
+ * que não se aplica ao modo — o showroom manda os dois campos.
+ */
+function aplicaEncomenda(room, { gameTypeKey = null, casa = null, playerId = null } = {}) {
+  if (room.mode === 'board') {
+    if (casa) board.forcaProximaCasa(room, casa, playerId);
+  } else if (gameTypeKey) {
+    game.forcaProximoTipo(room, gameTypeKey, playerId);
   }
 }
 

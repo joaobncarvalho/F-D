@@ -393,15 +393,21 @@
           <div class="card">
             <h2>🎮 Showroom de mini-jogos</h2>
             <p class="muted" style="margin-bottom: 12px">
-              Pré-visualiza os mini-jogos e eventos (tabuleiro e roda) sem começar um jogo — abre a app em modo demo.
+              Duas coisas diferentes na mesma página. A <b>vitrine</b> mostra os ecrãs com dados
+              fictícios — vê-se num segundo o que numa noite a sério é raro, mas os botões não fazem
+              nada. A <b>sala de teste</b> abre a app a sério, com bots, já dentro do jogo que se
+              quer ver: joga-se até ao fim, e testa a lógica. Cada cena da vitrine tem um "▶ jogar".
             </p>
             <div class="demobar">
               <input id="demoUrl" placeholder="http://localhost:5173" />
-              <button id="demoLoad" class="btn-ghost small">Carregar</button>
+              <button id="demoVitrine" class="btn-ghost small">🖼️ Vitrine</button>
+              <button id="demoJogar" class="btn-ghost small">🧪 Jogar (Roda)</button>
+              <button id="demoJogarBoard" class="btn-ghost small">🧪 Jogar (Tabuleiro)</button>
               <button id="demoOpen" class="btn-primary small">Abrir em nova aba ↗</button>
             </div>
             <p class="muted" style="font-size: 0.78rem; margin-top: 8px">
               Em produção usa a mesma origem. Em dev, aponta para o cliente Vite (ex.: http://localhost:5173).
+              A sala de teste precisa de <code>ENABLE_DEV_BOTS=1</code> no servidor.
             </p>
             <div class="phone"><iframe id="demoFrame" title="Demos F&D"></iframe></div>
           </div>
@@ -572,12 +578,17 @@
       }
 
       // ----- Dashboard: separadores + showroom de demos -----
+      // `demoQuery` é o que o iframe está a mostrar: a vitrine ("?demo=1") ou uma
+      // sala de teste ("?playtest=1&…", ver client/src/playtest.js). O "abrir em
+      // nova aba" segue o que estiver carregado.
       let demoLoaded = false;
+      let demoQuery = "?demo=1";
       const demoBase = () => ($("demoUrl").value || location.origin).replace(/\/+$/, "");
-      function loadDemo() {
+      function loadDemo(query) {
         const base = demoBase();
+        if (query) demoQuery = query;
         try { localStorage.setItem("fd_demo_client", base); } catch { /* ignora */ }
-        $("demoFrame").src = base + "/?demo=1";
+        $("demoFrame").src = base + "/" + demoQuery;
         demoLoaded = true;
       }
       function switchTab(name) {
@@ -593,8 +604,10 @@
       $("tabbtn-content").onclick = () => switchTab("content");
       $("tabbtn-board").onclick = () => switchTab("board");
       $("tabbtn-demos").onclick = () => switchTab("demos");
-      $("demoLoad").onclick = () => { demoLoaded = false; loadDemo(); };
-      $("demoOpen").onclick = () => window.open(demoBase() + "/?demo=1", "_blank");
+      $("demoVitrine").onclick = () => loadDemo("?demo=1");
+      $("demoJogar").onclick = () => loadDemo("?playtest=1&mode=wheel&intensity=caos&bots=3");
+      $("demoJogarBoard").onclick = () => loadDemo("?playtest=1&mode=board&intensity=caos&bots=3");
+      $("demoOpen").onclick = () => window.open(demoBase() + "/" + demoQuery, "_blank");
 
       // ----- Banco do Tabuleiro (?? / prisão / cartas) -----
       let boardLoaded = false;

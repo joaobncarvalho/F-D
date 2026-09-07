@@ -250,6 +250,55 @@ function finalizeOrder(room) {
 }
 
 /** Avançar 1/2/3 casas (bebe 2/4/6 golos). Resolve a casa; volta = vitória. Async (conteúdo). */
+/**
+ * PLAYTEST (dev): encomenda a casa onde o próximo lançamento vai cair.
+ *
+ * O tabuleiro tem 60 casas sorteadas: para ver a Beer Pinga ou um Leilão era
+ * preciso calhar lá. Aqui a casa é imposta ao `advance` seguinte e o dado deixa
+ * de mandar. `kind` aceita o que o tabuleiro tem ('mini', 'gamble', 'blackjack',
+ * 'beerpong', 'evento', 'leilao', 'reacao') mais dois atalhos que não são casas:
+ * 'prisao' (com o sorteio dos 80% do Tribunal) e 'tribunal' (julgamento certo).
+ * No socket está atrás do ENABLE_DEV_BOTS.
+ */
+export function forcaProximaCasa(room, spec, playerId = null) {
+  const b = room.board;
+  if (!b) throw new AppError('O tabuleiro ainda não começou.');
+  if (!spec) {
+    b.casaForcada = null;
+    return null;
+  }
+  const kind = String(spec.kind || '');
+  const CASAS = ['mini', 'gamble', 'blackjack', 'beerpong', 'evento', 'leilao', 'reacao', 'prisao', 'tribunal'];
+  if (!CASAS.includes(kind)) throw new AppError('Casa inválida.');
+  // `playerId`: a casa fica reservada a quem a pediu. Com bots na mesa jogam
+  // todos, e sem isto era um bot a cair na casa que se queria experimentar.
+  b.casaForcada = {
+    kind,
+    gameKey: spec.gameKey || null,
+    gameLabel: spec.gameLabel || null,
+    playerId: spec.playerId || playerId || null,
+  };
+  return b.casaForcada;
+}
+
+/** Lê e consome a casa encomendada (um lançamento, e só de quem a pediu). */
+function tomaCasaForcada(b, playerId) {
+  const c = b.casaForcada;
+  if (!c) return null;
+  if (c.playerId && c.playerId !== playerId) return null; // fica à espera do dono
+  b.casaForcada = null;
+  return c;
+}
+
+/** Monta a casa sintética a partir da encomenda (o mini precisa de tipo e rótulo). */
+async function casaEncomendada(forcada) {
+  if (forcada.kind !== 'mini') return { i: -1, kind: forcada.kind };
+  const types = await repo.getGameTypes();
+  const key = forcada.gameKey || BOARD_MINI_TYPES[0];
+  const gt = types.find((t) => t.key === key) || { key, label: forcada.gameLabel || key };
+  return { i: -1, kind: 'mini', gameKey: gt.key, gameLabel: gt.label };
+}
+
 export async function advance(room, playerId, squares) {
   const b = requireBoard(room, ['playing']);
   if (b.tribunal) throw new AppError('Há um julgamento a decorrer.');
@@ -277,6 +326,17 @@ export async function advance(room, playerId, squares) {
     me.fastStreak = 0;
   }
 
+  // PLAYTEST (dev): casa encomendada pelo showroom. Cala as sequências, a
+  // maldição e o azar da ganância — quem pediu a Beer Pinga quer a Beer Pinga,
+  // não quer ir preso a meio caminho por ter andado 1 três vezes.
+  const forcada = tomaCasaForcada(b, playerId);
+  if (forcada) {
+    toPrison = false;
+    greedy = false;
+    me.slowStreak = 0;
+    me.fastStreak = 0;
+  }
+
   b.lastMove = { playerId, name: nameOf(room, playerId), squares: n, golos: n * GOLOS_PER_SQUARE, toPrison, greedy, landedKind: null };
   b.lastEvent = null;
 
@@ -298,12 +358,21 @@ export async function advance(room, playerId, squares) {
 
   // Maldição escondida nesta casa? Dispara antes de a casa se resolver — é a
   // surpresa: quem a pôs pode até ser a vítima.
-  if (fireTrap(room, playerId)) {
+  if (!forcada && fireTrap(room, playerId)) {
     if (b.phase !== 'over') advanceBoardTurn(room);
     return { board: b, over: b.phase === 'over' };
   }
 
-  const sq = b.squares[me.pos];
+  // Prisão/Tribunal não são casas do tabuleiro — são o que a prisão faz. Por
+  // isso resolvem-se aqui, pelo mesmo caminho do `toPrison` lá em cima.
+  if (forcada && (forcada.kind === 'prisao' || forcada.kind === 'tribunal')) {
+    b.lastMove.landedKind = forcada.kind;
+    applyPrison(room, playerId, 'playtest', { forcarJulgamento: forcada.kind === 'tribunal' });
+    advanceBoardTurn(room);
+    return { board: b, over: false };
+  }
+
+  const sq = forcada ? await casaEncomendada(forcada) : b.squares[me.pos];
   b.lastMove.landedKind = sq.kind;
   if (sq.kind === 'mini') {
     await openMini(room, sq); // define b.pending; a vez só passa ao resolver
@@ -778,6 +847,9 @@ export function serializeBoard(room) {
   if (!b) return null;
   return {
     phase: b.phase,
+    // PLAYTEST (dev): a casa encomendada para o próximo lançamento (ver a barra
+    // de playtest no cliente). Fora de um playtest é sempre null.
+    casaForcada: b.casaForcada ? { kind: b.casaForcada.kind, gameKey: b.casaForcada.gameKey } : null,
     size: b.size,
     intensity: b.intensity,
     ultimoEvento: b.ultimoEvento || null, // Evento da Noite

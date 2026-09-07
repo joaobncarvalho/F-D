@@ -5,6 +5,66 @@
 
 ---
 
+## 2026-09-07 — 🧪 A sala de teste: os demos passam a jogar-se
+
+Pedido do João: "nos demos há cenários do jogo; o que proponho é poder jogar os
+mini-jogos e desafios até ao fim, para testar melhor as implementações".
+
+### O que já lá estava (e porque não bastava)
+Os bots de playtest existem desde 01 set (`server/src/bots.js`, `dev_add_bots`,
+gated por `ENABLE_DEV_BOTS=1`) e jogam a Roda, o Tabuleiro e o Torneio chamando
+as MESMAS funções que um humano chamaria. Ou seja: jogar sozinho já dava. O que
+não dava era **pontaria** — para ver o ⚖️ Tribunal era preciso calhar em
+hardcore, ou ir preso E cair nos 80%; para ver a Beer Pinga, calhar na casa. Era
+a queixa que já estava escrita em comentário no próprio `Demo.jsx`.
+
+### O que mudou
+- **Encomendar o próximo jogo.** `game.forcaProximoTipo(room, key, playerId)` e
+  `board.forcaProximaCasa(room, spec, playerId)`, consumidas no `spinWheel` e no
+  `advance`. Duas regras que valem a pena reter: vale **uma vez** (a volta
+  seguinte é do Diretor outra vez) e fica **reservada a quem a pediu** — com bots
+  na mesa, sem isso era um bot a levar o jogo que se ia testar. No Tabuleiro a
+  encomenda também cala as sequências, a maldição e o azar da ganância: quem pede
+  a Beer Pinga quer a Beer Pinga, não quer ir preso a meio do caminho.
+- **`prisao` e `tribunal` como "casas".** Não são casas do tabuleiro — são o que
+  a prisão dá. Estão na lista porque é a única forma prática de as apanhar, e o
+  `tribunal` salta o sorteio dos 80% (mas não as condições: sem júri, ou com um
+  julgamento a decorrer, continua a ser condenação direta).
+- **`dev_playtest`**: um evento monta a sala, enche-a de bots, impõe a
+  intensidade pelo caminho normal (os votos do lobby), arranca o modo, salta a
+  fase de escrever perguntas e aplica a encomenda. O `start_game` e este partilham
+  agora o `arrancaJogo` — se divergissem, o playtest deixava de testar o que a
+  mesa vai jogar.
+- **Cliente**: `playtest.js` (o contrato é o URL: `?playtest=1&mode=…&tipo=…`),
+  `PlaytestBar.jsx` (encomendar o jogo seguinte sem sair da sala; a lista vem do
+  servidor via `dev_catalogo`, para não haver uma segunda lista a desatualizar-se).
+- **Showroom e /admin**: cada cena ganhou "▶ jogar"; a /admin alterna
+  Vitrine ↔ Jogar no mesmo iframe.
+
+### A decisão que interessa
+**A vitrine fica.** Dá para a deitar fora agora que se pode jogar a sério, mas
+faz uma coisa que o playtest não faz: mostrar em dois toques estados que numa
+noite são raros — absolvido e condenado lado a lado, os quatro estados da faixa
+de palpites. Os dois servem coisas diferentes e vivem os dois na mesma página.
+
+### Ficheiros
+`server/src/game.js` · `board.js` · `board/core.js` (`applyPrison` com
+`forcarJulgamento`) · `socket.js` (`dev_playtest`, `dev_force_next`,
+`dev_catalogo`, `arrancaJogo`, `aplicaEncomenda`) · `admin.html` ·
+`client/src/playtest.js` (novo) · `components/PlaytestBar.jsx` (novo) ·
+`App.jsx` · `pages/Demo.jsx` · `test/playtest.test.js` (novo).
+
+### Como foi verificado
+`npm test` **217/217** (8 casos novos: encomenda consome-se, respeita o dono,
+abre o tipo/casa certos, o Tribunal salta os 80%, e um e2e pela rede que monta a
+sala num evento e confirma que a roda dá o que foi encomendado). Build limpo. E
+no Chrome, contra o servidor a sério: **Roda** (encomendei o Tribunal pela barra,
+saiu, foi a votos, custou-me uma vida), **Tabuleiro** (casa Beer Pinga
+encomendada no URL, caí lá com o dado a dizer outra coisa, atirei, resolveu),
+**Torneio** e **Modo da Morte** a arrancar com bots.
+
+---
+
 ## 2026-09-04 (d) — ⚖️ Tribunal da Injustiça
 
 Ideia do João, construída com as duas decisões que ficaram por tomar já tomadas
