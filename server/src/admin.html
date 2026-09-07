@@ -407,7 +407,9 @@
             </div>
             <p class="muted" style="font-size: 0.78rem; margin-top: 8px">
               Em produção usa a mesma origem. Em dev, aponta para o cliente Vite (ex.: http://localhost:5173).
-              A sala de teste precisa de <code>ENABLE_DEV_BOTS=1</code> no servidor.
+              A sala de teste abre com um bilhete desta página (vale uma hora) — por isso funciona no
+              servidor a sério sem ligar variável nenhuma. Em dev, o <code>ENABLE_DEV_BOTS=1</code>
+              dispensa o bilhete.
             </p>
             <div class="phone"><iframe id="demoFrame" title="Demos F&D"></iframe></div>
           </div>
@@ -583,12 +585,31 @@
       // nova aba" segue o que estiver carregado.
       let demoLoaded = false;
       let demoQuery = "?demo=1";
+      // 🧪 Bilhete da sala de teste. Em produção o ENABLE_DEV_BOTS não está ligado
+      // (nem deve estar): quem abre a sala de teste é esta página, que já provou
+      // ser o dono com a password. O bilhete vai no FRAGMENTO do URL — não chega
+      // ao servidor, não vai no Referer, e a app limpa-o mal arranca.
+      let demoTicket = "";
       const demoBase = () => ($("demoUrl").value || location.origin).replace(/\/+$/, "");
-      function loadDemo(query) {
+      async function pedeTicket() {
+        if (demoTicket) return demoTicket;
+        try {
+          const r = await api("/playtest-ticket", { method: "POST" });
+          demoTicket = r.ticket || "";
+        } catch (e) {
+          toast("Sem bilhete para a sala de teste: " + e.message, false);
+        }
+        return demoTicket;
+      }
+      function demoUrl() {
+        return demoBase() + "/" + demoQuery + (demoTicket ? "#pt=" + encodeURIComponent(demoTicket) : "");
+      }
+      async function loadDemo(query) {
         const base = demoBase();
         if (query) demoQuery = query;
         try { localStorage.setItem("fd_demo_client", base); } catch { /* ignora */ }
-        $("demoFrame").src = base + "/" + demoQuery;
+        await pedeTicket(); // também na vitrine: é de lá que saem os "▶ jogar"
+        $("demoFrame").src = demoUrl();
         demoLoaded = true;
       }
       function switchTab(name) {
@@ -607,7 +628,10 @@
       $("demoVitrine").onclick = () => loadDemo("?demo=1");
       $("demoJogar").onclick = () => loadDemo("?playtest=1&mode=wheel&intensity=caos&bots=3");
       $("demoJogarBoard").onclick = () => loadDemo("?playtest=1&mode=board&intensity=caos&bots=3");
-      $("demoOpen").onclick = () => window.open(demoBase() + "/" + demoQuery, "_blank");
+      $("demoOpen").onclick = async () => {
+        await pedeTicket();
+        window.open(demoUrl(), "_blank");
+      };
 
       // ----- Banco do Tabuleiro (?? / prisão / cartas) -----
       let boardLoaded = false;

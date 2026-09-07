@@ -5,6 +5,40 @@
 
 ---
 
+## 2026-09-07 (b) — A sala de teste abre no servidor a sério (bilhetes da /admin)
+
+O playtest funcionava em dev e no Railway dizia "bots de dev não estão ativos" —
+que é onde o João estava a tentar usá-lo. A resposta fácil era pedir-lhe para
+pôr `ENABLE_DEV_BOTS=1` nas variáveis do Railway; a resposta certa é não ter de
+o fazer, e não deixar a porta aberta a toda a gente.
+
+**A ideia:** já existe uma prova de que se é o dono do servidor — entrar na
+/admin com a `ADMIN_PASSWORD`. Essa página passa a emitir um **bilhete**
+(`POST /admin/api/playtest-ticket`, `server/src/devticket.js`): opaco, válido
+uma hora, guardado só em memória. O portão do playtest (`exigePlaytest`, em
+`socket.js`) aceita duas chaves — a variável de dev **ou** um bilhete válido.
+Sem nenhuma, fica fechado: senão qualquer pessoa enchia o servidor de salas com
+bots.
+
+**Onde é que o bilhete anda:** no **fragmento** do URL (`#pt=…`), e não numa
+query string. O fragmento não vai no pedido ao servidor nem no cabeçalho
+Referer, e a app limpa-o do URL mal arranca (`history.replaceState`), guardando-o
+no `sessionStorage` do separador. Daí segue para os separadores que o showroom
+abrir, porque o `linkPlaytest` volta a pô-lo no fragmento.
+
+Ficheiros: `server/src/devticket.js` (novo) · `admin.js` · `socket.js` ·
+`admin.html` · `client/src/playtest.js` · `App.jsx` · `PlaytestBar.jsx` ·
+`pages/Demo.jsx` (textos) · `test/playtest-gate.test.js` (novo).
+
+Verificado: `npm test` **220/220** — o ficheiro novo corre de propósito SEM
+`ENABLE_DEV_BOTS` e confirma que sem bilhete (ou com um inventado) os três
+eventos são recusados. E no Chrome, com o servidor a correr **sem** a variável e
+só com `ADMIN_PASSWORD`: entrar na /admin → Demos → a vitrine carrega com
+bilhete → "▶ jogar" numa cena → separador novo com a sala de pé e o Tribunal
+encomendado à espera.
+
+---
+
 ## 2026-09-07 — 🧪 A sala de teste: os demos passam a jogar-se
 
 Pedido do João: "nos demos há cenários do jogo; o que proponho é poder jogar os

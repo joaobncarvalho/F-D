@@ -6,6 +6,7 @@ import express from 'express';
 import { fileURLToPath } from 'node:url';
 import * as repo from './repo.js';
 import * as telemetria from './telemetria.js';
+import * as devticket from './devticket.js';
 
 export function createAdminRouter() {
   const router = express.Router();
@@ -32,6 +33,14 @@ export function createAdminRouter() {
   };
 
   router.get('/api/check', (_req, res) => res.json({ ok: true }));
+
+  // 🧪 Bilhete da sala de teste (server/src/devticket.js). Quem chega aqui já
+  // provou que é o dono do servidor — o bilhete deixa-o abrir a sala de teste em
+  // produção, onde o ENABLE_DEV_BOTS não está (nem deve estar) ligado.
+  router.post('/api/playtest-ticket', (_req, res) => {
+    const { token, validadeMs } = devticket.emite();
+    res.json({ ticket: token, validadeMs });
+  });
 
   // ----- Estatísticas (server/src/telemetria.js) -----
   //

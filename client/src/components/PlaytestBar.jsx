@@ -11,6 +11,7 @@
 import { useEffect, useState } from 'react';
 import { socket } from '../socket.js';
 import { sfx } from '../sfx.js';
+import { bilhete } from '../playtest.js';
 
 export default function PlaytestBar({ room, youId }) {
   const [aberto, setAberto] = useState(false);
@@ -22,7 +23,7 @@ export default function PlaytestBar({ room, youId }) {
 
   useEffect(() => {
     if (!aberto || catalogo) return;
-    socket.emit('dev_catalogo', {}, (r) => {
+    socket.emit('dev_catalogo', { ticket: bilhete() }, (r) => {
       if (r?.ok) setCatalogo({ tipos: r.tipos || [], casas: r.casas || [] });
       else setErro(r?.message || 'Não deu para ler o catálogo.');
     });
@@ -42,8 +43,8 @@ export default function PlaytestBar({ room, youId }) {
     if (!escolha) return;
     sfx.click();
     const payload = board
-      ? { casa: { kind: escolha.split(':')[0], gameKey: escolha.split(':')[1] || null } }
-      : { gameTypeKey: escolha };
+      ? { casa: { kind: escolha.split(':')[0], gameKey: escolha.split(':')[1] || null }, ticket: bilhete() }
+      : { gameTypeKey: escolha, ticket: bilhete() };
     socket.emit('dev_force_next', payload, (r) => {
       if (!r?.ok) setErro(r?.message || 'Não deu para encomendar.');
     });

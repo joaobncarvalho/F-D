@@ -18,7 +18,7 @@ import RegraNova from './components/RegraNova.jsx';
 import { keepScreenAwake, loadA11y, applyA11y, registerServiceWorker, rememberRoom } from './device.js';
 import { aplicaHumor, humorDaSala } from './mood.js';
 import { setPaused } from './clock.js';
-import { PLAYTEST } from './playtest.js';
+import { PLAYTEST, bilhete } from './playtest.js';
 import PlaytestBar from './components/PlaytestBar.jsx';
 
 const SESSION_KEY = 'fd_session';
@@ -97,7 +97,7 @@ export default function App() {
     saveSession(null); // sala nova de raiz: uma sessão antiga só ia religar à anterior
     setMessages([]);
     if (!socket.connected) socket.connect();
-    socket.emit('dev_playtest', PLAYTEST, (r) => {
+    socket.emit('dev_playtest', { ...PLAYTEST, ticket: bilhete() }, (r) => {
       if (!r?.ok) setError(r?.message || 'Não deu para montar a sala de teste.');
     });
   }, []);

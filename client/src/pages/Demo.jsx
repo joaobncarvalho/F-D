@@ -647,8 +647,9 @@ export default function Demo() {
         </div>
         <p className="text-[11px] text-white/35 px-1">
           Abre a app a sério em separador novo: tu + 3 bots, intensidade Caos, já dentro do jogo.
-          Lá dentro, a barra 🧪 encomenda o jogo seguinte. Precisa de{' '}
-          <code className="text-white/50">ENABLE_DEV_BOTS=1</code> no servidor.
+          Lá dentro, a barra 🧪 encomenda o jogo seguinte. No servidor a sério, abre este showroom
+          pela <code className="text-white/50">/admin</code> — é de lá que vem o bilhete que
+          destranca a sala de teste.
         </p>
       </div>
       <div className="flex flex-col gap-2">

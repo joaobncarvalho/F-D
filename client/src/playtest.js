@@ -10,10 +10,48 @@
 //   /?playtest=1&mode=board&casa=beerpong
 //   /?playtest=1&mode=board&casa=mini&gameKey=isto_ou_aquilo
 //
-// Do lado do servidor isto é o evento `dev_playtest`, atrás do ENABLE_DEV_BOTS:
-// sem essa variável a sala não se monta e a app diz porquê.
+// Do lado do servidor isto é o evento `dev_playtest`, que está fechado a não ser
+// que uma de duas chaves apareça: ENABLE_DEV_BOTS=1 (a máquina de dev) ou um
+// BILHETE emitido pela /admin (produção — ver server/src/devticket.js). Ou seja:
+// no servidor a sério, o caminho é abrir o showroom a partir da /admin.
+//
+// O BILHETE, e porque é que ele anda no `#`
+//
+// Chega no fragmento do URL (`#pt=…`) e não numa query string, por três razões:
+// o fragmento não vai no pedido ao servidor, não vai no cabeçalho Referer, e
+// pode ser apagado do URL mal a página arranca — que é o que fazemos aqui.
+// Depois disso vive no sessionStorage deste separador e viaja para os separadores
+// que o showroom abrir.
 
 const params = new URLSearchParams(window.location.search);
+const CHAVE_BILHETE = 'fd_playtest_ticket';
+
+/**
+ * Apanha o bilhete que veio no fragmento, guarda-o neste separador e limpa o URL
+ * (para não ficar na barra nem no histórico). Corre uma vez, no arranque.
+ */
+function recolheBilhete() {
+  const hash = window.location.hash || '';
+  const m = hash.match(/[#&]pt=([^&]+)/);
+  if (!m) return;
+  try {
+    sessionStorage.setItem(CHAVE_BILHETE, decodeURIComponent(m[1]));
+  } catch {
+    /* modo privado / storage cheio — o bilhete fica só nesta página */
+  }
+  const limpo = hash.replace(/[#&]pt=[^&]*/, '').replace(/^#$/, '');
+  window.history.replaceState(null, '', window.location.pathname + window.location.search + limpo);
+}
+recolheBilhete();
+
+/** O bilhete deste separador (ou null: em dev não é preciso nenhum). */
+export function bilhete() {
+  try {
+    return sessionStorage.getItem(CHAVE_BILHETE) || null;
+  } catch {
+    return null;
+  }
+}
 
 /** A encomenda que veio no URL, ou null se isto não é um playtest. */
 export const PLAYTEST = params.has('playtest')
@@ -37,5 +75,7 @@ export function linkPlaytest({ mode = 'wheel', tipo = null, casa = null, gameKey
   if (gameKey) p.set('gameKey', gameKey);
   // Sai do `?demo` de propósito: o showroom vive dentro dele e o playtest é a
   // app a sério. Mesma origem, para funcionar dentro do iframe da /admin.
-  return `${window.location.origin}${window.location.pathname}?${p}`;
+  const t = bilhete();
+  const frag = t ? `#pt=${encodeURIComponent(t)}` : '';
+  return `${window.location.origin}${window.location.pathname}?${p}${frag}`;
 }

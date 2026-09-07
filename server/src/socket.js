@@ -13,6 +13,7 @@ import * as modificadores from './game/modificadores.js';
 import * as snapshot from './snapshot.js';
 import * as telemetria from './telemetria.js';
 import * as repo from './repo.js';
+import * as devticket from './devticket.js';
 
 // As casas do Tabuleiro que a sala de teste sabe encomendar (ver
 // board.js → forcaProximaCasa). 'prisao' e 'tribunal' não são casas: são o que a
@@ -311,7 +312,7 @@ export function registerSocketHandlers(io) {
     // só que sem esperar por seis telemóveis nem pelo sorteio.
     socket.on('dev_playtest', async (opts = {}, ack) => {
       try {
-        if (!bots.ENABLED) throw new AppError('Bots de dev não estão ativos no servidor (ENABLE_DEV_BOTS=1).');
+        exigePlaytest(opts);
         const {
           name = 'Tu',
           mode = 'wheel',
@@ -358,9 +359,9 @@ export function registerSocketHandlers(io) {
     // O que há para encomendar. Vem do servidor (repo.getGameTypes) e não de uma
     // lista no cliente — uma segunda lista era uma lista para ficar desatualizada
     // no dia em que se acrescentasse um tipo.
-    socket.on('dev_catalogo', async (_payload, ack) => {
+    socket.on('dev_catalogo', async (payload = {}, ack) => {
       try {
-        if (!bots.ENABLED) throw new AppError('Bots de dev não estão ativos no servidor (ENABLE_DEV_BOTS=1).');
+        exigePlaytest(payload);
         const tipos = await repo.getGameTypes();
         if (typeof ack === 'function') ack({ ok: true, tipos, casas: CASAS_TABULEIRO });
       } catch (err) {
@@ -370,9 +371,9 @@ export function registerSocketHandlers(io) {
 
     // Encomendar o PRÓXIMO jogo/casa sem sair da sala — a barra de playtest
     // dentro do jogo. Vale para uma volta; a seguir o sorteio volta ao normal.
-    socket.on('dev_force_next', ({ gameTypeKey = null, casa = null } = {}, ack) => {
+    socket.on('dev_force_next', ({ gameTypeKey = null, casa = null, ticket = null } = {}, ack) => {
       try {
-        if (!bots.ENABLED) throw new AppError('Bots de dev não estão ativos no servidor (ENABLE_DEV_BOTS=1).');
+        exigePlaytest({ ticket });
         const room = requireRoom(socket);
         aplicaEncomenda(room, { gameTypeKey, casa, playerId: socket.data.playerId });
         broadcastState(io, room.code);
@@ -1252,6 +1253,25 @@ function announceIntrigasReason(io, room, round) {
       io.to(p.id).emit('intrigas_reason', { roundId: round.id, reason: round.reason });
     }
   }
+}
+
+/**
+ * O portão da SALA DE TESTE. Duas chaves, e chega uma:
+ *
+ *   1. `ENABLE_DEV_BOTS=1` — a máquina de desenvolvimento, onde tudo é de teste.
+ *   2. Um BILHETE da /admin (server/src/devticket.js) — em produção, onde a
+ *      variável não está nem deve estar: quem entrou na /admin com a
+ *      ADMIN_PASSWORD pede um bilhete e abre a sala de teste com ele.
+ *
+ * Sem uma delas isto fica fechado — senão qualquer pessoa enchia o servidor de
+ * salas com bots.
+ */
+function exigePlaytest({ ticket } = {}) {
+  if (bots.ENABLED) return;
+  if (devticket.valida(ticket)) return;
+  throw new AppError(
+    'A sala de teste está fechada. Abre-a a partir da /admin (entra com a password e usa o separador 🎮 Demos), ou liga ENABLE_DEV_BOTS=1 no servidor.'
+  );
 }
 
 /**

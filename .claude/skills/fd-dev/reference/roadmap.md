@@ -233,6 +233,18 @@ Legenda: ✅ feito · 🚧 em curso · ⬜ por fazer · 🔗 ponto de integraç�
       Verificado: `npm test` **217/217** (`test/playtest.test.js` novo, 8 casos
       incluindo um e2e pela rede) e os quatro modos exercidos no Chrome — o
       Tribunal encomendado saiu, foi a votos e custou uma vida.
+- [x] **…e a sala de teste passa a abrir em PRODUÇÃO (2026-09-07b)** — no Railway
+      o `ENABLE_DEV_BOTS` não está ligado (nem deve estar), e era lá que o João
+      queria experimentar. A /admin, que já pede a `ADMIN_PASSWORD`, passa a emitir
+      um **bilhete** (`POST /admin/api/playtest-ticket`, uma hora, memória do
+      processo) que destranca a sala de teste. O bilhete viaja no **fragmento** do
+      URL (`#pt=…`) — não vai ao servidor nem ao Referer — e a app limpa-o do URL
+      no arranque, guardando-o no `sessionStorage` do separador.
+      Ficheiros: `server/src/devticket.js` (novo) · `admin.js` · `socket.js`
+      (`exigePlaytest`) · `admin.html` · `client/src/playtest.js`.
+      Verificado: `npm test` **220/220** (`test/playtest-gate.test.js` novo, que
+      corre de propósito SEM a variável) e a /admin real no Chrome com o servidor
+      sem `ENABLE_DEV_BOTS`: entrar, Demos, "▶ jogar" numa cena, sala de pé.
 
 **Colega (BD)**
 - [ ] **Correr `db/04_telemetria.sql`** (ou `prisma db push`) — sem isso as
