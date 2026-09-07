@@ -5,6 +5,41 @@
 
 ---
 
+## 2026-09-07 (c) — O ecrã em branco do ⚖️ Tribunal na Roda (e o dropdown ilegível)
+
+Primeiro achado da sala de teste, e no primeiro dia: o João encomendou o
+Tribunal, girou a roda, e **desapareceu tudo**.
+
+### O bug
+O servidor punha `g.phase = 'tribunal'` e o `Game.jsx` até tinha o
+`<TribunalCard>` escrito — mas a fase não estava na lista `SPIN_PHASES`, e é essa
+lista que decide o `revealed` que manda desenhar o cartão. Nem o cartão nem a
+roda: **ecrã em branco**. Estava assim desde que o tipo foi feito (04 set); nunca
+se viu porque o Tribunal só sai em hardcore/caos e é raro. É exatamente o género
+de coisa para que a sala de teste foi feita — e apanhou-a no primeiro uso.
+
+### O que se fez além de corrigir
+Uma linha resolvia. Mas o erro não foi esquecer uma linha: foi haver **duas
+listas de fases**, uma de cada lado do arame, sem nada a compará-las. Por isso
+ficou também `test/fases-do-cliente.test.js`, que lê as fases que o motor da Roda
+consegue produzir (`g.phase = '…'` no `game.js` e no `game/*.js`) e exige que o
+`Game.jsx` saiba desenhar todas. Cruza a fronteira servidor↔cliente de propósito:
+vivem no mesmo repositório e é esta a costura que se rasgou. Confirmado que falha
+se se voltar a tirar a linha.
+
+### E o segundo bug: a lista da barra 🧪 "toda branca"
+Era um `<select>` nativo: o menu abre-se com as cores do SISTEMA (fundo branco) e
+por baixo levava o texto branco da app. Passou a ser uma lista de chips da
+própria app, com scroll — e de caminho poupa dois toques, porque carregar num
+jogo passa a SER encomendá-lo.
+
+Ficheiros: `client/src/pages/Game.jsx` · `components/PlaytestBar.jsx` ·
+`server/test/fases-do-cliente.test.js` (novo).
+Verificado: `npm test` **222/222** e o percurso todo no Chrome — encomendar o
+Tribunal, girar, e ver o banco dos réus com a tese e os 90 s a contar.
+
+---
+
 ## 2026-09-07 (b) — A sala de teste abre no servidor a sério (bilhetes da /admin)
 
 O playtest funcionava em dev e no Railway dizia "bots de dev não estão ativos" —

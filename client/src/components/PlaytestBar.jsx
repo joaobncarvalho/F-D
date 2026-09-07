@@ -39,12 +39,14 @@ export default function PlaytestBar({ room, youId }) {
     ? (catalogo?.casas || []).map((c) => ({ id: `${c.kind}:${c.gameKey || ''}`, label: c.label }))
     : (catalogo?.tipos || []).map((t) => ({ id: t.key, label: t.label }));
 
-  function encomenda() {
-    if (!escolha) return;
+  function encomenda(id) {
+    if (!id) return;
     sfx.click();
+    setEscolha(id);
+    setErro(null);
     const payload = board
-      ? { casa: { kind: escolha.split(':')[0], gameKey: escolha.split(':')[1] || null }, ticket: bilhete() }
-      : { gameTypeKey: escolha, ticket: bilhete() };
+      ? { casa: { kind: id.split(':')[0], gameKey: id.split(':')[1] || null }, ticket: bilhete() }
+      : { gameTypeKey: id, ticket: bilhete() };
     socket.emit('dev_force_next', payload, (r) => {
       if (!r?.ok) setErro(r?.message || 'Não deu para encomendar.');
     });
@@ -69,20 +71,21 @@ export default function PlaytestBar({ room, youId }) {
                 : 'Encomenda o jogo da tua próxima volta à roda. Vale uma vez, e só para ti.'}
             </p>
 
-            <div className="flex gap-2">
-              <select
-                value={escolha}
-                onChange={(e) => setEscolha(e.target.value)}
-                className="fd-chip flex-1 min-w-0 text-sm bg-black/40"
-              >
-                <option value="">{catalogo ? '— escolhe —' : 'a carregar…'}</option>
-                {opcoes.map((o) => (
-                  <option key={o.id} value={o.id}>{o.label}</option>
-                ))}
-              </select>
-              <button onClick={encomenda} disabled={!escolha} className="fd-btn fd-btn-primary text-sm px-3">
-                Encomendar
-              </button>
+            {/* Lista da própria app, e não um <select>: o menu nativo abre-se com
+                as cores do sistema (fundo branco) por baixo do texto branco da
+                app, e ficava ilegível. Aqui também poupa dois toques — carregar
+                num jogo É encomendá-lo. */}
+            {!catalogo && !erro && <p className="text-[11px] text-white/40 py-2">a carregar os jogos…</p>}
+            <div className="grid grid-cols-2 gap-1.5 max-h-[38vh] overflow-y-auto pr-0.5">
+              {opcoes.map((o) => (
+                <button
+                  key={o.id}
+                  onClick={() => encomenda(o.id)}
+                  className={`fd-chip text-left text-xs leading-tight py-2 ${escolha === o.id ? 'fd-chip-on' : ''}`}
+                >
+                  {o.label}
+                </button>
+              ))}
             </div>
 
             {emEspera && (

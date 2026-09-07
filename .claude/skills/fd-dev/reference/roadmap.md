@@ -245,6 +245,15 @@ Legenda: ✅ feito · 🚧 em curso · ⬜ por fazer · 🔗 ponto de integraç�
       Verificado: `npm test` **220/220** (`test/playtest-gate.test.js` novo, que
       corre de propósito SEM a variável) e a /admin real no Chrome com o servidor
       sem `ENABLE_DEV_BOTS`: entrar, Demos, "▶ jogar" numa cena, sala de pé.
+- [x] **1.º achado da sala de teste (2026-09-07c)** — e no primeiro dia: girar a
+      roda para o ⚖️ Tribunal dava **ecrã em branco**. A fase `tribunal` nunca foi
+      posta no `SPIN_PHASES` do `Game.jsx`, e sem isso o cartão do julgamento (que
+      já existia) nunca era desenhado. Estava assim desde 04 set — nunca se viu
+      porque o tipo só sai em hardcore/caos. Corrigido, e com guarda nova:
+      `test/fases-do-cliente.test.js` compara as fases que o servidor produz com
+      as que o cliente sabe desenhar (havia duas listas sem ninguém a
+      compará-las). A lista da barra 🧪 deixou de ser um `<select>` nativo — abria
+      com as cores do sistema e ficava ilegível. `npm test` **222/222**.
 
 **Colega (BD)**
 - [ ] **Correr `db/04_telemetria.sql`** (ou `prisma db push`) — sem isso as

@@ -49,6 +49,13 @@ const SPIN_PHASES = [
   'detetor',
   'julgamento',
   'contrato',
+  // ⚖️ Tribunal. Faltava aqui, e a falta dava ECRÃ VAZIO: o `revealed` abaixo
+  // exige que a fase esteja nesta lista, por isso o cartão do julgamento (que já
+  // existia, lá em baixo) nunca chegava a ser desenhado — a roda parava e a app
+  // ficava em branco. Não se tinha visto porque o tipo só sai em hardcore/caos.
+  // REGRA: toda a fase que o servidor ponha em `g.phase` para uma RONDA tem de
+  // estar nesta lista (test/fases-do-cliente.test.js guarda isso).
+  'tribunal',
 ];
 
 // Sugestões para os indecisos na preparação (banco curado — offline, sem custo).
