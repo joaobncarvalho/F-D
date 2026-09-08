@@ -5,6 +5,62 @@
 
 ---
 
+## 2026-09-08 (b) — 🐍 O azar da ganância também deixou de ser uma linha de texto
+
+Terceira carta de ecrã inteiro do Tabuleiro em dois dias, e a que fechava o
+buraco mais óbvio: a ganância é a **única jogada do tabuleiro em que o jogador
+escolhe o próprio castigo**. Bebe-se mais para andar mais depressa, o ecrã até
+avisa ("cuidado: outra de 3 casas seguidas e a ganância castiga-te"), e depois a
+fatura chegava numa linha cor-de-rosa por baixo da pista. Aviso a sério, cobrança
+a sussurrar.
+
+### O gesto: **aperta**
+
+`client/src/pages/board/GananciaOverlay.jsx`. Duas mandíbulas entram das bordas e
+fecham sobre o centro do ecrã; a carta com o veredito entra **quando elas se
+juntam** (0,45 s), não antes — e é nesse instante que o abanão e a vibração
+disparam, porque é o fecho que tem de se sentir, não a carta a abrir.
+
+Ficam agora quatro linguagens, e nenhuma se parece com as outras:
+
+| | o que é | o gesto |
+|---|---|---|
+| `EventoDaNoite` | cai do céu sobre a mesa | tempestade, tudo **desce** |
+| `RegraNova` | instala-se e fica a valer | carimbo, faixas |
+| `MaldicaoOverlay` | estava enterrada e acordou | fumo a **subir** |
+| `GananciaOverlay` | a mesa cobra o que se pediu | mandíbulas a **fechar** |
+
+O **1% que escapa** recebe a mesma armadilha ao contrário: as mandíbulas fecham,
+não apanham nada, e voltam a abrir — verde, confetti, alívio. É a mesma
+armadilha; o que muda é o fim. Ficou também no showroom (`b-greed-escapa`),
+porque à mesa ninguém o vai ver: numa noite a ganância dispara meia dúzia de
+vezes e escapar é 1 em 100.
+
+### O que mudou do lado do servidor
+
+O `lastEvent.greed` era `true`. Passou a objeto — `{ victim, turn, escapou,
+emoji, titulo, texto }`. Ler o castigo do texto seria voltar a decidir no cliente
+uma coisa já decidida no servidor. O `turn` (a jogada) vai junto porque é o que
+torna cada castigo **único**: dois castigos iguais seguidos não têm mais nada que
+os distinga, e sem isso o segundo não chegava a aparecer no ecrã — o mesmo
+problema que a maldição resolve com o par (casa, carta).
+
+O cliente só encena quando vem o objeto: um `greed: true` antigo (de um snapshot
+guardado antes desta versão) continua a pintar a linha cor-de-rosa e mais nada.
+
+No caso da prisão, o texto continua a ser o que o `applyPrison` escreveu — pode
+ser prisão direta ou o ⚖️ Tribunal a abrir —, e aqui só se marca que a origem foi
+a ganância.
+
+Ficheiros: `client/src/pages/board/GananciaOverlay.jsx` (novo) · `pages/Board.jsx` ·
+`pages/Demo.jsx` (cena `b-greed` com payload novo + `b-greed-escapa` nova) ·
+`server/src/board.js`.
+Verificado: `npm test` **224/224**, `npm run build` limpo, e as duas cenas no
+showroom em Chrome — as mandíbulas fecham, a carta entra por cima, tudo se fecha
+sozinho e o tabuleiro por baixo volta a responder.
+
+---
+
 ## 2026-09-08 — ☠️ A maldição ganhou encenação, e a ⚡ Reação passou a custar uma vida
 
 Duas coisas que estavam escritas mas não se **viam** nem se **sentiam**.

@@ -7,6 +7,7 @@ import { GambleReveal, CardPlayReveal, OrderReveal } from './board/reveals.jsx';
 import { Beerpong } from './board/Beerpong.jsx';
 import { EventoOverlay } from './board/EventoOverlay.jsx';
 import MaldicaoOverlay from './board/MaldicaoOverlay.jsx';
+import GananciaOverlay from './board/GananciaOverlay.jsx';
 import TribunalBand from './board/TribunalBand.jsx';
 import { BotaoReacao } from './games/ReacaoCard.jsx';
 import Feed, { ShareResult } from '../components/Feed.jsx';
@@ -38,6 +39,7 @@ export default function Board({ room, youId, myHand, myTraps, onPickPawn, onRoll
   const [ruleFail, setRuleFail] = useState(null); // regra a marcar como falhada (à espera de quem falhou)
   const [orderReveal, setOrderReveal] = useState(null); // { dice, order } — revelação da ordem
   const [maldicao, setMaldicao] = useState(null); // ☠️ maldição a disparar (overlay de ecrã inteiro)
+  const [ganancia, setGanancia] = useState(null); // 🐍 azar da ganância (overlay de ecrã inteiro)
 
   // Efeitos por evento (vitória / prisão / passo / blackjack).
   const wonRef = useRef(false);
@@ -110,6 +112,19 @@ export default function Board({ room, youId, myHand, myTraps, onPickPawn, onRoll
     setMaldicao(b.lastEvent.trap);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [trapKey]);
+
+  // 🐍 Azar da ganância: mesmo tratamento. Aqui a chave é a JOGADA (`turn`), que
+  // o servidor manda no payload — dois castigos iguais seguidos não têm mais
+  // nada que os distinga, e sem isso o segundo não chegava a aparecer.
+  // O `greed` antigo era um booleano (e ainda chega assim de estados guardados);
+  // só se encena quando vem o objeto.
+  const gd = typeof b?.lastEvent?.greed === 'object' ? b.lastEvent.greed : null;
+  const greedKey = gd ? `${gd.turn}|${gd.titulo}|${gd.texto}` : null;
+  useEffect(() => {
+    if (!greedKey) return;
+    setGanancia(gd);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [greedKey]);
 
   if (!b) return null;
   const rows = room.players.map((p) => ({ ...p, ...(b.players[p.id] || {}) }));
@@ -382,6 +397,13 @@ export default function Board({ room, youId, myHand, myTraps, onPickPawn, onRoll
       <AnimatePresence>
         {maldicao && (
           <MaldicaoOverlay key={`${maldicao.square}|${maldicao.key}`} trap={maldicao} onDone={() => setMaldicao(null)} />
+        )}
+      </AnimatePresence>
+
+      {/* 🐍 Azar da ganância — a armadilha a fechar, fecha-se sozinha */}
+      <AnimatePresence>
+        {ganancia && (
+          <GananciaOverlay key={`${ganancia.turn}|${ganancia.texto}`} greed={ganancia} onDone={() => setGanancia(null)} />
         )}
       </AnimatePresence>
 

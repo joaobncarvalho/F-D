@@ -146,6 +146,7 @@ const PLAY = {
   'b-turn': { mode: 'board' },
   'b-card': { mode: 'board' },
   'b-greed': { mode: 'board' },
+  'b-greed-escapa': { mode: 'board' },
   'b-over': { mode: 'board' },
   'b-regras': { mode: 'board' },
   'b-maldicao': { mode: 'board' },
@@ -236,7 +237,26 @@ const SCENARIOS = [
   { id: 'b-bp-jack', kind: 'board', group: 'Tabuleiro', label: '🏓 Beer Pinga: JACKPOT 🏆', render: renderBoard({ lastEvent: { text: '🍺 Acertaste no copo (trás) — bebe 4 · avança 3 + carta!', beerpong: { row: 2, cupIdx: 0, cupCount: 5, base: 4, emoji: '🏆', title: 'JACKPOT', desc: 'avança 3 + carta', good: true } } }) },
   { id: 'b-bp-bad', kind: 'board', group: 'Tabuleiro', label: '🏓 Beer Pinga: Afogado 🥴', render: renderBoard({ lastEvent: { text: '🍺 Acertaste no copo (trás) — bebe 4 · +6 golos!', beerpong: { row: 2, cupIdx: 1, cupCount: 5, base: 4, emoji: '🥴', title: 'Afogado', desc: '+6 golos', good: false } } }) },
   { id: 'b-card', kind: 'board', group: 'Tabuleiro', label: '🔁 Carta usada (banner)', render: renderBoard({ lastEvent: { text: '🔁 Bea trocou de casa contigo', card: { key: 'swap', emoji: '🔁', name: 'Troca', by: 'Bea', target: 'Tu' } } }) },
-  { id: 'b-greed', kind: 'board', group: 'Tabuleiro', label: '🐍 Ganância castigada', render: renderBoard({ lastEvent: { text: '🐍 Ganância castigada — recuas 3 casas!', greed: true } }) },
+  {
+    id: 'b-greed', kind: 'board', group: 'Tabuleiro', label: '🐍 Ganância castigada',
+    render: renderBoard({
+      lastEvent: {
+        text: '🐍 Ganância castigada — recuas 3 casas!',
+        greed: { victim: 'Tu', turn: 12, escapou: false, emoji: '🐍', titulo: 'Ganância castigada', texto: 'Recua 3 casas' },
+      },
+    }),
+  },
+  {
+    // O 1%. Está no showroom porque à mesa nunca ninguém o vai ver: numa noite
+    // inteira a ganância dispara meia dúzia de vezes, e escapar é 1 em 100.
+    id: 'b-greed-escapa', kind: 'board', group: 'Tabuleiro', label: '😅 Ganância — escapou (1%)',
+    render: renderBoard({
+      lastEvent: {
+        text: '😅 Tu abusaste da ganância… mas escapaste por um triz! Fica na mesma.',
+        greed: { victim: 'Tu', turn: 13, escapou: true, emoji: '😅', titulo: 'Escapou por um triz', texto: 'Fica tudo na mesma — desta vez.' },
+      },
+    }),
+  },
   { id: 'b-over', kind: 'board', group: 'Tabuleiro', label: '🏁 Ecrã de fim', render: renderBoard({ phase: 'over', winner: { id: 'p2', name: 'Bea' }, winnerId: 'p2', currentPlayerId: null }) },
 
   // ---------- Roda ----------

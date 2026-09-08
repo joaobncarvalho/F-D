@@ -271,6 +271,18 @@ Legenda: ✅ feito · 🚧 em curso · ⬜ por fazer · 🔗 ponto de integraç�
       Verificado: `npm test` **224/224** (2 testes novos), `npm run build`, e as
       duas cenas no showroom em Chrome — a maldição abre, fecha-se sozinha e não
       tranca o tabuleiro.
+- [x] **🐍 O azar da ganância também ganhou encenação (2026-09-08b)** — a única
+      jogada do tabuleiro em que o jogador escolhe o próprio castigo tinha aviso
+      a sério e cobrança a sussurrar (uma linha cor-de-rosa por baixo da pista).
+      Ganhou a quarta linguagem de carta de ecrã inteiro: **aperta** — duas
+      mandíbulas fecham sobre o centro, e a carta com o veredito entra no instante
+      em que se juntam (é aí que o abanão dispara). O 1% que escapa recebe a mesma
+      armadilha ao contrário: fecha, não apanha nada, volta a abrir. O
+      `lastEvent.greed` deixou de ser um booleano e passou a objeto, com o número
+      da jogada — que é o que torna dois castigos iguais seguidos distinguíveis.
+      Ficheiros: `client/src/pages/board/GananciaOverlay.jsx` (novo) · `Board.jsx` ·
+      `Demo.jsx` (cena nova para o 1%) · `server/src/board.js`.
+      Verificado: `npm test` **224/224**, build limpo, e as duas cenas no showroom.
 
 **Colega (BD)**
 - [ ] **Correr `db/04_telemetria.sql`** (ou `prisma db push`) — sem isso as

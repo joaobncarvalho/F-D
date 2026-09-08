@@ -510,30 +510,53 @@ export function boardRuleFail(room, reporterId, ruleId, targetId) {
 }
 
 // Azar da ganância: 99% algo mau, 1% escapa. Punição direta (não é escolha).
+//
+// O `greed` do `lastEvent` passou de `true` a um objeto: a encenação do cliente
+// (board/GananciaOverlay.jsx) precisa de saber SE escapou e O QUÊ lhe aconteceu,
+// e ler isso do texto seria voltar a decidir no cliente uma coisa que já foi
+// decidida aqui. O `turn` vai junto porque é o que torna cada castigo único —
+// sem ele, dois castigos iguais seguidos liam-se como o mesmo evento e o segundo
+// não chegava a aparecer no ecrã.
 function applyGreed(room, playerId) {
   const b = room.board;
   const me = b.players[playerId];
   const nm = nameOf(room, playerId);
+  const marca = (extra) => ({ victim: nm, turn: b.turnCount || 0, escapou: false, ...extra });
+
   if (Math.random() < 0.01) {
-    b.lastEvent = { text: `😅 ${nm} abusou da ganância… mas escapou por um triz! Fica na mesma.`, greed: true };
+    b.lastEvent = {
+      text: `😅 ${nm} abusou da ganância… mas escapou por um triz! Fica na mesma.`,
+      greed: marca({ escapou: true, emoji: '😅', titulo: 'Escapou por um triz', texto: 'Fica tudo na mesma — desta vez.' }),
+    };
     return;
   }
   switch (Math.floor(Math.random() * 4)) {
     case 0:
       me.pos = Math.max(0, me.pos - 3);
-      b.lastEvent = { text: `🐍 Ganância castigada — ${nm} recua 3 casas!`, greed: true };
+      b.lastEvent = {
+        text: `🐍 Ganância castigada — ${nm} recua 3 casas!`,
+        greed: marca({ emoji: '🐍', titulo: 'Ganância castigada', texto: 'Recua 3 casas' }),
+      };
       break;
     case 1:
       drinkFromSquare(room, playerId, 4);
-      b.lastEvent = { text: `🐍 Ganância castigada — ${nm} bebe 4 golos!`, greed: true };
+      b.lastEvent = {
+        text: `🐍 Ganância castigada — ${nm} bebe 4 golos!`,
+        greed: marca({ emoji: '🍺', titulo: 'Ganância castigada', texto: 'Bebe 4 golos' }),
+      };
       break;
     case 2:
       drinkFromSquare(room, playerId, 6);
-      b.lastEvent = { text: `🐍 Ganância castigada — ${nm} vira 6 golos de uma vez! 🥴`, greed: true };
+      b.lastEvent = {
+        text: `🐍 Ganância castigada — ${nm} vira 6 golos de uma vez! 🥴`,
+        greed: marca({ emoji: '🥴', titulo: 'Ganância castigada', texto: 'Vira 6 golos de uma vez' }),
+      };
       break;
     case 3:
       applyPrison(room, playerId, 'ganância');
-      if (b.lastEvent) b.lastEvent.greed = true;
+      // O texto é o que o `applyPrison` escreveu (pode ser prisão direta ou o
+      // ⚖️ Tribunal a abrir) — aqui só se marca que a origem foi a ganância.
+      if (b.lastEvent) b.lastEvent.greed = marca({ emoji: '🚔', titulo: 'Ganância castigada', texto: 'Vais preso' });
       break;
   }
 }
