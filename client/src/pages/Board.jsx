@@ -6,6 +6,7 @@ import { PlayingCard, BlackjackReveal } from './board/blackjack.jsx';
 import { GambleReveal, CardPlayReveal, OrderReveal } from './board/reveals.jsx';
 import { Beerpong } from './board/Beerpong.jsx';
 import { EventoOverlay } from './board/EventoOverlay.jsx';
+import MaldicaoOverlay from './board/MaldicaoOverlay.jsx';
 import TribunalBand from './board/TribunalBand.jsx';
 import { BotaoReacao } from './games/ReacaoCard.jsx';
 import Feed, { ShareResult } from '../components/Feed.jsx';
@@ -36,6 +37,7 @@ export default function Board({ room, youId, myHand, myTraps, onPickPawn, onRoll
   const [selCard, setSelCard] = useState(null); // carta selecionada p/ jogar (à espera de alvo)
   const [ruleFail, setRuleFail] = useState(null); // regra a marcar como falhada (à espera de quem falhou)
   const [orderReveal, setOrderReveal] = useState(null); // { dice, order } — revelação da ordem
+  const [maldicao, setMaldicao] = useState(null); // ☠️ maldição a disparar (overlay de ecrã inteiro)
 
   // Efeitos por evento (vitória / prisão / passo / blackjack).
   const wonRef = useRef(false);
@@ -97,6 +99,17 @@ export default function Board({ room, youId, myHand, myTraps, onPickPawn, onRoll
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [b?.phase]);
+
+  // ☠️ Maldição a disparar: dá-lhe ecrã inteiro por ~3,6 s. A chave é o par
+  // (casa, chave da carta) — estável entre broadcasts, e única porque a casa é
+  // consumida quando dispara. Sem ela, cada `room_state` re-armava o timer e a
+  // encenação nunca mais saía do ecrã.
+  const trapKey = b?.lastEvent?.trap ? `${b.lastEvent.trap.square}|${b.lastEvent.trap.key}` : null;
+  useEffect(() => {
+    if (!trapKey) return;
+    setMaldicao(b.lastEvent.trap);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [trapKey]);
 
   if (!b) return null;
   const rows = room.players.map((p) => ({ ...p, ...(b.players[p.id] || {}) }));
@@ -364,6 +377,13 @@ export default function Board({ room, youId, myHand, myTraps, onPickPawn, onRoll
         onVota={onTribunalVota}
         onFecha={onTribunalFecha}
       />
+
+      {/* ☠️ Maldição — encenação de ecrã inteiro, fecha-se sozinha */}
+      <AnimatePresence>
+        {maldicao && (
+          <MaldicaoOverlay key={`${maldicao.square}|${maldicao.key}`} trap={maldicao} onDone={() => setMaldicao(null)} />
+        )}
+      </AnimatePresence>
 
       {/* Casa ?? — overlay de 3 cartas viradas + flip */}
       <EventoOverlay

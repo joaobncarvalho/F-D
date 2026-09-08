@@ -255,3 +255,49 @@ test('Duelo: com o catálogo maior, a roda não repete sempre os mesmos', async 
   }
   assert.ok(vistos.size >= 6, `em 60 duelos só saíram ${vistos.size} tipos: ${[...vistos]}`);
 });
+
+// ----- Reação: o último não bebe só, perde uma vida ---------------------------
+// A regra mudou depois do playtest (dois golos era barato de mais para um jogo
+// que pára a mesa toda). O que se guarda aqui é o CUSTO, não a corrida em si.
+
+test('Reação: o último bebe e perde uma vida; os outros ficam intactos', async () => {
+  const { room, players } = start();
+  const [ana, rui, ze] = players;
+  const round = await spinUntil(room, 'reacao');
+  assert.equal(round.substate, 'racing');
+
+  // Força a janela aberta e mete os toques por ordem: Ana → Rui → Zé.
+  round.reaction.goAt = Date.now() - 50;
+  game.reacaoTap(room, ana.id);
+  game.reacaoTap(room, rui.id);
+  game.reacaoTap(room, ze.id);
+
+  const r = room.game.round;
+  assert.equal(r.substate, 'result', 'com todos a carregar, resolve sozinho');
+  const ultimo = r.result.ranking[r.result.ranking.length - 1];
+  assert.equal(r.result.perdeuVida?.id, ultimo.id, 'a vida sai a quem ficou em último');
+  assert.equal(room.players.get(ultimo.id).lives, 2, 'e sai mesmo — de 3 para 2');
+  for (const p of players) {
+    if (p.id === ultimo.id) continue;
+    assert.equal(room.players.get(p.id).lives, 3, 'quem não foi último não paga vida');
+  }
+  assert.ok(r.result.drinkers.some((d) => d.id === ultimo.id), 'o último também bebe');
+  assert.equal(r.efeitoVida.type, 'vida_perdida', 'o efeito fica pronto para o socket emitir');
+});
+
+test('Reação: falso arranque cai para último e é esse que perde a vida', async () => {
+  const { room, players } = start();
+  const [ana, rui, ze] = players;
+  const round = await spinUntil(room, 'reacao');
+
+  game.reacaoTap(room, ze.id); // ainda antes do GO → falso arranque
+  round.reaction.goAt = Date.now() - 50;
+  game.reacaoTap(room, ana.id);
+  game.reacaoTap(room, rui.id);
+
+  const r = room.game.round;
+  assert.equal(r.result.perdeuVida?.id, ze.id, 'quem se precipitou fica em último');
+  assert.equal(room.players.get(ze.id).lives, 2);
+  assert.equal(room.players.get(ana.id).lives, 3);
+  assert.equal(room.players.get(rui.id).lives, 3);
+});

@@ -255,6 +255,23 @@ Legenda: ✅ feito · 🚧 em curso · ⬜ por fazer · 🔗 ponto de integraç�
       compará-las). A lista da barra 🧪 deixou de ser um `<select>` nativo — abria
       com as cores do sistema e ficava ilegível. `npm test` **222/222**.
 
+- [x] **☠️ A maldição passou a ver-se, e a ⚡ Reação passou a doer (2026-09-08)** —
+      duas coisas que eram só texto. A maldição escondida numa casa (o melhor
+      truque do Tabuleiro: alguém a plantou há dez minutos e ninguém sabia onde)
+      disparava numa linha do `lastEvent` que a mesa lia depois de já ter passado
+      à frente — agora tem encenação de ecrã inteiro própria: círculo de ritual,
+      fumo a SUBIR (o contrário da tempestade do Evento da Noite) e o emoji a sair
+      da casa. E na Reação o último a carregar deixou de pagar só dois golos:
+      **perde uma vida**, como já acontecia na Mímica e no Relâmpago. Um falso
+      arranque que não acabe em último continua a pagar só em golos.
+      Ficheiros: `client/src/pages/board/MaldicaoOverlay.jsx` (novo) · `Board.jsx` ·
+      `Demo.jsx` (cena nova ⚡ Reação) · `games/ReacaoCard.jsx` · `components/Rules.jsx` ·
+      `server/src/board.js` (payload da maldição com `text`/`self`) ·
+      `server/src/game/reacao.js` · `socket.js`.
+      Verificado: `npm test` **224/224** (2 testes novos), `npm run build`, e as
+      duas cenas no showroom em Chrome — a maldição abre, fecha-se sozinha e não
+      tranca o tabuleiro.
+
 **Colega (BD)**
 - [ ] **Correr `db/04_telemetria.sql`** (ou `prisma db push`) — sem isso as
       contagens da /admin vivem no disco do container e morrem a cada deploy.

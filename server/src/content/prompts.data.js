@@ -726,7 +726,7 @@ export const GAME_TYPES = [
   },
   {
     // Reação (Primeiro a Carregar) — mecânica pura: conta decrescente com atraso
-    // aleatório; o último a carregar bebe. Também é duelo no Torneio e casa no Tabuleiro.
+    // aleatório; o último a carregar bebe e perde uma vida. Também é duelo no Torneio e casa no Tabuleiro.
     key: 'reacao',
     label: 'Reação',
     prompts: [],

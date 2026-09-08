@@ -15,6 +15,7 @@ import { AnimatePresence } from 'framer-motion';
 import Board from './Board.jsx';
 import { PromptCard, ChoiceCard, IntrigasCard } from './games/cards.jsx';
 import { RelampagoCard, MimicaCard, RoletaCard, DueloCard } from './games/quickCards.jsx';
+import { ReacaoCard } from './games/ReacaoCard.jsx';
 import { TribunalCard } from './games/hardcoreCards.jsx';
 import Beat from '../components/Beat.jsx';
 import PalpiteBand from './games/PalpiteBand.jsx';
@@ -174,6 +175,7 @@ const PLAY = {
   'w-iaq': { mode: 'wheel', tipo: 'isto_ou_aquilo' },
   'w-intrigas': { mode: 'wheel', tipo: 'intrigas' },
   'w-relampago': { mode: 'wheel', tipo: 'categoria_relampago' },
+  'w-reacao': { mode: 'wheel', tipo: 'reacao' },
   'w-mimica': { mode: 'wheel', tipo: 'mimica' },
   'w-roleta': { mode: 'wheel', tipo: 'roleta_russa' },
   'w-moeda': { mode: 'wheel', tipo: 'duelo' },
@@ -293,7 +295,7 @@ const SCENARIOS = [
   },
   {
     id: 'b-maldicao', kind: 'board', group: 'Tabuleiro', label: '☠️ Maldição disparada',
-    render: renderBoard({ trapCount: 1, lastEvent: { text: '☠️ MALDIÇÃO na casa 14: Tu bebes 4 golos (deixada por Bea)', trap: { key: 'curse_drink', emoji: '☠️', square: 14, victim: 'Tu', owner: 'Bea' } } }),
+    render: renderBoard({ trapCount: 1, lastEvent: { text: '☠️ MALDIÇÃO na casa 14: Tu bebes 4 golos (deixada por Bea)', trap: { key: 'curse_drink', emoji: '☠️', square: 14, victim: 'Tu', owner: 'Bea', text: 'bebes 4 golos', self: false } } }),
   },
   {
     id: 'w-intrigas', kind: 'wheel', group: 'Roda', label: '🗳️ Intrigas',
@@ -302,6 +304,37 @@ const SCENARIOS = [
   {
     id: 'w-relampago', kind: 'wheel', group: 'Roda', label: '⚡ Categoria Relâmpago',
     render: () => <RelampagoCard round={{ id: 'r1', gameTypeKey: 'categoria_relampago', currentPlayerId: 'me', currentPlayerName: 'Tu', category: 'Marcas de cerveja', seconds: 8, substate: 'ready', result: null }} room={{ players: mkPlayers() }} youId="me" canControl onStart={noop} onTimeUp={noop} onVota={noop} onContinue={noop} />,
+  },
+  {
+    // O estado que interessa ver é o RESULTADO: é onde se lê que o último não
+    // bebe só — perde mesmo uma vida. A corrida em si vê-se a jogar ("▶ jogar").
+    id: 'w-reacao', kind: 'wheel', group: 'Roda', label: '⚡ Reação (resultado)',
+    render: () => (
+      <ReacaoCard
+        round={{
+          id: 'r1',
+          gameTypeKey: 'reacao',
+          substate: 'result',
+          reaction: { goAt: Date.now(), done: true, tapped: ['me', 'p2'], falseStarts: [] },
+          result: {
+            ranking: [
+              { id: 'p2', name: 'Bea', ms: 214, early: false, missed: false },
+              { id: 'me', name: 'Tu', ms: 388, early: false, missed: false },
+              { id: 'p3', name: 'Rui', ms: null, early: false, missed: true },
+            ],
+            winner: { id: 'p2', name: 'Bea' },
+            drinkers: [{ id: 'p3', name: 'Rui' }],
+            perdeuVida: { id: 'p3', name: 'Rui' },
+            eliminado: false,
+          },
+        }}
+        room={{ players: mkPlayers() }}
+        youId="me"
+        canControl
+        onTap={noop}
+        onContinue={noop}
+      />
+    ),
   },
   {
     id: 'w-mimica', kind: 'wheel', group: 'Roda', label: '🎭 Mímica',

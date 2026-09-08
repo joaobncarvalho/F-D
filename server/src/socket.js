@@ -903,6 +903,10 @@ export function registerSocketHandlers(io) {
       try {
         const room = requireRoom(socket);
         const res = game.reacaoTap(room, socket.data.playerId);
+        // Se este toque fechou a corrida, o último perdeu uma vida — o cliente
+        // precisa do efeito para o animar (Beat.jsx), como nos outros jogos.
+        const efeito = room.game?.round?.efeitoVida;
+        if (efeito) io.to(room.code).emit('action_result', { effect: efeito });
         broadcastState(io, room.code);
         if (typeof ack === 'function') ack({ ok: true, ...res });
       } catch (err) {

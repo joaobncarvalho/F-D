@@ -50,7 +50,7 @@ const JOGOS = {
   quem_disse: 'Mostra-se uma pergunta escrita na preparação. Adivinha quem a escreveu — quem erra bebe.',
   cascata: 'Todos começam a beber. Só podes parar depois de quem está à tua frente. O último bebe muito mais.',
   desenho: 'Desenhas a palavra no telemóvel; os outros adivinham. Ninguém acerta = bebes tu.',
-  reacao: 'Assim que o ecrã ficar verde: carrega. O último bebe. Carregar antes do sinal também.',
+  reacao: 'Assim que o ecrã ficar verde: carrega. O último bebe E perde uma vida. Carregar antes do sinal manda-te para último.',
   bomba: 'Diz um item do tema e passa. O pavio é secreto — quem a tiver na mão quando rebentar perde uma vida ❤️',
   leilao: 'Ninguém quer o desafio. Licitam-se goles EM SEGREDO para escapar: quem licitar menos, fá-lo (e não bebe). Os outros bebem o que licitaram.',
   sincronia: 'Dois respondem à mesma pergunta em segredo. Se derem a mesma resposta, bebe a mesa toda; se não, bebem os dois.',

@@ -161,7 +161,7 @@ export { reacaoTap, resolveReacaoRoda } from './game/reacao.js';
 //                (eu_nunca / mais_provavel / termometro / quem_disse)
 //   'cascata'  — corrente: só paras depois de quem está à tua frente
 //   'desenho'  — desenha e adivinha (traços por canal próprio, palavra privada)
-//   'reacao'   — primeiro a carregar; o último bebe
+//   'reacao'   — primeiro a carregar; o último bebe e perde uma vida
 //   'gameover'
 //
 // Vidas: só se perdem em recusas (Boca Calada / Desafio). Intrigas/Segredos dão

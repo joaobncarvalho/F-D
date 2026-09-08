@@ -6,7 +6,8 @@
 // o "GO!" e regista a ordem dos toques.
 //
 // Regras: quem carrega antes do GO comete falso arranque e cai automaticamente
-// para último. Quem for último bebe. O relógio é do servidor (autoridade); os
+// para último. Quem for último bebe e perde uma vida (só na Roda — o Torneio e o
+// Tabuleiro têm as suas moedas). O relógio é do servidor (autoridade); os
 // clientes só recebem `goAt` e animam.
 
 const MIN_DELAY_MS = 2000;
@@ -91,7 +92,7 @@ export function serializeReaction(state) {
 // ----- Ligação ao modo Roda --------------------------------------------------
 // (o Torneio e o Tabuleiro usam o motor puro acima com as suas próprias regras)
 
-import { connectedOrder, drink, nameOf } from './helpers.js';
+import { connectedOrder, drink, nameOf, perdeVida } from './helpers.js';
 import { AppError } from '../errors.js';
 
 const GOLOS_ULTIMO = 2;
@@ -118,7 +119,20 @@ export function reacaoTap(room, playerId) {
   return res;
 }
 
-/** Fecha a corrida: o último paga; os falsos arranques também. Idempotente. */
+/**
+ * Fecha a corrida: o último BEBE E PERDE UMA VIDA; os falsos arranques bebem.
+ * Idempotente.
+ *
+ * A vida entrou depois do playtest: dois golos era barato de mais para um jogo
+ * que pára a mesa toda a olhar para o mesmo botão, e via-se gente a nem se dar
+ * ao trabalho de carregar. Com uma vida em jogo, a corrida passa a valer o
+ * silêncio que exige — e alinha com a mímica e o relâmpago, onde falhar já
+ * custava vida (ver `game/mimica.js`).
+ *
+ * Um falso arranque que NÃO acabe em último continua a pagar só em golos: quem
+ * se precipitou mas ainda assim não foi o pior da mesa não merece o mesmo
+ * castigo de quem ficou a olhar para o ecrã.
+ */
 export function resolveReacaoRoda(room) {
   const g = room.game;
   const r = g.round;
@@ -134,12 +148,25 @@ export function resolveReacaoRoda(room) {
     drink(g, id, r.reaction.falseStarts.includes(id) ? GOLOS_FALSO_ARRANQUE : GOLOS_ULTIMO);
   }
 
+  // A vida sai a QUEM FICOU EM ÚLTIMO no ranking — inclui quem fez falso
+  // arranque, que o motor já manda para o fim da fila. A trégua e a eliminação
+  // são tratadas dentro do `perdeVida`.
+  const efeito = last
+    ? perdeVida(room, last.id, {
+        motivo: last.early ? 'carregou antes do sinal' : 'foi o último a carregar',
+        emoji: '⚡',
+      })
+    : null;
+
   r.substate = 'result';
   r.status = 'resolved';
+  r.efeitoVida = efeito; // o socket emite-o em `action_result` para o cliente animar
   r.result = {
     ranking: ranking.map((x) => ({ ...named(x.id), ms: x.ms, early: x.early, missed: x.missed })),
     winner: ranking[0] && !ranking[0].early && !ranking[0].missed ? named(ranking[0].id) : null,
     drinkers: [...punished].map(named),
+    perdeuVida: efeito && efeito.type !== 'tregua' ? named(last.id) : null,
+    eliminado: efeito?.type === 'eliminated' || false,
   };
   return r;
 }

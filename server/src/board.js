@@ -424,7 +424,18 @@ function fireTrap(room, playerId) {
   const own = trap.ownerId === playerId ? ' — e a maldição era dele/a próprio/a! 💀' : ` (deixada por ${trap.ownerName})`;
   b.lastEvent = {
     text: `${fx.emoji} MALDIÇÃO na casa ${trap.square}: ${nm} ${fx.text}${own}`,
-    trap: { key: trap.key, emoji: fx.emoji, square: trap.square, victim: nm, owner: trap.ownerName },
+    // `text` e `self` seguem no payload para a encenação do cliente
+    // (board/MaldicaoOverlay.jsx) não ter de voltar a decidir o que a carta faz
+    // nem de comparar ids — quem escondeu o quê é conhecimento do servidor.
+    trap: {
+      key: trap.key,
+      emoji: fx.emoji,
+      square: trap.square,
+      victim: nm,
+      owner: trap.ownerName,
+      text: fx.text,
+      self: trap.ownerId === playerId,
+    },
   };
   return true;
 }

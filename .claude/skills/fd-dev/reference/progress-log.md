@@ -5,6 +5,70 @@
 
 ---
 
+## 2026-09-08 — ☠️ A maldição ganhou encenação, e a ⚡ Reação passou a custar uma vida
+
+Duas coisas que estavam escritas mas não se **viam** nem se **sentiam**.
+
+### A maldição era uma linha de texto
+
+É o melhor truque do Tabuleiro: alguém esconde uma carta `curse_*` numa casa à
+frente, e fica ali enterrada até que alguém pare em cima dela — dez minutos
+depois, às vezes o próprio que a plantou. O momento é dos melhores da noite, e a
+app despachava-o com `☠️ MALDIÇÃO na casa 14: …` numa linha do `lastEvent`, que a
+mesa lia (quando lia) já com a jogada seguinte a começar.
+
+Agora tem carta de ecrã inteiro própria — `client/src/pages/board/MaldicaoOverlay.jsx`.
+O que a distingue das duas que já existiam é o **gesto**, não a cor:
+
+| | o que é | como se lê |
+|---|---|---|
+| `EventoDaNoite` | cai do céu sobre a mesa toda | tempestade / raios, tudo desce |
+| `RegraNova` | instala-se e fica a valer | carimbo, faixas, documento |
+| `MaldicaoOverlay` | **estava enterrada e acordou** | círculo de ritual, fumo a **subir**, o emoji sai da casa |
+
+Fecha-se sozinha (3,6 s) e não recebe toques — o tabuleiro por baixo nunca fica
+trancado por causa da animação. O relógio de saída é armado primeiro e limpo
+sempre, pela mesma razão explicada no `EventoDaNoite.jsx`: com o guarda à frente,
+o duplo-monte do StrictMode deixava a carta presa no ecrã (foi assim que já se
+perdeu tempo duas vezes neste repositório).
+
+O servidor passou a mandar `text` e `self` dentro de `lastEvent.trap`: o cliente
+não tem de voltar a decidir o que a carta faz nem de comparar ids para saber se a
+maldição rebentou na cara de quem a escondeu — isso é conhecimento do servidor.
+
+### Na Reação, o último não pagava quase nada
+
+Dois golos. Para um jogo que **pára a mesa toda** a olhar para o mesmo botão
+vermelho durante seis segundos, era barato de mais — via-se gente a nem se dar ao
+trabalho de carregar. Passa a **perder uma vida**, alinhado com a Mímica e o
+Categoria Relâmpago, onde falhar já custava vida. A regra fica só na **Roda**: o
+Torneio elimina por duelo e o Tabuleiro conta golos, e nenhum dos dois tem vidas.
+
+Detalhe que fica escrito no código: um falso arranque que **não** acabe em último
+continua a pagar só em golos. Quem se precipitou mas ainda assim não foi o pior da
+mesa não merece o mesmo castigo de quem ficou a olhar para o ecrã.
+
+O efeito segue em `action_result` (como nos outros jogos) para o `Beat.jsx` o
+animar, e o cartão de resultado ganhou linha própria para a vida — não fica
+diluída na lista de quem bebe, porque é o castigo que conta.
+
+Ficheiros: `client/src/pages/board/MaldicaoOverlay.jsx` (novo) · `pages/Board.jsx` ·
+`pages/Demo.jsx` (cena nova "⚡ Reação (resultado)") · `pages/games/ReacaoCard.jsx` ·
+`components/Rules.jsx` · `server/src/board.js` · `server/src/game/reacao.js` ·
+`server/src/socket.js` · `server/src/game.js` · `server/src/content/prompts.data.js` ·
+`server/test/roda-novos-tipos.test.js`.
+Verificado: `npm test` **224/224** (dois testes novos: a vida sai a quem ficou em
+último e a mais ninguém; e um falso arranque cai para último e é esse que a
+perde), `npm run build` sem erros, e as duas cenas abertas no showroom em Chrome —
+a maldição entra, fecha-se sozinha, e o tabuleiro por baixo continua a responder.
+
+> Nota: o `test/playtest.test.js` falhou uma vez em três corridas ("a encomenda
+> fica reservada a quem a pediu" — a roda calhou em `tribunal` por acaso). É
+> intermitente e anterior a estas mudanças; fica registado para quando alguém lhe
+> pegar.
+
+---
+
 ## 2026-09-07 (c) — O ecrã em branco do ⚖️ Tribunal na Roda (e o dropdown ilegível)
 
 Primeiro achado da sala de teste, e no primeiro dia: o João encomendou o

@@ -71,7 +71,8 @@ export function ReacaoCard({ round, room, youId, canControl, onTap, onContinue }
   return (
     <CardShell typeKey="reacao">
       <p className="text-sm text-white/60">
-        ⚡ <b>Primeiro a carregar.</b> O último bebe — e carregar antes do sinal também.
+        ⚡ <b>Primeiro a carregar.</b> O último bebe <b>e perde uma vida</b> — e carregar antes
+        do sinal manda-te logo para último.
       </p>
 
       {naCorrida && (
@@ -122,6 +123,15 @@ export function ReacaoCard({ round, room, youId, canControl, onTap, onContinue }
           <p className="text-lg font-extrabold text-rose-300">
             🍺 Bebem: {round.result.drinkers.map((d) => d.name).join(' · ')}
           </p>
+          {/* A vida sai a quem ficou em último — merece linha própria e não
+              ficar diluída na lista de quem bebe: é o castigo que conta. */}
+          {round.result.perdeuVida && (
+            <p className="text-base font-extrabold text-rose-200">
+              {round.result.eliminado
+                ? `💀 ${round.result.perdeuVida.name} ficou sem vidas — shot e está fora!`
+                : `💔 ${round.result.perdeuVida.name} foi o último — perde uma vida.`}
+            </p>
+          )}
           {canControl && (
             <button onClick={() => { sfx.click(); onContinue(); }} className="fd-btn fd-btn-primary">
               Continuar →
