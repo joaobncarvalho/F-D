@@ -1,9 +1,11 @@
 // F&D — cartão do "Jogo do Vasco (Impostor)". Extraído do Game.jsx, comportamento idêntico.
 
 import { useEffect, useRef } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
 import { sfx } from '../../sfx.js';
 import { confetti, haptic } from '../../confetti.js';
-import { CardShell } from './shared.jsx';
+import { CardShell, Fichas } from './shared.jsx';
+import { ITEM_LISTA, LISTA, MOLA, suavizado } from '../../motion.js';
 
 export function VascoCard({ round, room, youId, role, canControl, onStartClues, onClueDone, onVote, onRedeem, onReveal, onContinue }) {
   const theme = round.theme;
@@ -27,7 +29,7 @@ export function VascoCard({ round, room, youId, role, canControl, onStartClues, 
   // --- Reveal do papel ---
   if (sub === 'reveal') {
     return (
-      <CardShell typeKey="vasco">
+      <CardShell typeKey="vasco" passo="reveal">
         {role ? (
           isImpostor ? (
             <>
@@ -71,7 +73,7 @@ export function VascoCard({ round, room, youId, role, canControl, onStartClues, 
     const cur = room.players.find((p) => p.id === round.clueCurrentId);
     const isMyTurn = round.clueCurrentId === youId;
     return (
-      <CardShell typeKey="vasco">
+      <CardShell typeKey="vasco" passo="clues">
         <p className="text-base">
           Tema: <b className="text-teal-300">{theme}</b>
         </p>
@@ -80,10 +82,21 @@ export function VascoCard({ round, room, youId, role, canControl, onStartClues, 
             Palavra: <b className="text-teal-300">{secretWord}</b>
           </p>
         )}
-        <p className="text-base mt-1">
-          Pista de <b className="text-white">{cur?.name || '…'}</b>
-          {isMyTurn && <span className="text-orange-300"> (és tu!)</span>}
-        </p>
+        <AnimatePresence mode="wait" initial={false}>
+          <motion.p
+            key={round.clueCurrentId}
+            className="text-base mt-1"
+            {...suavizado({
+              initial: { opacity: 0, y: 8 },
+              animate: { opacity: 1, y: 0 },
+              exit: { opacity: 0, y: -8 },
+              transition: MOLA.pop,
+            })}
+          >
+            Pista de <b className="text-white">{cur?.name || '…'}</b>
+            {isMyTurn && <span className="text-orange-300"> (és tu!)</span>}
+          </motion.p>
+        </AnimatePresence>
         <p className="text-xs text-white/50">Diz em voz alta UMA palavra ligada à palavra secreta.</p>
         {isMyTurn || canControl ? (
           <button
@@ -107,7 +120,7 @@ export function VascoCard({ round, room, youId, role, canControl, onStartClues, 
     const voted = round.voterIds?.includes(youId);
     const others = room.players.filter((p) => p.connected && !p.eliminated && p.id !== youId);
     return (
-      <CardShell typeKey="vasco">
+      <CardShell typeKey="vasco" passo="voting">
         <p className="text-lg font-bold text-orange-300">🗳️ Quem é o Vasco?</p>
         <p className="text-sm text-white/60">
           Tema: <b className="text-teal-300">{theme}</b> — votem no infiltrado que não sabia a palavra.
@@ -119,20 +132,7 @@ export function VascoCard({ round, room, youId, role, canControl, onStartClues, 
             Votaste! À espera dos outros… {round.voterIds.length}/{activeCount}
           </p>
         ) : (
-          <div className="flex flex-wrap gap-2 justify-center">
-            {others.map((p) => (
-              <button
-                key={p.id}
-                onClick={() => {
-                  sfx.click();
-                  onVote(p.id);
-                }}
-                className="fd-chip"
-              >
-                {p.name}
-              </button>
-            ))}
-          </div>
+          <Fichas players={others} onPick={onVote} />
         )}
         {canControl && (
           <button onClick={onReveal} className="fd-btn fd-btn-ghost py-2 text-sm">
@@ -149,7 +149,7 @@ export function VascoCard({ round, room, youId, role, canControl, onStartClues, 
     const iAmAccused = accused?.id === youId;
     const words = round.boardWords || [];
     return (
-      <CardShell typeKey="vasco">
+      <CardShell typeKey="vasco" passo="redemption">
         <p className="text-lg font-bold text-orange-300">🎯 Apanhado!</p>
         <p className="text-base">
           <b>{accused?.name}</b> é o Vasco! Última hipótese para se safar: adivinhar a palavra do grupo.
@@ -158,20 +158,27 @@ export function VascoCard({ round, room, youId, role, canControl, onStartClues, 
           Tema: <b className="text-teal-300">{theme}</b>
         </p>
         {iAmAccused ? (
-          <div className="grid grid-cols-3 gap-1.5">
+          <motion.div
+            className="grid grid-cols-3 gap-1.5"
+            variants={LISTA}
+            initial="initial"
+            animate="animate"
+          >
             {words.map((w) => (
-              <button
+              <motion.button
                 key={w}
+                variants={suavizado(ITEM_LISTA)}
+                whileTap={{ scale: 0.94 }}
                 onClick={() => {
                   sfx.click();
                   onRedeem(w);
                 }}
-                className="rounded-lg px-2 py-2 text-center text-sm bg-white/5 hover:bg-white/15 active:scale-95 transition"
+                className="rounded-lg px-2 py-2 text-center text-sm bg-white/5 hover:bg-white/15 transition"
               >
                 {w}
-              </button>
+              </motion.button>
             ))}
-          </div>
+          </motion.div>
         ) : (
           <p className="text-sm text-white/50">{accused?.name} está a tentar adivinhar… 👀</p>
         )}
@@ -183,7 +190,7 @@ export function VascoCard({ round, room, youId, role, canControl, onStartClues, 
   const r = round.result;
   const caughtRight = r?.accusedId && r.impostors?.some((i) => i.id === r.accusedId);
   return (
-    <CardShell typeKey="vasco">
+    <CardShell typeKey="vasco" passo="result">
       <p className="text-sm text-white/60">A palavra era:</p>
       <p className="text-3xl font-extrabold text-teal-300">{r?.secretWord}</p>
       {r?.accusedName ? (
@@ -199,18 +206,27 @@ export function VascoCard({ round, room, youId, role, canControl, onStartClues, 
           {r.redemption.correct ? 'acertou e safou-se! 😎' : 'falhou 😖'}
         </p>
       )}
-      <ul className="flex flex-col gap-1 text-sm mt-1">
+      <motion.ul
+        className="flex flex-col gap-1 text-sm mt-1"
+        variants={LISTA}
+        initial="initial"
+        animate="animate"
+      >
         {r?.impostors?.map((imp) => (
-          <li key={imp.id} className={imp.outcome === 'vida' ? 'text-emerald-300 font-semibold' : 'text-amber-300'}>
+          <motion.li
+            key={imp.id}
+            variants={suavizado(ITEM_LISTA)}
+            className={imp.outcome === 'vida' ? 'text-emerald-300 font-semibold' : 'text-amber-300'}
+          >
             🕵️ <b>{imp.name}</b> —{' '}
             {imp.outcome === 'vida'
               ? imp.caught
                 ? 'safou-se! +1 vida 💚'
                 : 'escapou! +1 vida 💚'
               : `apanhado, bebe ${r.golos} golos 🍺`}
-          </li>
+          </motion.li>
         ))}
-      </ul>
+      </motion.ul>
       {canControl && (
         <button onClick={onContinue} className="fd-btn fd-btn-primary mt-1">
           Voltar à roda →

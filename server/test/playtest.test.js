@@ -66,9 +66,18 @@ test('Roda: a encomenda fica reservada a quem a pediu', async () => {
   game.forcaProximoTipo(room, 'tribunal', ana.id);
   // O Rui gira primeiro (é a mesa a andar): não pode levar o jogo da Ana.
   room.game.currentPlayerId = rui.id;
-  const doRui = await game.spinWheel(room, rui.id);
-  assert.notEqual(doRui.gameTypeKey, 'tribunal');
+  await game.spinWheel(room, rui.id);
+
+  // Pelo mesmo motivo do teste do Tabuleiro mais abaixo: o tipo que saiu ao Rui
+  // não prova nada. A mesa está em 'caos', o ⚖️ Tribunal ENTRA no sorteio, e de
+  // vez em quando calha-lhe a ele por sorte — o teste acusava consumo onde só
+  // houve coincidência.
+  //
+  // A propriedade exata é a encomenda continuar de pé e com o mesmo dono:
+  // consumi-la punha `tipoForcado` a `null` (ver `tomaTipoForcado`).
   assert.ok(room.game.tipoForcado, 'a encomenda fica à espera do dono');
+  assert.equal(room.game.tipoForcado.key, 'tribunal');
+  assert.equal(room.game.tipoForcado.playerId, ana.id, 'e continua reservada a quem a pediu');
 
   room.game.phase = 'wheel';
   room.game.currentPlayerId = ana.id;
@@ -116,8 +125,18 @@ test('Tabuleiro: a encomenda não é gasta por outro jogador', async () => {
   board.forcaProximaCasa(room, { kind: 'gamble' }, ana.id);
   b.currentPlayerId = rui.id;
   await board.advance(room, rui.id, 3);
-  assert.notEqual(b.pending?.kind, 'gamble', 'o Rui caiu na casa dele');
+
+  // Olhar para o `pending` do Rui NÃO serve de prova. O tabuleiro é sorteado
+  // por sala (`shuffle` no `generateSquares`) e tem 4 casas `gamble` em 59: o
+  // Rui cai numa por acaso uma vez em cada catorze, e o teste acusava consumo
+  // onde só houve coincidência (falhava ~1 em 10 corridas).
+  //
+  // A propriedade a testar é outra, e é exata: consumir a encomenda põe
+  // `casaForcada` a `null` (ver `tomaCasaForcada`). Se ela continua de pé, com
+  // o mesmo dono, então não foi gasta — caia o Rui onde cair.
   assert.ok(b.casaForcada, 'a encomenda fica à espera da Ana');
+  assert.equal(b.casaForcada.kind, 'gamble');
+  assert.equal(b.casaForcada.playerId, ana.id, 'e continua reservada a quem a pediu');
 });
 
 test('Tabuleiro: a encomenda cala as sequências (não vai preso a meio)', async () => {

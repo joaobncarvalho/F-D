@@ -147,6 +147,28 @@ Legenda: ✅ feito · 🚧 em curso · ⬜ por fazer · 🔗 ponto de integraç�
       · 🐛 a "Curva de intensidade" do lobby não chegava ao motor — corrigido
       · ✨ palco do Ambiente no showroom (`?demo=1`) para ver humores e batidas
       · verificado no browser a sério (roda alinhada com o servidor, 50 rondas sem erros)
+- [x] **Movimento nas cartas mais jogadas + guardas nas outras costuras (2026-09-08c)**
+      — pedido do João ("upgrade geral antes do grande playtest"). A recolha
+      mostrou que o upgrade pedido estava quase todo feito (`motion.js` já em 38
+      de ~45 ficheiros); o que faltava estava noutro sítio:
+      · 🎬 `cards.jsx` (`PromptCard`/`ChoiceCard`/`IntrigasCard`) não tinha um
+        único `<motion.*>` — é o cartão que a mesa vê MAIS vezes. Nas Intrigas os
+        três passos trocavam sem gesto nenhum (o `CardShell` não remonta dentro
+        do mesmo tipo). Peças novas em `shared.jsx`: `CardShell passo={…}` e
+        `Fichas` (a fila de escolher jogador, escalonada). Também no
+        `GuessingCard` e `VascoCard`. Tudo com `suavizado()`.
+      · 🛡️ o guarda anti-ecrã-branco (nascido do bug do Tribunal) só cobria a
+        Roda. Passa a cobrir as três tabelas de despacho: `board.pending.kind` e
+        `t.phase`. Não havia buraco hoje — passa a haver quem verifique amanhã.
+      · 🐛 **três testes intermitentes** (nenhum novo, falhavam ~1 em 10): dois
+        afirmavam o que o OUTRO jogador não recebeu, quando o tabuleiro/roda são
+        sorteados e podiam dar-lho por acaso; o do Desenha girava 400 vezes à
+        espera de sorte, e passa a encomendar o tipo.
+      Verificado: `npm test` **226/226** em **60 corridas seguidas sem falhas**,
+      build limpo, guardas exercidos com erros injetados.
+      ⚠️ **Por ver com olhos:** as animações novas não foram abertas no browser
+      (extensão do Chrome não ligada) — falta o showroom nas cenas de Intrigas,
+      Segredos e Vasco.
 - [ ] 2.º playtest (11 set) → validar estas mudanças com o grupo
 - [x] **Snapshot das salas na Postgres** (2026-09-01b) — modelo `RoomSnapshot`;
       ficheiro a cada 5s + BD a cada 15s e no SIGTERM. Sobrevive a um deploy que
@@ -285,11 +307,16 @@ Legenda: ✅ feito · 🚧 em curso · ⬜ por fazer · 🔗 ponto de integraç�
       Verificado: `npm test` **224/224**, build limpo, e as duas cenas no showroom.
 
 **Colega (BD)**
-- [ ] **Correr `db/04_telemetria.sql`** (ou `prisma db push`) — sem isso as
-      contagens da /admin vivem no disco do container e morrem a cada deploy.
+- [x] **`db/04_telemetria.sql` corrido** (confirmado 2026-09-08c na Supabase:
+      `telemetry_nights` e `telemetry_counters` de pé, com 10 noites e 110
+      contadores). As contagens da /admin já sobrevivem aos deploys.
 - [ ] Troubleshooting de queries/performance durante os testes
 - [ ] Validar estratégia de limpeza/arquivo de salas antigas
-- [ ] Correr `db push` + seed com os 6 tipos novos (`db/02_seed.sql` já regenerado)
+- [x] Seed corrido (2026-09-08c): 25 tipos · **730 prompts** · 49 itens de tabuleiro.
+      Descoberta pelo caminho: o ⚖️ Tribunal tinha 20 temas na BD e 30 no código,
+      **quase disjuntos** (só 2 coincidiam) — os 20 foram escritos na /admin.
+      O seed é idempotente e não apagou nada, por isso ficaram os **48**.
+      ⚠️ **Decisão para o João:** ficam os dois conjuntos ativos ou desativa-se um?
 
 ---
 

@@ -17,6 +17,10 @@ import { io as connect } from 'socket.io-client';
 delete process.env.DATABASE_URL; // conteúdo em memória
 process.env.SNAPSHOT = '0'; // sem gravação em disco durante os testes
 process.env.AUTO_RESOLVE_MS = '0'; // sem varrimento automático a interferir
+// Destranca o `dev_force_next` (a encomenda da sala de teste). Só abre esse
+// handler — os bots continuam a entrar apenas por `dev_playtest`, que nenhum
+// teste deste ficheiro chama.
+process.env.ENABLE_DEV_BOTS = '1';
 
 const { registerSocketHandlers } = await import('../src/socket.js');
 
@@ -79,8 +83,32 @@ function esperaEvento(socket, evento) {
 }
 
 /**
+ * Encomenda um tipo e gira UMA vez.
+ *
+ * O `giraAte` faz o contrário — gira às cegas até calhar — e para um tipo só
+ * isso é uma aposta: o Desenha falhava as 400 voltas em ~1 de cada 20 corridas
+ * e derrubava a suite inteira. A encomenda existe desde a sala de teste e dá a
+ * mesma ronda sem depender da sorte da roda.
+ *
+ * Fica reservada a quem a pede (ver `tomaCasaForcada`/`forcaProximoTipo`), por
+ * isso quem encomenda tem de ser o jogador da vez — o mesmo que vai girar.
+ */
+async function encomendaEGira(s, gameTypeKey) {
+  const quem = socketDe(s, s.ultimo?.game?.currentPlayerId);
+  await pede(quem, 'dev_force_next', { gameTypeKey });
+  const proximo = esperaEstado(s.a, (r) => !!r.game.round, 'ronda encomendada');
+  await pede(quem, 'spin_wheel');
+  const room = await proximo;
+  assert.equal(room.game.round.gameTypeKey, gameTypeKey, 'saiu o tipo encomendado');
+  return room;
+}
+
+/**
  * Gira a roda até sair um dos tipos pedidos, saltando as rondas que não servem.
  * Gira sempre pelo jogador da vez — o servidor não deixa outro girar.
+ *
+ * Continua a servir quando se aceita QUALQUER um de vários tipos (aí a roda
+ * acerta depressa). Para um tipo só, usa-se o `encomendaEGira` acima.
  */
 async function giraAte(s, tipos) {
   let room = null;
@@ -239,8 +267,7 @@ test('socket: no Desenha, a palavra vai por canal privado e os traços não vão
   await pede(s.a, 'start_game', { lives: 3 });
   await pede(s.a, 'begin_play');
 
-  const room = await giraAte(s, ['desenho']);
-  assert.ok(room, 'nunca saiu o Desenha em 400 voltas');
+  const room = await encomendaEGira(s, 'desenho');
   assert.ok(!('word' in room.game.round), 'a palavra não vai no broadcast');
 
   // A palavra é entregue a quem desenha por canal privado — vamos buscá-la à

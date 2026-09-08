@@ -5,6 +5,120 @@
 
 ---
 
+## 2026-09-08 (c) — Movimento nas cartas mais jogadas, guardas nas outras duas costuras, e três testes que mentiam
+
+Revisão pré-playtest a pedido do João ("upgrade geral antes do grande
+playtest"). A conclusão da recolha foi que o upgrade pedido já estava
+praticamente feito — o `motion.js` já era usado em 38 dos ~45 ficheiros do
+cliente — e que o valor que restava estava noutro sítio.
+
+### Onde faltava mesmo movimento: no cartão que a mesa vê mais vezes
+
+O `cards.jsx` (`PromptCard`, `ChoiceCard`, `IntrigasCard`) não tinha um único
+`<motion.*>`. Toda a gramática de gesto foi construída para os momentos
+excecionais — Tribunal, maldição, ganância — e o pão-nosso-de-cada-ronda ficou
+parado. O `CardShell` animava a carta a ENTRAR, mas dentro dela nada se mexia.
+
+O caso mais claro eram as **Intrigas**: três passos (escolher → pedra-papel-
+tesoura → reveal) dentro do mesmo tipo. Como o tipo não muda, o React reutiliza
+o mesmo `motion.div`, a carta não remonta, e o conteúdo trocava de um frame para
+o outro. Quem estava a olhar para o telemóvel do lado não dava por a ronda ter
+avançado.
+
+Duas peças novas em `shared.jsx`, para não repetir movimento à mão em quatro
+ficheiros:
+
+| peça | o que faz |
+|---|---|
+| `CardShell passo={...}` | `AnimatePresence mode="wait"` sobre o conteúdo: os sub-estados passam a trocar com gesto. Sem `passo`, a carta comporta-se exatamente como antes |
+| `Fichas` | a fila de escolher jogador (buddy, acusado, voto, palpite) — o gesto mais repetido da noite, escrito à mão em quatro sítios e sempre estático. Agora entra escalonada |
+
+Aplicado a `cards.jsx` (+ `Acao`, que anima o bloco de baixo — é onde o jogador
+tem de reparar que agora é a vez dele), `GuessingCard`, `VascoCard`. Tudo passa
+pelo `suavizado()`, por isso quem pediu movimento reduzido no sistema recebe as
+mesmas trocas só em opacidade.
+
+**Uma decisão revertida a meio:** cheguei a keyar o passo do Vasco em
+`clues:<id>`, o que fazia a carta inteira sair e entrar a cada troca de pista.
+Com `mode="wait"` isso deixa o cartão vazio ~0,4 s de cada vez — e a esconder o
+tema e a palavra, que são justamente o que o jogador precisa de ter à frente.
+Agora só troca a LINHA de quem dá a pista.
+
+### O guarda anti-ecrã-branco só cobria uma das três costuras
+
+O `fases-do-cliente.test.js` nasceu do bug do Tribunal (04→07 set: o servidor
+punha `g.phase = 'tribunal'`, o `SPIN_PHASES` não a tinha, dava ecrã em branco).
+Mas a forma do erro não é da Roda: sempre que o servidor escolhe um valor e o
+cliente precisa de um RAMO para esse valor, há duas listas sem ninguém a
+compará-las. No repositório há três, e só uma estava guardada:
+
+| | servidor | cliente |
+|---|---|---|
+| Roda | `g.phase` | `SPIN_PHASES` (já guardado) |
+| Tabuleiro | `board.pending.kind` | `pending?.kind === '…'` — **novo** |
+| Torneio | `t.phase` | `t.phase === '…'` — **novo** |
+
+Hoje não havia buraco nenhum: os 9 `kind` e as 3 fases estão todos cobertos. O
+que passa a existir é quem verifique isso amanhã. Os `substate` de cada
+mini-jogo ficam DE FORA de propósito — aí o ramo por omissão é legítimo (o
+`VascoCard` trata o `result` como caso final sem o nomear) e um guarda genérico
+só daria falsos positivos.
+
+Os dois guardas foram exercidos ao contrário antes de contarem: com um `kind`
+inventado no `board.js` e uma fase inventada no `tournament.js`, ambos falham.
+
+### Três testes que passavam por sorte
+
+Apareceram durante a verificação, e nenhum é novo — falhavam ~1 em cada 10 a 20
+corridas, o suficiente para ninguém confiar no `npm test` na véspera do
+playtest. Os dois primeiros são o MESMO erro, escrito duas vezes:
+
+1. `playtest.test.js` — "a encomenda não é gasta por outro jogador" afirmava que
+   o Rui não caía numa casa `gamble`. Mas o tabuleiro é sorteado por sala
+   (`shuffle` no `generateSquares`) e tem 4 casas `gamble` em 59: o Rui cai numa
+   por acaso uma vez em cada catorze. O teste acusava consumo onde só havia
+   coincidência.
+2. `playtest.test.js` — a versão da Roda do mesmo proxy: em 'caos' o ⚖️ Tribunal
+   entra no sorteio e às vezes calha ao Rui.
+
+   Nos dois, a propriedade exata não era o que saiu ao outro jogador — era a
+   encomenda continuar de pé e com o mesmo dono (consumi-la põe `tipoForcado` /
+   `casaForcada` a `null`). É o que passam a afirmar.
+
+3. `socket-e2e.test.js` — o teste do Desenha girava a roda até 400 vezes à espera
+   que o tipo calhasse, e falhava ~1 em 20. Passa a **encomendar** o tipo
+   (`dev_force_next`, com `ENABLE_DEV_BOTS=1` no topo do ficheiro, que só
+   destranca esse handler). A ferramenta para isto existe desde 07 set — o teste
+   é que ainda apostava. O `giraAte` fica, e continua a servir quando se aceita
+   qualquer um de vários tipos.
+
+### Base de dados
+
+Confirmado que a Supabase responde (pooler eu-west-1, ~640 ms) e que as tabelas
+de telemetria já lá estavam com dados (10 noites, 110 contadores) — o roadmap é
+que estava por marcar.
+
+O ⚖️ Tribunal tinha **20 temas na BD e 30 no código, e os conjuntos eram quase
+disjuntos** (só 2 coincidiam): os 20 da BD foram escritos na /admin por vocês
+(Rio Ave, Euro 2016, política portuguesa) e os 30 do código nunca lá tinham
+chegado. O `db:seed` é idempotente e não apaga nada, por isso o Tribunal passou
+a ter **48 temas** — os dois conjuntos. **Decisão em aberto para o João:** ficam
+os 48 ativos, ou desativa-se um dos conjuntos na /admin.
+
+Ficheiros: `client/src/pages/games/shared.jsx` · `cards.jsx` · `GuessingCard.jsx` ·
+`VascoCard.jsx` · `server/test/fases-do-cliente.test.js` · `playtest.test.js` ·
+`socket-e2e.test.js`.
+Verificado: `npm test` **226/226** (eram 224) em **60 corridas seguidas sem uma
+única falha** — antes falhava ~1 em 10; `npm run build` limpo (+0,4 kB gzip);
+guardas novos exercidos com erros injetados de propósito; e uma verificação de
+imports em cada ficheiro tocado (o build do Vite deixa passar um `sfx` por
+definir, e o `GuessingCard` deixou mesmo de precisar dele).
+**Por ver com olhos:** a extensão do Chrome não estava ligada nesta sessão, por
+isso as animações novas não foram vistas a correr — falta abrir o showroom
+(`?demo=1`) nas cenas das Intrigas, Segredos e Vasco.
+
+---
+
 ## 2026-09-08 (b) — 🐍 O azar da ganância também deixou de ser uma linha de texto
 
 Terceira carta de ecrã inteiro do Tabuleiro em dois dias, e a que fechava o

@@ -2,9 +2,9 @@
 // Extraído do Game.jsx (monólito) para modularização gradual — sem alterar
 // comportamento. TYPES é a fonte única dos tipos da roda (cor/emoji/label).
 
-import { motion } from 'framer-motion';
+import { AnimatePresence, motion } from 'framer-motion';
 import { sfx } from '../../sfx.js';
-import { ENTRA } from '../../motion.js';
+import { ENTRA, ITEM_LISTA, LISTA, MOLA, suavizado } from '../../motion.js';
 
 export const TYPES = [
   { key: 'boca_calada', label: 'Boca Calada', color: '#ff3d8b', emoji: '🤐' },
@@ -80,18 +80,80 @@ export function Avatar({ player, size = 30, ring = false }) {
   );
 }
 
-export function CardShell({ children, typeKey }) {
+/**
+ * Transição entre PASSOS dentro da mesma carta.
+ *
+ * O `CardShell` já animava a carta a ENTRAR, mas um jogo como as Intrigas tem
+ * três passos (escolher → pedra-papel-tesoura → reveal) dentro do MESMO tipo:
+ * o React reutiliza o mesmo `motion.div`, a carta não remonta, e o conteúdo
+ * trocava de um frame para o outro sem nada a marcar a passagem. Quem estava a
+ * olhar para o telemóvel do lado nem dava por a ronda ter avançado.
+ *
+ * `mode="wait"` de propósito: os passos são exclusivos e o que sai não se deve
+ * cruzar com o que entra — numa carta estreita isso lê-se como uma falha.
+ */
+const PASSO = suavizado({
+  initial: { opacity: 0, x: 18 },
+  animate: { opacity: 1, x: 0 },
+  exit: { opacity: 0, x: -18 },
+  transition: MOLA.suave,
+});
+
+export function CardShell({ children, typeKey, passo = null }) {
   const t = TYPES.find((x) => x.key === typeKey);
   return (
     <motion.div
-      {...ENTRA}
+      {...suavizado(ENTRA)}
       className="fd-card p-5 flex flex-col gap-3 text-center"
       style={{ boxShadow: `0 12px 40px -14px ${t?.color}99` }}
     >
       <p className="text-sm font-bold uppercase tracking-wide" style={{ color: t?.color }}>
         {t?.emoji} {t?.label}
       </p>
-      {children}
+      {/* Sem `passo`, o conteúdo entra direto como sempre entrou — as cartas
+          sem sub-estados não pagam nada por isto. */}
+      {passo == null ? (
+        children
+      ) : (
+        <AnimatePresence mode="wait" initial={false}>
+          <motion.div key={passo} {...PASSO} className="flex flex-col gap-3">
+            {children}
+          </motion.div>
+        </AnimatePresence>
+      )}
+    </motion.div>
+  );
+}
+
+/**
+ * Fila de fichas de jogador (escolher alguém: buddy, acusado, voto, palpite).
+ * É o gesto mais repetido da noite e estava escrito à mão em quatro sítios,
+ * sempre estático. Entram escalonadas — a mesa vê a lista a formar-se em vez de
+ * a encontrar já feita.
+ */
+export function Fichas({ players, onPick, rotulo = (p) => p.name, disabled = false }) {
+  return (
+    <motion.div
+      className="flex flex-wrap gap-2 justify-center"
+      variants={LISTA}
+      initial="initial"
+      animate="animate"
+    >
+      {players.map((p) => (
+        <motion.button
+          key={p.id}
+          variants={suavizado(ITEM_LISTA)}
+          whileTap={{ scale: 0.94 }}
+          disabled={disabled}
+          onClick={() => {
+            sfx.click();
+            onPick(p.id);
+          }}
+          className="fd-chip"
+        >
+          {rotulo(p)}
+        </motion.button>
+      ))}
     </motion.div>
   );
 }
@@ -111,20 +173,7 @@ export function BuddyBlock({ round, room, youId, isMyTurn, onChooseBuddy }) {
     return (
       <div className="flex flex-col gap-2">
         <p className="text-sm text-cyan-300 font-semibold">🤝 Escolhe o teu Buddy (bebe sempre que tu bebes):</p>
-        <div className="flex flex-wrap gap-2 justify-center">
-          {others.map((p) => (
-            <button
-              key={p.id}
-              onClick={() => {
-                sfx.click();
-                onChooseBuddy(p.id);
-              }}
-              className="fd-chip"
-            >
-              {p.name}
-            </button>
-          ))}
-        </div>
+        <Fichas players={others} onPick={onChooseBuddy} />
       </div>
     );
   }

@@ -2,8 +2,7 @@
 // Comportamento idêntico ao original.
 
 import { useState } from 'react';
-import { sfx } from '../../sfx.js';
-import { CardShell } from './shared.jsx';
+import { CardShell, Fichas } from './shared.jsx';
 
 export function GuessingCard({ round, room, youId, isAuthor, canControl, onGuess, onReveal, onContinue }) {
   const [guessed, setGuessed] = useState(round.guessers?.includes(youId));
@@ -14,7 +13,7 @@ export function GuessingCard({ round, room, youId, isAuthor, canControl, onGuess
   if (round.revealed) {
     const r = round.result;
     return (
-      <CardShell typeKey="segredos">
+      <CardShell typeKey="segredos" passo="reveal">
         <p className="text-base italic text-white/80">"{round.prompt?.text}"</p>
         <p className="text-lg font-bold">
           🎭 Era do/a <span className="text-teal-300">{r?.authorName || '—'}</span>!
@@ -36,7 +35,7 @@ export function GuessingCard({ round, room, youId, isAuthor, canControl, onGuess
   }
 
   return (
-    <CardShell typeKey="segredos">
+    <CardShell typeKey="segredos" passo="palpite">
       <p className="text-lg italic leading-snug">"{round.prompt?.text}"</p>
       {isAuthor ? (
         <p className="text-sm text-teal-300 font-semibold">
@@ -52,23 +51,13 @@ export function GuessingCard({ round, room, youId, isAuthor, canControl, onGuess
           ) : guessed ? (
             <p className="text-sm text-emerald-300 font-semibold">Adivinhaste! ✓ A aguardar…</p>
           ) : (
-            <div className="flex flex-wrap gap-2 justify-center">
-              {connected
-                .filter((p) => p.id !== youId)
-                .map((p) => (
-                  <button
-                    key={p.id}
-                    onClick={() => {
-                      sfx.click();
-                      setGuessed(true);
-                      onGuess(p.id);
-                    }}
-                    className="fd-chip"
-                  >
-                    {p.name}
-                  </button>
-                ))}
-            </div>
+            <Fichas
+              players={connected.filter((p) => p.id !== youId)}
+              onPick={(id) => {
+                setGuessed(true);
+                onGuess(id);
+              }}
+            />
           )}
         </>
       )}

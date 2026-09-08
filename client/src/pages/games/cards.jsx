@@ -2,10 +2,34 @@
 // modularização gradual e para o showroom (Demo.jsx) os reutilizar sem drift.
 // Comportamento idêntico ao original.
 
+import { AnimatePresence, motion } from 'framer-motion';
 import { sfx } from '../../sfx.js';
 import Timer from '../../components/Timer.jsx';
-import { CardShell, BuddyBlock } from './shared.jsx';
+import { CardShell, BuddyBlock, Fichas } from './shared.jsx';
 import VereditoBand from './VereditoBand.jsx';
+import { ITEM_LISTA, LISTA, MOLA, suavizado } from '../../motion.js';
+
+/**
+ * O bloco de baixo das cartas (botões de ação, veredito, "à espera de…") troca
+ * várias vezes na MESMA ronda. Sem isto, mudava de um frame para o outro — e é
+ * precisamente o sítio onde o jogador tem de reparar que agora é a vez dele.
+ */
+const ACAO = suavizado({
+  initial: { opacity: 0, y: 10 },
+  animate: { opacity: 1, y: 0 },
+  exit: { opacity: 0, y: -8 },
+  transition: MOLA.suave,
+});
+
+function Acao({ chave, children }) {
+  return (
+    <AnimatePresence mode="wait" initial={false}>
+      <motion.div key={chave} {...ACAO} className="flex flex-col gap-2 mt-1">
+        {children}
+      </motion.div>
+    </AnimatePresence>
+  );
+}
 
 export function PromptCard({
   round, room, youId, isMyTurn, canControl, podeDobrar, podeAdiar, morteSubita,
@@ -33,18 +57,19 @@ export function PromptCard({
         </div>
       )}
       {emJulgamento ? (
-        <div className="flex flex-col gap-2 mt-1">
+        <Acao chave="julgamento">
           <VereditoBand veredito={round.veredito} room={room} youId={youId} onVota={onVota} />
           {round.dobro.resultado && canControl && (
             <button onClick={() => { sfx.click(); onContinue(); }} className="fd-btn fd-btn-primary">
               ➡️ Continuar
             </button>
           )}
-        </div>
+        </Acao>
       ) : isMyTurn && !buddyPending ? (
-        <div className="flex flex-col gap-2 mt-1">
+        <Acao chave="acao">
           <div className="flex gap-3">
-            <button
+            <motion.button
+              whileTap={{ scale: 0.94 }}
               onClick={() => {
                 sfx.click();
                 onAction('accept');
@@ -52,8 +77,9 @@ export function PromptCard({
               className="fd-btn fd-btn-success flex-1"
             >
               {isBoca ? '🎤 Respondo' : '✅ Aceito'}
-            </button>
-            <button
+            </motion.button>
+            <motion.button
+              whileTap={{ scale: 0.94 }}
               onClick={() => {
                 sfx.click();
                 onAction('refuse');
@@ -61,7 +87,7 @@ export function PromptCard({
               className="fd-btn fd-btn-danger flex-1"
             >
               {morteSubita ? '💀 Recuso (saio)' : isBoca ? '🤐 Boca Calada' : '🍺 Recuso'}
-            </button>
+            </motion.button>
           </div>
           {/* A Conta: adiar não é escapar. A vida custa o mesmo que recusar — o
               que muda é que o gole fica a dever, com juro, à vista da mesa. */}
@@ -91,9 +117,11 @@ export function PromptCard({
               🔁 Dobro ou nada — a mesa julga: +1 vida se conseguires, −1 se falhares
             </button>
           )}
-        </div>
+        </Acao>
       ) : !isMyTurn ? (
-        <p className="text-sm text-white/40 mt-1">A aguardar {round.currentPlayerName}…</p>
+        <Acao chave="espera">
+          <p className="text-sm text-white/40">A aguardar {round.currentPlayerName}…</p>
+        </Acao>
       ) : null}
     </CardShell>
   );
@@ -110,13 +138,20 @@ export function ChoiceCard({ round, room, youId, canControl, onChooseBuddy, onCh
         Vez de <span className="font-bold text-white">{round.currentPlayerName}</span> — Isto ou Aquilo?
       </p>
       <BuddyBlock round={round} room={room} youId={youId} isMyTurn={isMyTurn} onChooseBuddy={onChooseBuddy} />
-      <div className="flex flex-col gap-2 mt-1">
+      <motion.div
+        className="flex flex-col gap-2 mt-1"
+        variants={LISTA}
+        initial="initial"
+        animate="animate"
+      >
         {opts.map((o, i) => {
           const arrow = i === 0 ? '👈 ' : '👉 ';
           if (isMyTurn && !resolved && !buddyPending) {
             return (
-              <button
+              <motion.button
                 key={i}
+                variants={suavizado(ITEM_LISTA)}
+                whileTap={{ scale: 0.97 }}
                 onClick={() => {
                   sfx.click();
                   onChooseOption(i);
@@ -125,25 +160,30 @@ export function ChoiceCard({ round, room, youId, canControl, onChooseBuddy, onCh
               >
                 {arrow}
                 {o}
-              </button>
+              </motion.button>
             );
           }
           const chosen = resolved && round.chosen === i;
           const dim = resolved && round.chosen !== i;
+          // A escolhida dá um salto e a outra apaga-se. O "Isto ou Aquilo"
+          // resolve-se num instante, e sem isto ninguém via qual das duas saiu.
           return (
-            <div
+            <motion.div
               key={i}
+              variants={suavizado(ITEM_LISTA)}
+              animate={{ opacity: dim ? 0.4 : 1, scale: chosen ? 1.03 : 1 }}
+              transition={chosen ? MOLA.pop : MOLA.suave}
               className={`fd-card p-3 text-left text-sm ${
-                chosen ? 'ring-2 ring-emerald-400 text-emerald-200 font-semibold' : dim ? 'opacity-40' : ''
+                chosen ? 'ring-2 ring-emerald-400 text-emerald-200 font-semibold' : ''
               }`}
             >
               {arrow}
               {o}
               {chosen ? ' ✓' : ''}
-            </div>
+            </motion.div>
           );
         })}
-      </div>
+      </motion.div>
       {resolved ? (
         <>
           <p className="text-sm font-bold text-emerald-300">{round.currentPlayerName} escolheu! 🎉</p>
@@ -186,32 +226,17 @@ export function IntrigasCard({
   if (round.substate === 'choosing') {
     if (isAccuser) {
       return (
-        <CardShell typeKey="intrigas">
+        <CardShell typeKey="intrigas" passo="choosing">
           <p className="text-lg leading-snug">{reason || '…'}</p>
           <p className="text-xs text-white/50">
             Quem é mais provável? A pessoa não vai saber porquê 😏
           </p>
-          <div className="flex flex-wrap gap-2 justify-center">
-            {connected
-              .filter((p) => p.id !== youId)
-              .map((p) => (
-                <button
-                  key={p.id}
-                  onClick={() => {
-                    sfx.click();
-                    onChooseTarget(p.id);
-                  }}
-                  className="fd-chip"
-                >
-                  {p.name}
-                </button>
-              ))}
-          </div>
+          <Fichas players={connected.filter((p) => p.id !== youId)} onPick={onChooseTarget} />
         </CardShell>
       );
     }
     return (
-      <CardShell typeKey="intrigas">
+      <CardShell typeKey="intrigas" passo="choosing">
         <p className="text-base text-white/70">
           🤫 <b>{round.currentPlayerName}</b> recebeu uma pergunta secreta e está a escolher
           alguém…
@@ -223,7 +248,7 @@ export function IntrigasCard({
   // Passo 2 — pedra-papel-tesoura
   if (round.substate === 'rps') {
     return (
-      <CardShell typeKey="intrigas">
+      <CardShell typeKey="intrigas" passo="rps">
         {round.ties > 0 && (
           <p className="text-xs text-amber-300 font-semibold">Empate! Joguem outra vez ({round.ties}) ✊✋✌️</p>
         )}
@@ -245,10 +270,17 @@ export function IntrigasCard({
           iSubmitted ? (
             <p className="text-sm text-emerald-300 font-semibold">Jogaste! À espera do outro…</p>
           ) : (
-            <div className="flex gap-3 justify-center">
+            <motion.div
+              className="flex gap-3 justify-center"
+              variants={LISTA}
+              initial="initial"
+              animate="animate"
+            >
               {RPS.map(([m, e]) => (
-                <button
+                <motion.button
                   key={m}
+                  variants={suavizado(ITEM_LISTA)}
+                  whileTap={{ scale: 0.9 }}
                   onClick={() => {
                     sfx.click();
                     onSubmitRps(m);
@@ -256,9 +288,9 @@ export function IntrigasCard({
                   className="fd-chip text-3xl px-4 py-3"
                 >
                   {e}
-                </button>
+                </motion.button>
               ))}
-            </div>
+            </motion.div>
           )
         ) : (
           <p className="text-xs text-white/50">
@@ -272,7 +304,7 @@ export function IntrigasCard({
   // Passo 3 — reveal
   const r = round.result;
   return (
-    <CardShell typeKey="intrigas">
+    <CardShell typeKey="intrigas" passo="reveal">
       {reason ? (
         <p className="text-lg leading-snug">{reason}</p>
       ) : (
