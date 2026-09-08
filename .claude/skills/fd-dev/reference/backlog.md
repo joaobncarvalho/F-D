@@ -225,6 +225,50 @@ ser possível, senão o julgamento é teatro e a mesa aprende a ignorá-lo.
 
 ---
 
+## 🔎 Medido por simulação (2026-09-08e) — a preparação é um interruptor escondido
+
+Simulação de noites inteiras na Roda (40 noites × 60 rondas × 8 jogadores) para
+responder a uma pergunta que não se responde a ler o código: **com 25 tipos,
+quantos é que a mesa chega a ver numa noite?**
+
+Resposta boa: **20,8 tipos diferentes por noite** (mín. 18) e **zero prompts
+repetidos** — o saco anti-repetição faz o seu trabalho. O ⚖️ Tribunal aparece em
+70% das noites em caos e em nenhuma abaixo de hardcore, como foi desenhado.
+
+O que a simulação revelou e não estava à vista:
+
+| cenário (rondas/noite) | 🔥 desafio | 🤐 boca_calada | 💬 quem_disse |
+|---|---|---|---|
+| ninguém escreve na prep | **7,13** | 3,50 | **0,00** |
+| 1 pergunta por pessoa | 4,50 | 3,67 | 2,87 |
+| 2 perguntas por pessoa | 4,47 | 3,70 | 3,07 |
+| 3 perguntas por pessoa | 4,63 | 3,63 | 2,77 |
+
+O `quem_disse` tem `peso: 7` (dos mais altos da roda) e **é** sorteado — mas
+vive das perguntas da preparação, e sem elas o `setupGrupo` falha e ele cai em
+silêncio para `desafio` (`game.js:730`). Sem prep, um tipo inteiro desaparece e
+o Desafio incha **+58%**. A noite fica mais genérica sem ninguém perceber
+porquê.
+
+O 🤐 Boca Calada não muda de contagem, mas degrada-se pior: o `pickQuestion`
+(`game.js:342`) procura pergunta **dirigida àquele jogador**, e sem ela cai para
+o banco genérico (`game.js:661`). A ronda acontece na mesma — só perde a única
+coisa que a torna especial, que é um amigo ter escrito aquilo sobre ti. Se só
+metade da mesa escrever, a outra metade nunca recebe uma pergunta pessoal.
+
+**Uma pergunta por pessoa chega** — a 2.ª e a 3.ª não movem a distribuição.
+
+Ações candidatas (P1, nenhuma feita):
+- 💡 **Contador de perguntas na prep** — mostrar ao host quantas foram escritas e
+  **quem ainda não tem nenhuma dirigida a si**. Hoje o host não tem como saber
+  que a noite vai nascer coxa.
+- 💡 **Não deixar sair da prep** com jogadores sem pergunta dirigida (ou avisar).
+- 💡 **Contar o fallback silencioso na telemetria** — quantas vezes um
+  `quem_disse` virou `desafio` por falta de perguntas. É a métrica que teria
+  apanhado isto sem simulação nenhuma.
+
+---
+
 ## 💡 Ideias novas (a validar)
 
 Estas vão além do FD — candidatas a diferenciar o jogo. Discutir prioridade.
