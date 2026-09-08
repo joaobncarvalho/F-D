@@ -8,7 +8,7 @@
 -- Idempotente: os ids são derivados do texto (sempre iguais) e o ON CONFLICT
 -- atualiza em vez de duplicar. Correr DEPOIS de 01_schema.sql.
 --
--- 25 tipos de jogo · 905 prompts
+-- 25 tipos de jogo · 906 prompts
 -- =====================================================================
 
 BEGIN;
@@ -1038,7 +1038,7 @@ ON CONFLICT (game_type_id, text) DO UPDATE SET
   intensity = EXCLUDED.intensity, active = true, buddy = EXCLUDED.buddy,
   duration = EXCLUDED.duration, tag = EXCLUDED.tag;
 
--- Tribunal da Injustiça (30)
+-- Tribunal da Injustiça (31)
 INSERT INTO prompts (id, game_type_id, text, intensity, active, buddy, duration, tag) VALUES
   ('48efffff-48f9-57f9-8a24-e690ba697917', '0b974e68-8516-5011-801d-1b50451aa20d', 'Defende que dividir a conta ao meio é roubo e devia dar cadeia.', 'leve', true, false, NULL, NULL),
   ('043d786d-81cd-5ebd-8427-47f48cf3da46', '0b974e68-8516-5011-801d-1b50451aa20d', 'Defende que há uma idade máxima para se andar de trotinete.', 'leve', true, false, NULL, NULL),
@@ -1069,13 +1069,14 @@ INSERT INTO prompts (id, game_type_id, text, intensity, active, buddy, duration,
   ('4911fd2b-0f80-5888-8c71-fa17af77760a', '0b974e68-8516-5011-801d-1b50451aa20d', 'Defende que toda a gente aqui finge gostar de pelo menos uma pessoa presente.', 'hardcore', true, false, NULL, NULL),
   ('0fbb0147-2ade-58bf-82ee-390464181f06', '0b974e68-8516-5011-801d-1b50451aa20d', 'Defende que a amizade é um esquema em pirâmide e que tu estás no topo.', 'caos', true, false, NULL, NULL),
   ('ab170238-ce88-5b1d-88ef-2e5982baca46', '0b974e68-8516-5011-801d-1b50451aa20d', 'Defende que devias herdar tudo o que os teus amigos têm, por mérito.', 'caos', true, false, NULL, NULL),
-  ('9601030d-d84d-590f-8007-399bae97ebd5', '0b974e68-8516-5011-801d-1b50451aa20d', 'Defende que esta mesa devia ser dissolvida e recomeçada sem ti a decidir.', 'caos', true, false, NULL, NULL)
+  ('9601030d-d84d-590f-8007-399bae97ebd5', '0b974e68-8516-5011-801d-1b50451aa20d', 'Defende que esta mesa devia ser dissolvida e recomeçada sem ti a decidir.', 'caos', true, false, NULL, NULL),
+  ('e6575100-d291-51d8-8a12-e1c6a65b805c', '0b974e68-8516-5011-801d-1b50451aa20d', 'Defende que o júri que te está a julgar não tem autoridade moral para o fazer.', 'caos', true, false, NULL, NULL)
 ON CONFLICT (game_type_id, text) DO UPDATE SET
   intensity = EXCLUDED.intensity, active = true, buddy = EXCLUDED.buddy,
   duration = EXCLUDED.duration, tag = EXCLUDED.tag;
 
 COMMIT;
 
--- Conferência rápida (deve dar 25 e 905):
+-- Conferência rápida (deve dar 25 e 906):
 --   SELECT count(*) FROM game_types;
 --   SELECT count(*) FROM prompts;

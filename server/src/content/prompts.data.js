@@ -1125,6 +1125,7 @@ export const GAME_TYPES = [
       ['Defende que a amizade é um esquema em pirâmide e que tu estás no topo.', 'caos'],
       ['Defende que devias herdar tudo o que os teus amigos têm, por mérito.', 'caos'],
       ['Defende que esta mesa devia ser dissolvida e recomeçada sem ti a decidir.', 'caos'],
+      ['Defende que o júri que te está a julgar não tem autoridade moral para o fazer.', 'caos'],
     ],
   },
 ];

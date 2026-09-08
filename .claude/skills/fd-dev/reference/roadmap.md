@@ -175,7 +175,11 @@ Legenda: ✅ feito · 🚧 em curso · ⬜ por fazer · 🔗 ponto de integraç�
       `contrato/caos`**. Não partia nada (há fallback de intensidade), mas o
       `sincronia/caos` tinha um único prompt — era sempre o mesmo. **+194
       prompts**, os seis a 12/12/12/12. Catálogo em 905 no código e 924 na BD.
-      Falta só `tribunal/caos` (11), à espera da curadoria dos temas.
+      **Fechado (2026-09-08e):** o João decidiu ficar com os **48 temas do
+      Tribunal todos ativos** (os 18 escritos na /admin + os 30 do seed, que são
+      quase disjuntos). Com isso o `tribunal/caos` ficava em 11, e juntou-se +1
+      tema. **Nenhum nível do catálogo inteiro está agora abaixo de 12.**
+      925 prompts ativos na BD.
 - [ ] 2.º playtest (11 set) → validar estas mudanças com o grupo
 - [x] **Snapshot das salas na Postgres** (2026-09-01b) — modelo `RoomSnapshot`;
       ficheiro a cada 5s + BD a cada 15s e no SIGTERM. Sobrevive a um deploy que

@@ -39,7 +39,17 @@ Os seis ficam agora em **12 / 12 / 12 / 12 = 48** cada, como todos os outros.
 Todo o catálogo passa o critério, com uma única exceção: `tribunal/caos = 11`
 (um a menos), que fica à espera da curadoria dos temas do Tribunal.
 
-Ficheiros: `server/src/content/prompts.data.js` (905 prompts, era 711) ·
+**Fecho (2026-09-08e):** decidido ficar com os **48 temas do Tribunal todos
+ativos** — os 18 escritos na /admin e os 30 do seed, que são de registos
+diferentes (os vossos são opiniões do mundo real; os do seed são absurdos
+auto-referenciais virados para a própria mesa). Isso deixava o `tribunal/caos`
+em 11, o último nível do catálogo abaixo do critério; juntou-se +1 tema
+("o júri que te está a julgar não tem autoridade moral para o fazer" — na
+mesma linha dos do seed, a apontar ao júri enquanto ele vota). **Nenhum nível
+do catálogo está agora abaixo de 12**, pela primeira vez desde que os tipos
+hardcore existem. 906 no código, 925 ativos na BD.
+
+Ficheiros: `server/src/content/prompts.data.js` (906 prompts, era 711) ·
 `server/db/02_seed.sql` regenerado (`npm run db:sql`).
 Verificado: contagem por tipo e por nível a bater os 12 nos quatro níveis, **0
 duplicados** no ficheiro inteiro, `npm run db:seed` levado à Supabase (**924
