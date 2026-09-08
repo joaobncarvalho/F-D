@@ -169,6 +169,13 @@ Legenda: ✅ feito · 🚧 em curso · ⬜ por fazer · 🔗 ponto de integraç�
       ⚠️ **Por ver com olhos:** as animações novas não foram abertas no browser
       (extensão do Chrome não ligada) — falta o showroom nas cenas de Intrigas,
       Segredos e Vasco.
+- [x] **Conteúdo dos seis tipos hardcore ao nível dos outros (2026-09-08d)** —
+      os tipos de 03 set nunca passaram pelo critério de "12 por nível" fixado a
+      02 set: estavam a 2 no `bomba/caos`, 1 no `sincronia/caos`, **0 no
+      `contrato/caos`**. Não partia nada (há fallback de intensidade), mas o
+      `sincronia/caos` tinha um único prompt — era sempre o mesmo. **+194
+      prompts**, os seis a 12/12/12/12. Catálogo em 905 no código e 924 na BD.
+      Falta só `tribunal/caos` (11), à espera da curadoria dos temas.
 - [ ] 2.º playtest (11 set) → validar estas mudanças com o grupo
 - [x] **Snapshot das salas na Postgres** (2026-09-01b) — modelo `RoomSnapshot`;
       ficheiro a cada 5s + BD a cada 15s e no SIGTERM. Sobrevive a um deploy que

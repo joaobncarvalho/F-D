@@ -5,6 +5,49 @@
 
 ---
 
+## 2026-09-08 (d) — Os seis tipos de 03 set passaram, finalmente, no critério de 02 set
+
+A 02 set a revisão pré-playtest fixou um padrão: **nenhum nível abaixo de 12 por
+tipo**. Os seis tipos hardcore nasceram no dia SEGUINTE (03 set) e nunca lá
+passaram — ninguém voltou a correr a conta depois de os acrescentar.
+
+Estavam assim, exatamente nas intensidades em que aparecem:
+
+| tipo | leve | picante | hardcore | caos |
+|---|---|---|---|---|
+| 💣 bomba | 10 | 5 | 3 | **2** |
+| 🤝 contrato | 7 | 3 | 2 | **0** |
+| 🕵️‍♂️ detetor | 6 | 5 | 3 | **2** |
+| ⚖️ julgamento | 7 | 4 | 2 | **1** |
+| 🔨 leilao | 6 | 5 | 3 | **2** |
+| 🔗 sincronia | 8 | 5 | 2 | **1** |
+
+Não partia nada — o `repo.js:78` cai para outra intensidade quando não há linhas,
+e o saco anti-repetição repõe-se quando esvazia. O que acontecia era pior de
+outra maneira: `sincronia/caos` tinha **um** prompt, portanto era sempre o
+mesmo; e `contrato/caos` servia conteúdo `leve` no meio de uma noite em caos.
+Numa noite de 90 minutos com 8 pessoas, nota-se.
+
+**+194 prompts**, escritos a respeitar a mecânica de cada tipo (a bomba são
+categorias, o leilão são desafios que se licitam, a sincronia são perguntas de
+"quem desta mesa", o detetor são "já…?", o julgamento são acusações, o contrato
+são pactos entre dois) e o princípio transversal das camadas hardcore: **nada
+disto manda beber mais** — sobe em exposição, em verdade dita à frente da mesa e
+em risco, não em golos.
+
+Os seis ficam agora em **12 / 12 / 12 / 12 = 48** cada, como todos os outros.
+Todo o catálogo passa o critério, com uma única exceção: `tribunal/caos = 11`
+(um a menos), que fica à espera da curadoria dos temas do Tribunal.
+
+Ficheiros: `server/src/content/prompts.data.js` (905 prompts, era 711) ·
+`server/db/02_seed.sql` regenerado (`npm run db:sql`).
+Verificado: contagem por tipo e por nível a bater os 12 nos quatro níveis, **0
+duplicados** no ficheiro inteiro, `npm run db:seed` levado à Supabase (**924
+prompts ativos** na BD, era 730 — a diferença são os que vocês escreveram na
+/admin, que o seed não toca), `npm test` **226/226** e build limpo.
+
+---
+
 ## 2026-09-08 (c) — Movimento nas cartas mais jogadas, guardas nas outras duas costuras, e três testes que mentiam
 
 Revisão pré-playtest a pedido do João ("upgrade geral antes do grande
