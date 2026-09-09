@@ -198,13 +198,13 @@ test('a roda não sorteia tipos que a mesa não tem gente para jogar', () => {
     { key: 'eu_nunca', label: 'Eu Nunca' },
   ];
   const saidas = new Set();
-  for (let i = 0; i < 500; i++) saidas.add(game.pickWeightedType(types, { jogadores: 2 }).key);
+  for (let i = 0; i < 500; i++) saidas.add(game.pickType(types, { jogadores: 2 }).key);
   assert.ok(!saidas.has('vasco'), 'o Vasco precisa de 4 (com 2 é uma acusação a dois)');
   assert.ok(!saidas.has('piramide'), 'a Pirâmide precisa de 3');
   assert.ok(saidas.has('desafio') && saidas.has('eu_nunca'), 'os curtos servem qualquer mesa');
 
   const comMesa = new Set();
-  for (let i = 0; i < 500; i++) comMesa.add(game.pickWeightedType(types, { jogadores: 6 }).key);
+  for (let i = 0; i < 500; i++) comMesa.add(game.pickType(types, { jogadores: 6 }).key);
   assert.equal(comMesa.size, 4, 'com mesa cheia, tudo volta a entrar na roda');
 });
 
@@ -212,7 +212,7 @@ test('a roda evita os tipos que acabaram de sair', () => {
   const types = ['desafio', 'eu_nunca', 'mimica', 'termometro', 'cascata', 'reacao']
     .map((key) => ({ key, label: key }));
   for (let i = 0; i < 300; i++) {
-    const escolhido = game.pickWeightedType(types, { jogadores: 6, recentes: ['desafio', 'eu_nunca'] });
+    const escolhido = game.pickType(types, { jogadores: 6, recentes: ['desafio', 'eu_nunca'] });
     assert.ok(!['desafio', 'eu_nunca'].includes(escolhido.key), 'não repete o que saiu nas duas últimas voltas');
   }
 });
@@ -221,18 +221,27 @@ test('mesa pequena de mais: prefere-se repetir a ficar sem roda', () => {
   const types = [{ key: 'desafio', label: 'Desafio' }, { key: 'eu_nunca', label: 'Eu Nunca' }];
   // Só há dois tipos e ambos são "recentes" — a roda tem de devolver um deles à
   // mesma. Uma roda vazia encravava o jogo; um tipo repetido só aborrece.
-  const escolhido = game.pickWeightedType(types, { jogadores: 2, recentes: ['desafio', 'eu_nunca'] });
+  const escolhido = game.pickType(types, { jogadores: 2, recentes: ['desafio', 'eu_nunca'] });
   assert.ok(['desafio', 'eu_nunca'].includes(escolhido.key));
 });
 
-test('a roda respeita os pesos (os jogos longos saem menos)', () => {
-  const types = [{ key: 'desafio', label: 'D' }, { key: 'vasco', label: 'V' }];
-  let desafios = 0;
-  const N = 4000;
-  for (let i = 0; i < N; i++) if (game.pickWeightedType(types, { jogadores: 6 }).key === 'desafio') desafios += 1;
-  // Pesos 12 vs 3 → o desafio deve ficar perto de 80%. Folga larga de propósito:
-  // um teste de aleatoriedade que falha de vez em quando é pior do que nenhum.
-  assert.ok(desafios / N > 0.7, `o desafio saiu ${((desafios / N) * 100).toFixed(0)}% das vezes`);
+test('a roda é plana: todos os tipos que cabem na mesa saem por igual', () => {
+  // Era o teste dos pesos (o Desafio a 80% contra o Vasco). A roda deixou de
+  // pesar (ver TYPE_PROFILE em game.js): com quatro tipos e mesa cheia, cada um
+  // tem de andar à volta de 25%.
+  const types = ['desafio', 'vasco', 'detetor', 'bomba'].map((key) => ({ key, label: key }));
+  const conta = {};
+  const N = 8000;
+  for (let i = 0; i < N; i++) {
+    const k = game.pickType(types, { jogadores: 6 }).key;
+    conta[k] = (conta[k] || 0) + 1;
+  }
+  for (const t of types) {
+    const parte = (conta[t.key] || 0) / N;
+    // Folga larga de propósito: um teste de aleatoriedade que falha de vez em
+    // quando é pior do que nenhum.
+    assert.ok(parte > 0.2 && parte < 0.3, `${t.key} saiu ${(parte * 100).toFixed(1)}% (esperado ~25%)`);
+  }
 });
 
 // ----- 6. A curva de intensidade do lobby -----------------------------------

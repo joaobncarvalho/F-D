@@ -225,10 +225,12 @@ test('o final é anunciado antes de se jogar e o jogo acaba sozinho a seguir', a
   assert.equal(g.finaleFeito, true);
 });
 
-test('a roda respeita o Diretor: no aquecimento os jogos longos são raros', async () => {
-  // Estatístico e não absoluto, de propósito. O Diretor baixa o peso do Vasco a
-  // 15%, não a zero — um teste que exigisse "nunca" falhava de vez em quando
-  // sozinho, e um teste que falha à sorte deixa de ser lido.
+test('a roda é plana: os jogos longos também saem no aquecimento', async () => {
+  // Era o contrário: o Diretor segurava os longos nas primeiras rondas (Vasco,
+  // Desenha, Pirâmide a 15% do peso). A roda deixou de pesar — todos os tipos
+  // que cabem na mesa têm a mesma probabilidade, do princípio ao fim da noite
+  // (ver a nota em TYPE_PROFILE, game.js). Este teste guarda essa decisão: se
+  // alguém voltar a inclinar a roda, é aqui que dá sinal.
   const { room } = mesa(['Ana', 'Rui', 'Zé', 'Nel', 'Bea']);
   const g = room.game;
   const N = 400;
@@ -242,5 +244,7 @@ test('a roda respeita o Diretor: no aquecimento os jogos longos são raros', asy
     g.phase = 'wheel';
   }
   const fracao = longos / N;
-  assert.ok(fracao < 0.05, `jogos longos no aquecimento: ${(fracao * 100).toFixed(1)}% (esperava <5%)`);
+  // Três tipos longos em ~25: à volta de 12%. Folga larga, que isto é sorteio.
+  assert.ok(fracao > 0.05, `jogos longos no aquecimento: ${(fracao * 100).toFixed(1)}% (esperava ~12%)`);
+  assert.ok(fracao < 0.25, `jogos longos a mais: ${(fracao * 100).toFixed(1)}%`);
 });

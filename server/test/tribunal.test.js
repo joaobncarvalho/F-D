@@ -57,7 +57,7 @@ test('Roda: o tribunal só entra no sorteio a partir do Hardcore', () => {
   for (const nivel of ['leve', 'picante']) {
     for (let i = 0; i < 200; i++) {
       assert.notEqual(
-        game.pickWeightedType(types, { jogadores: 6, intensidade: nivel }).key,
+        game.pickType(types, { jogadores: 6, intensidade: nivel }).key,
         'tribunal',
         `não pode sair em ${nivel}`
       );
@@ -65,11 +65,11 @@ test('Roda: o tribunal só entra no sorteio a partir do Hardcore', () => {
   }
   let saiu = false;
   for (let i = 0; i < 400 && !saiu; i++) {
-    saiu = game.pickWeightedType(types, { jogadores: 6, intensidade: 'hardcore' }).key === 'tribunal';
+    saiu = game.pickType(types, { jogadores: 6, intensidade: 'hardcore' }).key === 'tribunal';
   }
   assert.ok(saiu, 'em hardcore tem de poder sair');
   // Sem intensidade (testes antigos, chamadores futuros) a roda fica inteira.
-  assert.doesNotThrow(() => game.pickWeightedType(types, { jogadores: 6 }));
+  assert.doesNotThrow(() => game.pickType(types, { jogadores: 6 }));
 });
 
 test('Roda: absolvido — quem condenou é que bebe', () => {

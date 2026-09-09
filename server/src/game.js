@@ -353,52 +353,59 @@ function pickQuestion(game, targetId) {
 }
 
 /**
- * Perfil de cada tipo na roda. Duas colunas, duas razões diferentes:
+ * Perfil de cada tipo na roda.
  *
  *   min  — nº MÍNIMO de jogadores ativos para o tipo fazer sentido. O Vasco com
  *          3 pessoas é uma acusação a dois; o Duelo com 3 deixa um a olhar. Um
  *          tipo abaixo do mínimo nem entra no sorteio.
- *   peso — RITMO da noite. Nem todos os tipos custam o mesmo tempo: a Pirâmide,
- *          o Vasco e o Desenha são de 5+ minutos e cansam se saírem seguidos;
- *          os curtos (desafio, eu nunca) aguentam sair muitas vezes. Peso alto
- *          = sai mais vezes. É aqui — e só aqui — que se afina a cadência.
+ *
+ * A RODA É PLANA (decisão do João, 09 set 2026)
+ *
+ * Havia aqui uma segunda coluna, o `peso`, que dava mais voltas aos tipos
+ * curtos e menos aos longos, e por cima dela o Diretor multiplicava ainda mais
+ * (game/director.js). O resultado era uma roda muito inclinada: o Desafio saía
+ * ~7% das rondas e cada tipo da camada 3 ~3% — havia noites inteiras sem se ver
+ * metade do jogo.
+ *
+ * Agora TODOS os tipos que cabem na mesa têm exatamente a mesma probabilidade.
+ * O que sobra a moldar a noite são os dois filtros que não são preferências:
+ * quantos jogadores o tipo precisa (`min`), e não repetir o que saiu nas duas
+ * últimas voltas.
  *
  * Um tipo que não esteja nesta tabela (conteúdo novo vindo da BD) entra com o
  * perfil neutro DEFAULT_PROFILE: nunca fica de fora por esquecimento.
  */
 const TYPE_PROFILE = {
-  desafio: { min: 2, peso: 12 },
-  boca_calada: { min: 2, peso: 10 },
-  eu_nunca: { min: 2, peso: 10 },
-  isto_ou_aquilo: { min: 2, peso: 8 },
-  termometro: { min: 2, peso: 7 },
-  mais_provavel: { min: 3, peso: 8 },
-  reacao: { min: 3, peso: 8 },
-  quem_disse: { min: 3, peso: 7 },
-  cascata: { min: 3, peso: 6 },
-  intrigas: { min: 3, peso: 6 },
-  segredos: { min: 3, peso: 6 },
-  roleta_russa: { min: 2, peso: 6 },
-  categoria_relampago: { min: 2, peso: 6 },
-  mimica: { min: 3, peso: 5 },
-  duelo: { min: 3, peso: 5 },
-  desenho: { min: 3, peso: 4 },
-  vasco: { min: 4, peso: 3 },
-  piramide: { min: 3, peso: 3 },
-  // Tipos "hardcore" (camada 3). Pesos deliberadamente moderados: são todos mais
-  // longos ou mais expostos do que a média, e uma noite feita só disto cansa.
-  bomba: { min: 3, peso: 8 }, // curto e barulhento → aguenta sair muitas vezes
-  leilao: { min: 3, peso: 5 },
-  sincronia: { min: 4, peso: 6 }, // precisa de dupla + mesa para pagar
-  detetor: { min: 3, peso: 6 },
-  julgamento: { min: 4, peso: 4 }, // réu + advogado + júri
-  contrato: { min: 3, peso: 4 }, // deixa uma regra ativa atrás de si
-  // ⚖️ Tribunal da Injustiça: 90s de defesa fazem dele um dos tipos mais longos
-  // da roda, daí o peso baixo. `intensidades` restringe-o ao Hardcore para cima
+  desafio: { min: 2 },
+  boca_calada: { min: 2 },
+  eu_nunca: { min: 2 },
+  isto_ou_aquilo: { min: 2 },
+  termometro: { min: 2 },
+  mais_provavel: { min: 3 },
+  reacao: { min: 3 },
+  quem_disse: { min: 3 },
+  cascata: { min: 3 },
+  intrigas: { min: 3 },
+  segredos: { min: 3 },
+  roleta_russa: { min: 2 },
+  categoria_relampago: { min: 2 },
+  mimica: { min: 3 },
+  duelo: { min: 3 },
+  desenho: { min: 3 },
+  vasco: { min: 4 },
+  piramide: { min: 3 },
+  // Tipos "hardcore" (camada 3): mais longos ou mais expostos do que a média.
+  bomba: { min: 3 },
+  leilao: { min: 3 },
+  sincronia: { min: 4 },
+  detetor: { min: 3 },
+  julgamento: { min: 4 },
+  contrato: { min: 3 },
+  // ⚖️ Tribunal da Injustiça: `intensidades` restringe-o ao Hardcore para cima
   // — é o único tipo com essa marca, e é assim que o João o desenhou.
-  tribunal: { min: 3, peso: 4, intensidades: ['hardcore', 'caos'] },
+  tribunal: { min: 3, intensidades: ['hardcore', 'caos'] },
 };
-const DEFAULT_PROFILE = { min: 2, peso: 6 };
+const DEFAULT_PROFILE = { min: 2 };
 // Quantos tipos recentes se evitam. Com sorteio uniforme entre 18 tipos, o mesmo
 // saía outra vez dentro de 3 voltas em ~1 de cada 6 rondas — e a mesa nota.
 const EVITAR_RECENTES = 2;
@@ -411,17 +418,16 @@ const perfil = (key) => TYPE_PROFILE[key] || DEFAULT_PROFILE;
  * @param types    tipos disponíveis (repo.getGameTypes)
  * @param opts.jogadores  nº de jogadores ATIVOS (ligados e não eliminados)
  * @param opts.recentes   chaves das últimas voltas (mais recente primeiro)
- * @param opts.pesos      multiplicadores por tipo vindos do Diretor (1 = como está).
- *                        Ficam DEPOIS dos filtros de propósito: o Diretor afina a
- *                        probabilidade, mas nunca faz sair um tipo que a mesa não
- *                        tem gente para jogar.
  *
  * A ordem dos filtros importa: primeiro corta-se o que não SERVE (poucos
  * jogadores), depois o que ABORRECE (acabou de sair). O segundo filtro é
  * dispensável — se ao evitar os recentes ficasse quase nada, prefere-se repetir
  * um tipo a estreitar a roda a duas opções.
+ *
+ * Passados os filtros, é um sorteio PLANO: todos os que sobram têm a mesma
+ * probabilidade (ver a nota em TYPE_PROFILE).
  */
-export function pickWeightedType(types, { jogadores = 99, recentes = [], pesos = null, intensidade = null } = {}) {
+export function pickType(types, { jogadores = 99, recentes = [], intensidade = null } = {}) {
   if (!types?.length) return null;
 
   const cabem = types.filter((t) => {
@@ -440,14 +446,7 @@ export function pickWeightedType(types, { jogadores = 99, recentes = [], pesos =
   const frescos = pool.filter((t) => !evitar.has(t.key));
   if (frescos.length >= 3) pool = frescos;
 
-  const pesoDe = (t) => Math.max(0.01, perfil(t.key).peso * (pesos?.[t.key] ?? 1));
-  const total = pool.reduce((soma, t) => soma + pesoDe(t), 0);
-  let bilhete = Math.random() * total;
-  for (const t of pool) {
-    bilhete -= pesoDe(t);
-    if (bilhete <= 0) return t;
-  }
-  return pool[pool.length - 1];
+  return pool[Math.floor(Math.random() * pool.length)];
 }
 
 /**
@@ -616,18 +615,22 @@ export async function spinWheel(room, playerId) {
   const types = await repo.getGameTypes();
 
   // O DIRETOR (game/director.js). A roda continua a girar no ecrã — o que muda é
-  // o que está por trás dela: quem anda calado, quem já está a levar com tudo,
-  // se a mesa acabou de aguentar três jogos longos, e em que ponto vai a noite.
+  // o que está por trás dela: quem anda calado, quem já está a levar com tudo, e
+  // em que ponto vai a noite.
+  //
+  // O que ele JÁ NÃO faz é mexer na probabilidade dos tipos: o sorteio é plano
+  // (ver TYPE_PROFILE). Continua a escolher em QUEM cai a volta e a montar o
+  // final da noite — `pesosDe` fica no módulo, desligado do sorteio, para o dia
+  // em que se quiser voltar a inclinar a roda.
   const l = director.leitura(room);
   const fase = director.faseDaNoite(room);
   // A intensidade EM VIGOR (curva incluída) entra no sorteio, e não só na escolha
   // do prompt: há tipos que não são conteúdo mais forte, são um jogo diferente, e
   // esses só existem a partir de certo nível (ver `TYPE_PROFILE.tribunal`).
   const inten = effectiveIntensity(g);
-  let gt = pickWeightedType(types, {
+  let gt = pickType(types, {
     jogadores: l.jogadores,
     recentes: g.recentTypes || [],
-    pesos: director.pesosDe(l, fase),
     intensidade: inten,
   });
   // PLAYTEST (dev): o showroom pode encomendar o próximo tipo. Consome-se aqui,
