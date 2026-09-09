@@ -8,8 +8,14 @@ import { MOLA, LISTA, ITEM_LISTA } from '../../motion.js';
  * A Conta (modificador 📿) — ver server/src/game/divida.js.
  *
  * Três coisas num sítio só, porque são a mesma coisa vista de ângulos
- * diferentes: quem deve o quê (sempre à vista — uma conta escondida não se
- * negoceia), o botão de passar a conta a alguém, e a herança de quem sai.
+ * diferentes: o que EU devo, o botão de passar a conta a alguém, e a herança de
+ * quem sai.
+ *
+ * A faixa era a lista das contas de toda a mesa e ficava no ecrã a noite
+ * inteira: quem passava a sua continuava a vê-la (agora com o nome de quem a
+ * recebeu) e parecia que não tinha saído dali. Passa a ser PESSOAL — aparece a
+ * quem deve, e sai no instante em que se deixa de dever. Quem recebeu a conta
+ * vê-a no ecrã dele, que é onde ela agora interessa.
  *
  * A herança tem prioridade sobre tudo: é um momento, não um estado, e enquanto
  * dura é a única coisa que interessa no ecrã.
@@ -74,71 +80,61 @@ export default function DividaBand({ divida, room, youId, onTransfere, onHerdeir
     );
   }
 
-  if (!divida.contas.length) return null;
+  // Não devo nada → não há faixa nenhuma. É a regra toda.
+  if (!minha) return null;
 
-  // ----- Contas abertas ---------------------------------------------------------
+  // ----- A minha conta ----------------------------------------------------------
   return (
     <div className="fd-card p-2.5 flex flex-col gap-1.5">
       <p className="text-xs font-bold text-amber-300">📿 A Conta</p>
-      <div className="flex flex-wrap gap-x-3 gap-y-1">
-        {divida.contas.map((c) => {
-          const p = jogador(c.id);
-          return (
-            <span key={c.id} className="text-xs text-white/70 flex items-center gap-1">
-              {p && <Avatar player={p} size={16} />}
-              <b className="text-white">{c.name}</b> deve {c.golos}
-            </span>
-          );
-        })}
-      </div>
+      <p className="text-xs text-white/70 flex items-center gap-1">
+        Deves <b className="text-white">{minha.golos}</b> goles — pagam-se no fim da noite (ou quando
+        cair o Cobrador).
+      </p>
 
       {/* Passar a conta é uma NEGOCIAÇÃO: quem assume ganha uma vida. O preço
           está escrito para os dois lados o lerem antes de alguém tocar em nada. */}
-      {minha && (
-        <>
-          <button
-            onClick={() => {
-              sfx.click();
-              setAPassar((v) => !v);
-            }}
-            className="fd-chip text-xs mt-0.5"
+      <button
+        onClick={() => {
+          sfx.click();
+          setAPassar((v) => !v);
+        }}
+        className="fd-chip text-xs mt-0.5"
+      >
+        {aPassar ? '✖️ Deixa estar' : `🤝 Passar os meus ${minha.golos} goles a alguém`}
+      </button>
+      <AnimatePresence>
+        {aPassar && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            className="flex flex-col gap-1.5 overflow-hidden"
           >
-            {aPassar ? '✖️ Deixa estar' : `🤝 Passar os meus ${minha.golos} goles a alguém`}
-          </button>
-          <AnimatePresence>
-            {aPassar && (
-              <motion.div
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: 'auto' }}
-                exit={{ opacity: 0, height: 0 }}
-                className="flex flex-col gap-1.5 overflow-hidden"
-              >
-                <p className="text-[11px] text-white/40 leading-tight">
-                  Quem aceitar fica com os {minha.golos} goles e ganha uma vida. Convençam-se em voz alta.
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  {room.players
-                    .filter((p) => p.connected && !p.eliminated && p.id !== youId)
-                    .map((p) => (
-                      <button
-                        key={p.id}
-                        onClick={() => {
-                          sfx.click();
-                          setAPassar(false);
-                          onTransfere(p.id);
-                        }}
-                        className="fd-chip flex items-center gap-1.5 text-xs"
-                      >
-                        <Avatar player={p} size={18} />
-                        {p.name}
-                      </button>
-                    ))}
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </>
-      )}
+            <p className="text-[11px] text-white/40 leading-tight">
+              Quem aceitar fica com os {minha.golos} goles e ganha uma vida. Convençam-se em voz alta.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {room.players
+                .filter((p) => p.connected && !p.eliminated && p.id !== youId)
+                .map((p) => (
+                  <button
+                    key={p.id}
+                    onClick={() => {
+                      sfx.click();
+                      setAPassar(false);
+                      onTransfere(p.id);
+                    }}
+                    className="fd-chip flex items-center gap-1.5 text-xs"
+                  >
+                    <Avatar player={p} size={18} />
+                    {p.name}
+                  </button>
+                ))}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
