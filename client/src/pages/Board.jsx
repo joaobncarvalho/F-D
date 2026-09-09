@@ -9,7 +9,7 @@ import { EventoOverlay } from './board/EventoOverlay.jsx';
 import { encena } from '../palco.js';
 import TribunalBand from './board/TribunalBand.jsx';
 import { BotaoReacao } from './games/ReacaoCard.jsx';
-import Feed, { ShareResult } from '../components/Feed.jsx';
+import { ShareResult } from '../components/Feed.jsx';
 
 const KIND_ICON = { partida: '🏁', evento: '❓', gamble: '🎲', blackjack: '🃏', beerpong: '🏓', leilao: '🔨' };
 const CURSE_PREFIX = 'curse_';
@@ -398,7 +398,6 @@ export default function Board({ room, youId, myHand, myTraps, onPickPawn, onRoll
         {isMyTurn ? '🎯 É a tua vez!' : b.currentPlayerId ? `Vez de ${currentPawn} ${currentPlayer?.name || ''}`.trim() : '⏳ À espera de jogadores…'}
       </Header>
 
-      <Feed feed={room.feed} />
 
       {/* ⚖️ O julgamento vem ANTES de tudo o resto e tranca a jogada: enquanto
           durar, o tabuleiro por baixo está suspenso (ver board/tribunal.js). */}

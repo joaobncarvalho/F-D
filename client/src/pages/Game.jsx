@@ -20,7 +20,7 @@ import { ReacaoCard } from './games/ReacaoCard.jsx';
 import {
   BombaCard, LeilaoCard, SincroniaCard, DetetorCard, JulgamentoCard, ContratoCard, TribunalCard,
 } from './games/hardcoreCards.jsx';
-import Feed, { ShareResult } from '../components/Feed.jsx';
+import { ShareResult } from '../components/Feed.jsx';
 import { Avatar } from './games/shared.jsx';
 import { socket } from '../socket.js';
 import { sfx } from '../sfx.js';
@@ -246,7 +246,6 @@ export default function Game(props) {
         </span>
       </div>
 
-      <Feed feed={room.feed} />
 
       {/* Modificadores em vigor. Uma regra que muda o custo de recusar tem de
           estar à vista de quem vai decidir recusar — e agora ainda mais, porque
