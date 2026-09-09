@@ -399,6 +399,7 @@ export function serializeRoom(room) {
     duracaoMin: room.duracaoMin || null,
     modifiers: modificadores.serialize(room),
     paused: !!room.paused,
+    botRitmo: room.botRitmo || null, // só em salas de teste (ver socket.js → BOT_RITMOS)
     feed: serializeFeed(room),
     // Estado de jogo (null enquanto no lobby). Serialização/anonimização em game.js/board.js.
     game: serializeGame(room),

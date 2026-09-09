@@ -33,13 +33,29 @@ const CASAS_TABULEIRO = [
 ];
 
 const rooms = new RoomManager();
-const botTicks = new Map(); // code -> intervalId (tick dos bots de playtest)
+const botTicks = new Map(); // code -> { timer } (tick dos bots de playtest)
+
+// RITMO dos bots na sala de teste. O tick era fixo em 850ms e isso, numa mesa
+// só de bots, passava por cima das animações: a roda, o veredito e os desafios
+// apareciam já resolvidos e não se percebia o que tinha acontecido. Agora o
+// ritmo escolhe-se dentro da sala (barra 🧪) — e há o passo-a-passo, em que
+// nada acontece sem se carregar no botão.
+export const BOT_RITMOS = {
+  rapido: 800,
+  normal: 1800,
+  lento: 3200,
+  manual: null, // passo-a-passo: só anda com `dev_bot_step`
+};
+const BOT_RITMO_OMISSAO = 'normal';
 
 // Eventos permitidos com a sala em PAUSA (host foi à casa de banho, etc.).
 // Tudo o resto é recusado pelo servidor — a pausa tem de ser real, não decorativa.
 const ALLOWED_WHILE_PAUSED = new Set([
   'pause_game', 'rejoin_room', 'send_message', 'end_game', 'reset_game',
   'create_room', 'join_room', 'set_identity', 'watch_room',
+  // Sala de teste: com a mesa em pausa é precisamente quando se quer mudar o
+  // ritmo dos bots ou dar um passo de cada vez para ver o que se passa.
+  'dev_bot_ritmo', 'dev_bot_step',
 ]);
 
 /**
@@ -322,6 +338,7 @@ export function registerSocketHandlers(io) {
           casa = null,
           lives = null,
           curve = false, // playtest quer a intensidade PEDIDA, não a curva a subir
+          ritmo = null, // ritmo dos bots (ver BOT_RITMOS); vem do URL &ritmo=lento
         } = opts;
 
         leavePreviousRoom(io, socket); // um clique novo no showroom não deixa a sala anterior com um fantasma
@@ -329,6 +346,7 @@ export function registerSocketHandlers(io) {
         bindSocketToRoom(socket, room.code, player.id);
         rooms.setMode(room.code, player.id, mode);
         rooms.setCurve(room.code, player.id, curve);
+        if (ritmo && ritmo in BOT_RITMOS) room.botRitmo = ritmo;
 
         const n = Math.max(1, Math.min(7, Number(quantos) || 3));
         for (let i = 0; i < n; i++) rooms.addBot(room.code);
@@ -378,6 +396,36 @@ export function registerSocketHandlers(io) {
         aplicaEncomenda(room, { gameTypeKey, casa, playerId: socket.data.playerId });
         broadcastState(io, room.code);
         if (typeof ack === 'function') ack({ ok: true });
+      } catch (err) {
+        handleError(socket, ack, err);
+      }
+    });
+
+    // RITMO dos bots: numa mesa só de bots, 850ms entre jogadas passava por cima
+    // das animações — via-se o resultado, não o que lá levou. Aqui escolhe-se
+    // devagar (ou passo-a-passo) sem sair da sala.
+    socket.on('dev_bot_ritmo', ({ ritmo = 'normal', ticket = null } = {}, ack) => {
+      try {
+        exigePlaytest({ ticket });
+        const room = requireRoom(socket);
+        if (!(ritmo in BOT_RITMOS)) throw new AppError('Ritmo desconhecido.');
+        room.botRitmo = ritmo;
+        reagendaBotTick(io, room.code);
+        broadcastState(io, room.code);
+        if (typeof ack === 'function') ack({ ok: true, ritmo });
+      } catch (err) {
+        handleError(socket, ack, err);
+      }
+    });
+
+    // PASSO-A-PASSO: uma jogada de bot por toque (o par do ritmo 'manual', mas
+    // não custa deixar dar um empurrão em qualquer ritmo).
+    socket.on('dev_bot_step', async ({ ticket = null } = {}, ack) => {
+      try {
+        exigePlaytest({ ticket });
+        const room = requireRoom(socket);
+        const changed = await passoBots(io, room.code);
+        if (typeof ack === 'function') ack({ ok: true, changed });
       } catch (err) {
         handleError(socket, ack, err);
       }
@@ -1323,29 +1371,64 @@ function aplicaEncomenda(room, { gameTypeKey = null, casa = null, playerId = nul
   }
 }
 
-/** Arranca (se ainda não existir) o tick que faz os bots de playtest jogar. */
+/** Faz os bots avançarem UMA jogada. Devolve `true` se algum agiu. */
+async function passoBots(io, code) {
+  const room = rooms.getRoom(code);
+  if (!room) return false;
+  try {
+    const changed = await bots.driveBots(room, {
+      onSpin: (round) => announceSpin(io, room, round),
+      onIntrigasTarget: (round) => announceIntrigasReason(io, room, round),
+    });
+    if (changed) broadcastState(io, code);
+    return changed;
+  } catch (err) {
+    log.error('erro no tick dos bots', { code, message: err?.message });
+    return false;
+  }
+}
+
+/**
+ * Arranca (se ainda não existir) o tick que faz os bots de playtest jogar.
+ *
+ * É um setTimeout que se reagenda a si próprio, e não um setInterval: assim o
+ * ritmo pode mudar a meio da sala, e o passo-a-passo é só não agendar nada.
+ */
 function ensureBotTick(io, code) {
   if (botTicks.has(code)) return;
-  const id = setInterval(async () => {
+  botTicks.set(code, { timer: null }); // marca a sala antes do 1.º agendamento
+
+  const agenda = () => {
     const room = rooms.getRoom(code);
     const hasBots = room && [...room.players.values()].some((p) => p.isBot && p.connected);
     if (!hasBots) {
-      clearInterval(id);
       botTicks.delete(code);
       return;
     }
-    try {
-      const changed = await bots.driveBots(room, {
-        onSpin: (round) => announceSpin(io, room, round),
-        onIntrigasTarget: (round) => announceIntrigasReason(io, room, round),
-      });
-      if (changed) broadcastState(io, code);
-    } catch (err) {
-      log.error('erro no tick dos bots', { code, message: err?.message });
+    const ms = BOT_RITMOS[room.botRitmo] ?? BOT_RITMOS[BOT_RITMO_OMISSAO];
+    if (ms == null) {
+      botTicks.set(code, { timer: null }); // manual: fica à espera do `dev_bot_step`
+      return;
     }
-  }, 850);
-  id.unref?.();
-  botTicks.set(code, id);
+    const timer = setTimeout(async () => {
+      // A PAUSA do host também trava os bots: antes disto, pôr a sala em pausa
+      // no meio de um playtest não servia de nada — eles continuavam a jogar.
+      if (!rooms.getRoom(code)?.paused) await passoBots(io, code);
+      agenda();
+    }, ms);
+    timer.unref?.();
+    botTicks.set(code, { timer });
+  };
+
+  agenda();
+}
+
+/** O ritmo mudou → deitar abaixo o agendamento em curso e voltar a arrancar. */
+function reagendaBotTick(io, code) {
+  const t = botTicks.get(code);
+  if (t?.timer) clearTimeout(t.timer);
+  botTicks.delete(code);
+  ensureBotTick(io, code);
 }
 
 function respond(ack, socket, event, payload) {

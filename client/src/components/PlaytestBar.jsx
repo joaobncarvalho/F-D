@@ -13,11 +13,23 @@ import { socket } from '../socket.js';
 import { sfx } from '../sfx.js';
 import { bilhete } from '../playtest.js';
 
+// Ritmo dos bots (o servidor tem os milissegundos, em socket.js → BOT_RITMOS).
+// Uma mesa só de bots jogava depressa demais para se ver o que acontecia: a
+// roda, os vereditos e os desafios passavam sem se perceber. Daqui abranda-se —
+// ou põe-se em passo-a-passo, e nada anda sem se carregar em "passo".
+const RITMOS = [
+  { id: 'rapido', label: '⏩ rápido' },
+  { id: 'normal', label: '▶️ normal' },
+  { id: 'lento', label: '🐢 lento' },
+  { id: 'manual', label: '👣 passo-a-passo' },
+];
+
 export default function PlaytestBar({ room, youId }) {
   const [aberto, setAberto] = useState(false);
   const [catalogo, setCatalogo] = useState(null); // { tipos, casas }
   const [erro, setErro] = useState(null);
   const [escolha, setEscolha] = useState('');
+  const ritmo = room?.botRitmo || 'normal';
 
   const board = room?.mode === 'board';
 
@@ -49,6 +61,21 @@ export default function PlaytestBar({ room, youId }) {
       : { gameTypeKey: id, ticket: bilhete() };
     socket.emit('dev_force_next', payload, (r) => {
       if (!r?.ok) setErro(r?.message || 'Não deu para encomendar.');
+    });
+  }
+
+  function mudaRitmo(id) {
+    sfx.click();
+    setErro(null);
+    socket.emit('dev_bot_ritmo', { ritmo: id, ticket: bilhete() }, (r) => {
+      if (!r?.ok) setErro(r?.message || 'Não deu para mudar o ritmo.');
+    });
+  }
+
+  function passo() {
+    sfx.click();
+    socket.emit('dev_bot_step', { ticket: bilhete() }, (r) => {
+      if (!r?.ok) setErro(r?.message || 'Não deu para dar o passo.');
     });
   }
 
@@ -88,6 +115,27 @@ export default function PlaytestBar({ room, youId }) {
               ))}
             </div>
 
+            {/* Ritmo dos bots: o que faz a diferença entre ver o jogo e ver o
+                resultado dele. Fica por cima da encomenda porque é o que se
+                mexe primeiro quando se abre a barra a meio de uma volta. */}
+            <div className="flex flex-wrap items-center gap-1.5 pt-1 border-t border-white/10">
+              <span className="text-[11px] text-white/45 w-full">Ritmo dos bots</span>
+              {RITMOS.map((r) => (
+                <button
+                  key={r.id}
+                  onClick={() => mudaRitmo(r.id)}
+                  className={`fd-chip text-[11px] py-1.5 ${ritmo === r.id ? 'fd-chip-on' : ''}`}
+                >
+                  {r.label}
+                </button>
+              ))}
+              {ritmo === 'manual' && (
+                <button onClick={passo} className="fd-chip fd-chip-on text-[11px] py-1.5 ml-auto">
+                  👉 passo
+                </button>
+              )}
+            </div>
+
             {emEspera && (
               <p className="text-[11px] text-fuchsia-200/80">
                 📌 À espera: <b>{rotuloEspera}</b>{' '}
@@ -106,12 +154,24 @@ export default function PlaytestBar({ room, youId }) {
         )}
 
         {!aberto && (
-          <button
-            onClick={() => { sfx.click(); setAberto(true); }}
-            className="fd-card px-3 py-2 text-xs font-bold border border-dashed border-fuchsia-400/40"
-          >
-            🧪 sala de teste{emEspera ? ' · 📌' : ''}
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => { sfx.click(); setAberto(true); }}
+              className="fd-card px-3 py-2 text-xs font-bold border border-dashed border-fuchsia-400/40"
+            >
+              🧪 sala de teste{ritmo === 'lento' ? ' · 🐢' : ''}{ritmo === 'manual' ? ' · 👣' : ''}{emEspera ? ' · 📌' : ''}
+            </button>
+            {/* No passo-a-passo o jogo está parado à espera deste botão — tem de
+                estar à mão sem abrir a barra. */}
+            {ritmo === 'manual' && (
+              <button
+                onClick={passo}
+                className="fd-card px-3 py-2 text-xs font-bold border border-dashed border-fuchsia-400/40"
+              >
+                👉 passo
+              </button>
+            )}
+          </div>
         )}
       </div>
     </div>

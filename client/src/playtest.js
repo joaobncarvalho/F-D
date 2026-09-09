@@ -62,17 +62,20 @@ export const PLAYTEST = params.has('playtest')
         : 'caos', // o playtest quer ver TUDO: em leve há tipos que nem entram no sorteio
       bots: Math.max(1, Math.min(7, Number(params.get('bots')) || 3)),
       name: params.get('name') || 'Tu',
+      // Ritmo dos bots (server/src/socket.js -> BOT_RITMOS). Sem isto ficava o do servidor.
+      ritmo: ['rapido','normal','lento','manual'].includes(params.get('ritmo')) ? params.get('ritmo') : null,
       gameTypeKey: params.get('tipo') || null,
       casa: params.get('casa') ? { kind: params.get('casa'), gameKey: params.get('gameKey') || null } : null,
     }
   : null;
 
 /** Monta o link de uma sala de teste (usado pelos botões do showroom). */
-export function linkPlaytest({ mode = 'wheel', tipo = null, casa = null, gameKey = null, intensity = 'caos', bots = 3 } = {}) {
+export function linkPlaytest({ mode = 'wheel', tipo = null, casa = null, gameKey = null, intensity = 'caos', bots = 3, ritmo = null } = {}) {
   const p = new URLSearchParams({ playtest: '1', mode, intensity, bots: String(bots) });
   if (tipo) p.set('tipo', tipo);
   if (casa) p.set('casa', casa);
   if (gameKey) p.set('gameKey', gameKey);
+  if (ritmo) p.set('ritmo', ritmo);
   // Sai do `?demo` de propósito: o showroom vive dentro dele e o playtest é a
   // app a sério. Mesma origem, para funcionar dentro do iframe da /admin.
   const t = bilhete();
