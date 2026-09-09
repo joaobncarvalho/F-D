@@ -16,7 +16,7 @@ import Board from './Board.jsx';
 import { PromptCard, ChoiceCard, IntrigasCard } from './games/cards.jsx';
 import { RelampagoCard, MimicaCard, RoletaCard, DueloCard } from './games/quickCards.jsx';
 import { ReacaoCard } from './games/ReacaoCard.jsx';
-import { TribunalCard } from './games/hardcoreCards.jsx';
+import { TribunalCard, DetetorCard } from './games/hardcoreCards.jsx';
 import Beat from '../components/Beat.jsx';
 import PalpiteBand from './games/PalpiteBand.jsx';
 import VereditoBand from './games/VereditoBand.jsx';
@@ -138,6 +138,29 @@ const tribunalBoard = (patch = {}) => ({
   ...patch,
 });
 
+// 🕵️‍♂️ Detetor de Mentiras (server/src/game/detetor.js).
+//
+// É o único tipo em que MENTIR é a jogada: a marca de "era verdade" fica no
+// servidor e a mesa vota às cegas. Isso faz dele um caso difícil de ver a
+// pedido — o estado interessante (o resultado, e sobretudo os dois extremos)
+// depende de como a mesa votou, e os extremos são raros a jogar a sério:
+// enganar TODA a gente dá uma vida, ser lido por TODA a gente tira uma.
+// A pergunta é uma das reais (`content/prompts.data.js`).
+const PERGUNTA_DET = 'Já fingiste estar doente para faltar a um plano com alguém desta mesa?';
+const detetorRound = (patch = {}) => ({
+  id: 'det-' + (patch.substate || 'responder'),
+  gameTypeKey: 'detetor',
+  currentPlayerId: 'me',
+  currentPlayerName: 'Tu',
+  pergunta: PERGUNTA_DET,
+  substate: 'responder', // responder → votar → result
+  jaVotaram: [],
+  custoVotoErrado: 2,
+  result: null,
+  ...patch,
+});
+const nomeP = (id) => ({ id, name: mkPlayers().find((p) => p.id === id)?.name || id });
+
 // A sala de teste que corresponde a cada cena (ver playtest.js). Onde não há
 // entrada, a cena é um estado que não se encomenda — o "▶ jogar" leva na mesma
 // ao modo certo, e o resto acontece a jogar.
@@ -183,6 +206,11 @@ const PLAY = {
   'w-roleta': { mode: 'wheel', tipo: 'roleta_russa' },
   'w-moeda': { mode: 'wheel', tipo: 'duelo' },
   'w-duelo': { mode: 'wheel', tipo: 'duelo' },
+  'w-det-marca': { mode: 'wheel', tipo: 'detetor' },
+  'w-det-vota': { mode: 'wheel', tipo: 'detetor' },
+  'w-det-result': { mode: 'wheel', tipo: 'detetor' },
+  'w-det-enganou': { mode: 'wheel', tipo: 'detetor' },
+  'w-det-lido': { mode: 'wheel', tipo: 'detetor' },
   'w-trib-defesa': { mode: 'wheel', tipo: 'tribunal' },
   'w-trib-voto': { mode: 'wheel', tipo: 'tribunal' },
   'w-trib-convenceu': { mode: 'wheel', tipo: 'tribunal' },
@@ -392,6 +420,56 @@ const SCENARIOS = [
   },
   // ⚖️ Tribunal na Roda — os quatro estados. Só sai em hardcore/caos, por isso
   // vê-lo a pedido é a única forma prática de lhe afinar o texto.
+  // 🕵️‍♂️ Detetor — a marca secreta, a votação da mesa e os três desfechos.
+  {
+    id: 'w-det-marca', kind: 'wheel', group: 'Roda', label: '🕵️‍♂️ Detetor — marcar a verdade',
+    render: () => <DetetorCard round={detetorRound()} room={{ players: mkPlayers() }} youId="me" canControl onMarca={noop} onVota={noop} onContinue={noop} />,
+  },
+  {
+    id: 'w-det-vota', kind: 'wheel', group: 'Roda', label: '🕵️‍♂️ Detetor — a mesa vota',
+    render: () => (
+      <DetetorCard
+        round={detetorRound({ substate: 'votar', currentPlayerId: 'p2', currentPlayerName: 'Bea', jaVotaram: ['p3'] })}
+        room={{ players: mkPlayers() }} youId="me" canControl onMarca={noop} onVota={noop} onContinue={noop}
+      />
+    ),
+  },
+  {
+    id: 'w-det-result', kind: 'wheel', group: 'Roda', label: '🕵️‍♂️ Detetor — era mentira 🤥',
+    render: () => (
+      <DetetorCard
+        round={detetorRound({
+          substate: 'result', currentPlayerId: 'p2', currentPlayerName: 'Bea',
+          result: { eraVerdade: false, atorId: 'p2', atorName: 'Bea', acertaram: [nomeP('me')], falharam: [nomeP('p3')], custo: 2, extremo: null },
+        })}
+        room={{ players: mkPlayers() }} youId="me" canControl onMarca={noop} onVota={noop} onContinue={noop}
+      />
+    ),
+  },
+  {
+    id: 'w-det-enganou', kind: 'wheel', group: 'Roda', label: '🕵️‍♂️ Detetor — enganou a mesa toda 🏆',
+    render: () => (
+      <DetetorCard
+        round={detetorRound({
+          substate: 'result',
+          result: { eraVerdade: true, atorId: 'me', atorName: 'Tu', acertaram: [], falharam: [nomeP('p2'), nomeP('p3')], custo: 2, extremo: 'enganou_todos' },
+        })}
+        room={{ players: mkPlayers() }} youId="me" canControl onMarca={noop} onVota={noop} onContinue={noop}
+      />
+    ),
+  },
+  {
+    id: 'w-det-lido', kind: 'wheel', group: 'Roda', label: '🕵️‍♂️ Detetor — lido por todos 🔍',
+    render: () => (
+      <DetetorCard
+        round={detetorRound({
+          substate: 'result',
+          result: { eraVerdade: false, atorId: 'me', atorName: 'Tu', acertaram: [nomeP('p2'), nomeP('p3')], falharam: [], custo: 2, extremo: 'lido_por_todos' },
+        })}
+        room={{ players: mkPlayers() }} youId="me" canControl onMarca={noop} onVota={noop} onContinue={noop}
+      />
+    ),
+  },
   {
     id: 'w-trib-defesa', kind: 'wheel', group: 'Roda', label: '⚖️ Tribunal — defesa (90s)',
     render: () => <TribunalCard round={tribunalRound()} room={{ players: mkPlayers() }} youId="me" canControl onAoVoto={noop} onVota={noop} onContinue={noop} />,
