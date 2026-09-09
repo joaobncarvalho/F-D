@@ -16,7 +16,9 @@ import Board from './Board.jsx';
 import { PromptCard, ChoiceCard, IntrigasCard } from './games/cards.jsx';
 import { RelampagoCard, MimicaCard, RoletaCard, DueloCard } from './games/quickCards.jsx';
 import { ReacaoCard } from './games/ReacaoCard.jsx';
-import { TribunalCard, DetetorCard } from './games/hardcoreCards.jsx';
+import {
+  TribunalCard, DetetorCard, BombaCard, SincroniaCard, JulgamentoCard, ContratoCard,
+} from './games/hardcoreCards.jsx';
 import Beat from '../components/Beat.jsx';
 import PalpiteBand from './games/PalpiteBand.jsx';
 import VereditoBand from './games/VereditoBand.jsx';
@@ -160,6 +162,75 @@ const detetorRound = (patch = {}) => ({
   ...patch,
 });
 const nomeP = (id) => ({ id, name: mkPlayers().find((p) => p.id === id)?.name || id });
+// O mock base tem o Rui desligado de propósito (para se ver esse estado na
+// lista de jogadores). Nas cenas que mostram uma GRELHA de caras ou uma
+// contagem de quem falta, isso dava uma escolha só e um "0 de 0": aí usa-se a
+// mesa toda ligada.
+const mkPlayersOnline = () => mkPlayers().map((p) => ({ ...p, connected: true }));
+
+// 💣 🔗 ⚖️ 🤝 Os outros quatro tipos da camada 3 (server/src/game/{bomba,
+// sincronia,julgamento,contrato}.js). Estavam todos na mesma situação do
+// Detetor: conteúdo na BD, cartão no jogo, nada no showroom — e todos com o
+// mesmo problema de os ver a jogar, porque o sorteio dá cada um deles em poucas
+// rondas por noite e os desfechos dependem de como a mesa votou.
+//
+// Os textos são todos reais (`content/prompts.data.js`).
+const bombaRound = (patch = {}) => ({
+  id: 'bomba-' + (patch.substate || 'a_arder'),
+  gameTypeKey: 'bomba',
+  tema: 'Desculpas para faltar ao trabalho',
+  holderId: 'me',
+  passagens: 7,
+  substate: 'a_arder', // a_arder → rebentou
+  result: null,
+  ...patch,
+});
+const sincroniaRound = (patch = {}) => ({
+  id: 'sinc-' + (patch.substate || 'responder'),
+  gameTypeKey: 'sincronia',
+  pergunta: 'Quem fala mais alto quando bebe?',
+  currentPlayerId: 'me',
+  currentPlayerName: 'Tu',
+  parId: 'p2',
+  parName: 'Bea',
+  dupla: ['me', 'p2'],
+  jaResponderam: [],
+  substate: 'responder', // responder → result
+  result: null,
+  ...patch,
+});
+const ACUSACAO = 'É acusado de contar segredos dos outros como se fossem histórias.';
+const julgamentoRound = (patch = {}) => ({
+  id: 'julg-' + (patch.substate || 'defesa'),
+  gameTypeKey: 'julgamento',
+  acusacao: ACUSACAO,
+  reuId: 'me',
+  reuName: 'Tu',
+  advogadoId: 'p2',
+  advogadoName: 'Bea',
+  substate: 'defesa', // defesa → votar → result
+  veredito: null,
+  custoCondenarMal: 2,
+  result: null,
+  ...patch,
+});
+const PACTO = 'Sempre que um for desafiado, o outro tem de o defender em voz alta.';
+const contratoRound = (patch = {}) => ({
+  id: 'contrato-' + (patch.substate || 'escolher'),
+  gameTypeKey: 'contrato',
+  pacto: PACTO,
+  currentPlayerId: 'me',
+  currentPlayerName: 'Tu',
+  parceiroId: null,
+  parceiroName: null,
+  dupla: [],
+  jaAssinaram: [],
+  substate: 'escolher', // escolher → assinar → result
+  duracao: 5,
+  custoRecusa: 3,
+  result: null,
+  ...patch,
+});
 
 // A sala de teste que corresponde a cada cena (ver playtest.js). Onde não há
 // entrada, a cena é um estado que não se encomenda — o "▶ jogar" leva na mesma
@@ -206,6 +277,22 @@ const PLAY = {
   'w-roleta': { mode: 'wheel', tipo: 'roleta_russa' },
   'w-moeda': { mode: 'wheel', tipo: 'duelo' },
   'w-duelo': { mode: 'wheel', tipo: 'duelo' },
+  'w-bomba-comigo': { mode: 'wheel', tipo: 'bomba' },
+  'w-bomba-mesa': { mode: 'wheel', tipo: 'bomba' },
+  'w-bomba-tempo': { mode: 'wheel', tipo: 'bomba' },
+  'w-bomba-voltas': { mode: 'wheel', tipo: 'bomba' },
+  'w-sinc-responde': { mode: 'wheel', tipo: 'sincronia' },
+  'w-sinc-fora': { mode: 'wheel', tipo: 'sincronia' },
+  'w-sinc-bateu': { mode: 'wheel', tipo: 'sincronia' },
+  'w-sinc-falhou': { mode: 'wheel', tipo: 'sincronia' },
+  'w-julg-defesa': { mode: 'wheel', tipo: 'julgamento' },
+  'w-julg-voto': { mode: 'wheel', tipo: 'julgamento' },
+  'w-julg-absolvido': { mode: 'wheel', tipo: 'julgamento' },
+  'w-julg-culpado': { mode: 'wheel', tipo: 'julgamento' },
+  'w-contrato-escolher': { mode: 'wheel', tipo: 'contrato' },
+  'w-contrato-assinar': { mode: 'wheel', tipo: 'contrato' },
+  'w-contrato-feito': { mode: 'wheel', tipo: 'contrato' },
+  'w-contrato-caiu': { mode: 'wheel', tipo: 'contrato' },
   'w-det-marca': { mode: 'wheel', tipo: 'detetor' },
   'w-det-vota': { mode: 'wheel', tipo: 'detetor' },
   'w-det-result': { mode: 'wheel', tipo: 'detetor' },
@@ -420,6 +507,167 @@ const SCENARIOS = [
   },
   // ⚖️ Tribunal na Roda — os quatro estados. Só sai em hardcore/caos, por isso
   // vê-lo a pedido é a única forma prática de lhe afinar o texto.
+  // 💣 Bomba-Relógio — o pavio é secreto, e são DOIS (tempo e passagens): o
+  // ecrã de resultado muda conforme o que rebentou, e essa é a linha que aqui
+  // se vê lado a lado.
+  {
+    id: 'w-bomba-comigo', kind: 'wheel', group: 'Roda', label: '💣 Bomba — está contigo',
+    render: () => <BombaCard round={bombaRound()} room={{ players: mkPlayers() }} youId="me" canControl onPassa={noop} onContinue={noop} />,
+  },
+  {
+    id: 'w-bomba-mesa', kind: 'wheel', group: 'Roda', label: '💣 Bomba — está com outro',
+    render: () => <BombaCard round={bombaRound({ holderId: 'p2', passagens: 11 })} room={{ players: mkPlayers() }} youId="me" canControl onPassa={noop} onContinue={noop} />,
+  },
+  {
+    id: 'w-bomba-tempo', kind: 'wheel', group: 'Roda', label: '💣 Bomba — rebentou (pavio de tempo)',
+    render: () => (
+      <BombaCard
+        round={bombaRound({ substate: 'rebentou', result: { quemId: 'p2', quemName: 'Bea', passagens: 9, porque: 'tempo', segundos: 38 } })}
+        room={{ players: mkPlayers() }} youId="me" canControl onPassa={noop} onContinue={noop}
+      />
+    ),
+  },
+  {
+    id: 'w-bomba-voltas', kind: 'wheel', group: 'Roda', label: '💣 Bomba — rebentou (às voltas)',
+    render: () => (
+      <BombaCard
+        round={bombaRound({ substate: 'rebentou', result: { quemId: 'me', quemName: 'Tu', passagens: 18, porque: 'passagens', segundos: null } })}
+        room={{ players: mkPlayers() }} youId="me" canControl onPassa={noop} onContinue={noop}
+      />
+    ),
+  },
+
+  // 🔗 Sincronia — a dupla responde às cegas; a graça é as duas escolhas
+  // saírem ao mesmo tempo no reveal.
+  {
+    id: 'w-sinc-responde', kind: 'wheel', group: 'Roda', label: '🔗 Sincronia — responder às cegas',
+    render: () => <SincroniaCard round={sincroniaRound()} room={{ players: mkPlayersOnline() }} youId="me" canControl onResponde={noop} onContinue={noop} />,
+  },
+  {
+    id: 'w-sinc-fora', kind: 'wheel', group: 'Roda', label: '🔗 Sincronia — visto da mesa',
+    render: () => (
+      <SincroniaCard
+        round={sincroniaRound({ currentPlayerId: 'p2', currentPlayerName: 'Bea', parId: 'p3', parName: 'Rui', dupla: ['p2', 'p3'], jaResponderam: ['p2'] })}
+        room={{ players: mkPlayersOnline() }} youId="me" canControl onResponde={noop} onContinue={noop}
+      />
+    ),
+  },
+  {
+    id: 'w-sinc-bateu', kind: 'wheel', group: 'Roda', label: '🔗 Sincronia — bateu certo 🎉',
+    render: () => (
+      <SincroniaCard
+        round={sincroniaRound({
+          substate: 'result',
+          result: {
+            bateu: true,
+            escolhas: [{ id: 'me', name: 'Tu', escolhaId: 'p3', escolhaName: 'Rui' }, { id: 'p2', name: 'Bea', escolhaId: 'p3', escolhaName: 'Rui' }],
+            bebedores: [nomeP('p3')],
+          },
+        })}
+        room={{ players: mkPlayers() }} youId="me" canControl onResponde={noop} onContinue={noop}
+      />
+    ),
+  },
+  {
+    id: 'w-sinc-falhou', kind: 'wheel', group: 'Roda', label: '🔗 Sincronia — não bateu 💔',
+    render: () => (
+      <SincroniaCard
+        round={sincroniaRound({
+          substate: 'result',
+          result: {
+            bateu: false,
+            escolhas: [{ id: 'me', name: 'Tu', escolhaId: 'p3', escolhaName: 'Rui' }, { id: 'p2', name: 'Bea', escolhaId: 'me', escolhaName: 'Tu' }],
+            bebedores: [nomeP('me'), nomeP('p2')],
+          },
+        })}
+        room={{ players: mkPlayers() }} youId="me" canControl onResponde={noop} onContinue={noop}
+      />
+    ),
+  },
+
+  // ⚖️ Julgamento — réu + advogado sorteado + júri. O advogado defende-o goste
+  // ou não, e é ele que ganha a vida se o absolverem: é o que distingue isto do
+  // Tribunal, onde o réu se defende sozinho.
+  {
+    id: 'w-julg-defesa', kind: 'wheel', group: 'Roda', label: '⚖️ Julgamento — a defesa',
+    render: () => <JulgamentoCard round={julgamentoRound()} room={{ players: mkPlayers() }} youId="me" canControl onAoVoto={noop} onVota={noop} onContinue={noop} />,
+  },
+  {
+    id: 'w-julg-voto', kind: 'wheel', group: 'Roda', label: '⚖️ Julgamento — o júri vota',
+    render: () => (
+      <JulgamentoCard
+        round={julgamentoRound({
+          substate: 'votar',
+          veredito: { pergunta: `Tu: ${ACUSACAO}`, rotulos: { sim: '⚖️ Inocente', nao: '🔨 Culpado', aviso: 'Se for absolvido, quem votou culpado bebe' }, atores: ['me', 'p2'], jaVotaram: [], fechado: false },
+        })}
+        room={{ players: mkPlayersOnline() }} youId="p3" canControl onAoVoto={noop} onVota={noop} onContinue={noop}
+      />
+    ),
+  },
+  {
+    id: 'w-julg-absolvido', kind: 'wheel', group: 'Roda', label: '⚖️ Julgamento — absolvido',
+    render: () => (
+      <JulgamentoCard
+        round={julgamentoRound({
+          substate: 'result',
+          result: { inocente: true, reuId: 'me', reuName: 'Tu', advogadoId: 'p2', advogadoName: 'Bea', inocentes: 2, culpados: 1, pagantes: [nomeP('p3')], custo: 2 },
+        })}
+        room={{ players: mkPlayers() }} youId="me" canControl onAoVoto={noop} onVota={noop} onContinue={noop}
+      />
+    ),
+  },
+  {
+    id: 'w-julg-culpado', kind: 'wheel', group: 'Roda', label: '⚖️ Julgamento — culpado 🔨',
+    render: () => (
+      <JulgamentoCard
+        round={julgamentoRound({
+          substate: 'result',
+          result: { inocente: false, reuId: 'me', reuName: 'Tu', advogadoId: 'p2', advogadoName: 'Bea', inocentes: 0, culpados: 3, pagantes: [], custo: 2 },
+        })}
+        room={{ players: mkPlayers() }} youId="me" canControl onAoVoto={noop} onVota={noop} onContinue={noop}
+      />
+    ),
+  },
+
+  // 🤝 Contrato — o único tipo que deixa uma regra ativa atrás de si.
+  {
+    id: 'w-contrato-escolher', kind: 'wheel', group: 'Roda', label: '🤝 Contrato — escolher parceiro',
+    render: () => <ContratoCard round={contratoRound()} room={{ players: mkPlayersOnline() }} youId="me" canControl onEscolhe={noop} onAssina={noop} onContinue={noop} />,
+  },
+  {
+    id: 'w-contrato-assinar', kind: 'wheel', group: 'Roda', label: '🤝 Contrato — assinar ou não',
+    render: () => (
+      <ContratoCard
+        round={contratoRound({ substate: 'assinar', parceiroId: 'p2', parceiroName: 'Bea', dupla: ['me', 'p2'] })}
+        room={{ players: mkPlayers() }} youId="me" canControl onEscolhe={noop} onAssina={noop} onContinue={noop}
+      />
+    ),
+  },
+  {
+    id: 'w-contrato-feito', kind: 'wheel', group: 'Roda', label: '🤝 Contrato — assinado 🤝',
+    render: () => (
+      <ContratoCard
+        round={contratoRound({
+          substate: 'result', parceiroId: 'p2', parceiroName: 'Bea', dupla: ['me', 'p2'], jaAssinaram: ['me', 'p2'],
+          result: { feito: true, pacto: PACTO, entre: [nomeP('me'), nomeP('p2')], recusaram: [], custo: 3, duracao: 5 },
+        })}
+        room={{ players: mkPlayers() }} youId="me" canControl onEscolhe={noop} onAssina={noop} onContinue={noop}
+      />
+    ),
+  },
+  {
+    id: 'w-contrato-caiu', kind: 'wheel', group: 'Roda', label: '🤝 Contrato — caiu ✍️',
+    render: () => (
+      <ContratoCard
+        round={contratoRound({
+          substate: 'result', parceiroId: 'p2', parceiroName: 'Bea', dupla: ['me', 'p2'], jaAssinaram: ['me', 'p2'],
+          result: { feito: false, pacto: PACTO, entre: [nomeP('me'), nomeP('p2')], recusaram: [nomeP('p2')], custo: 3, duracao: 5 },
+        })}
+        room={{ players: mkPlayers() }} youId="me" canControl onEscolhe={noop} onAssina={noop} onContinue={noop}
+      />
+    ),
+  },
+
   // 🕵️‍♂️ Detetor — a marca secreta, a votação da mesa e os três desfechos.
   {
     id: 'w-det-marca', kind: 'wheel', group: 'Roda', label: '🕵️‍♂️ Detetor — marcar a verdade',
