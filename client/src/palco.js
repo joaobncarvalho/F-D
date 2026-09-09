@@ -15,6 +15,19 @@
 // seguinte. O componente da cena não muda nada (os overlays continuam a ser os
 // mesmos, com o mesmo `onDone`); o que muda é QUEM decide quando é que ele monta.
 //
+// E QUEM A MANDA EMBORA
+//
+// As encenações fechavam-se sozinhas ao fim dos seus 3 ou 4 segundos. Numa mesa
+// isso não chega: são seis pessoas a ler o mesmo ecrã, uma delas a servir uma
+// bebida e outra a olhar para o lado — quando voltam, já passou, e ninguém
+// pergunta "o que é que dizia?" a meio da ronda. Agora a cena ACABA a animação
+// e FICA, com um "toca para continuar"; sai quando alguém a fecha.
+//
+// Cada telemóvel fecha o seu (isto é tudo local): quem já leu segue, quem está
+// a ler fica. O relógio só existe como rede — ao fim de `LIMITE_LEITURA_MS` a
+// cena sai sozinha, para um telemóvel esquecido em cima da mesa não ficar preso
+// nem entupir a fila.
+//
 // Isto vive num módulo e não num contexto de React de propósito: quem encena
 // está espalhado pelo App e pelos ecrãs, e um contexto obrigava a passar o
 // dispatch por todos eles. Aqui é um `import` e uma chamada.
@@ -24,6 +37,10 @@ import { useEffect, useState } from 'react';
 const INTERVALO_MS = 260; // respiro entre cenas (dá tempo à saída da anterior)
 const MARGEM_MS = 900; // rede de segurança por cima da duração anunciada
 const DURACAO_OMISSAO = 4000;
+// Quanto tempo uma cena fica à espera de um toque antes de sair sozinha. Não é
+// o tempo de leitura (esse é o de cada um) — é a rede para um telemóvel
+// pousado: 45 s chegam para ler três vezes e não prendem a fila a sério.
+const LIMITE_LEITURA_MS = 45000;
 const MAX_FILA = 5; // uma jogada não gera mais do que isto; o resto é lixo acumulado
 
 let fila = [];
@@ -43,9 +60,13 @@ function proxima() {
   atual = fila.shift() || null;
   avisa();
   if (!atual) return;
-  // Rede de segurança: se a cena não chamar `onDone` (um erro lá dentro, um
-  // `onDone` que se perdeu), o palco não pode ficar entupido para sempre.
-  relogio = setTimeout(() => fecha(atual?.id), (atual.duracaoMs || DURACAO_OMISSAO) + MARGEM_MS);
+  // Rede de segurança. Nas cenas que esperam por um toque é longa (o normal é
+  // sair por toque); nas que se fecham sozinhas é a duração anunciada mais uma
+  // margem, para um `onDone` que se perca não entupir o palco.
+  const limite = atual.fechaSozinha
+    ? (atual.duracaoMs || DURACAO_OMISSAO) + MARGEM_MS
+    : (atual.duracaoMs || DURACAO_OMISSAO) + LIMITE_LEITURA_MS;
+  relogio = setTimeout(() => fecha(atual?.id), limite);
 }
 
 /**
@@ -53,7 +74,10 @@ function proxima() {
  * duas chamadas com o mesmo id são a mesma cena vista duas vezes pelo React, e
  * a segunda é ignorada.
  *
- * cena: { tipo, duracaoMs?, som?, ...dados que o componente precisa }
+ * cena: { tipo, duracaoMs?, som?, fechaSozinha?, ...dados do componente }
+ *
+ * `fechaSozinha` é para o que NÃO é um momento a ler (o banner da carta usada):
+ * essas passam e vão-se. Tudo o resto fica à espera de um toque.
  */
 export function encena(id, cena) {
   if (!id || vistas.has(id)) return;

@@ -127,7 +127,7 @@ export default function Board({ room, youId, myHand, myTraps, onPickPawn, onRoll
   const cardKey = b?.lastEvent?.card && !b?.pending ? b.lastEvent.text : null;
   useEffect(() => {
     if (!cardKey) return;
-    encena(`card-${cardKey}`, { tipo: 'carta', card: b.lastEvent.card, duracaoMs: 2100 });
+    encena(`card-${cardKey}`, { tipo: 'carta', card: b.lastEvent.card, duracaoMs: 2100, fechaSozinha: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cardKey]);
 

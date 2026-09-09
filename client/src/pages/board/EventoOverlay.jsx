@@ -6,6 +6,9 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { sfx } from '../../sfx.js';
 import { confetti, haptic } from '../../confetti.js';
 
+// A rede, não o tempo de leitura: ver a nota no efeito abaixo.
+const LIMITE_LEITURA_MS = 45000;
+
 export function EventoOverlay({ pending, reveal, isMyTurn, currentName, onPick }) {
   const [picked, setPicked] = useState(null); // índice escolhido (otimista, à espera do servidor)
   const [visibleReveal, setVisibleReveal] = useState(null);
@@ -14,8 +17,15 @@ export function EventoOverlay({ pending, reveal, isMyTurn, currentName, onPick }
 
   const revealKey = reveal ? `${reveal.pickedIndex}|${reveal.title}|${reveal.desc}` : null;
 
-  // Nova revelação: mostra flip, som/confetti e auto-esconde. Depende SÓ de revealKey
-  // (string estável) — assim os broadcasts do room_state não re-armam/limpam o timer.
+  // Nova revelação: mostra o flip, o som/confetti, e FICA. Depende SÓ de
+  // revealKey (string estável) — assim os broadcasts do room_state não
+  // re-armam/limpam o relógio.
+  //
+  // Ficava 3,6 s e ia-se embora. Numa mesa isso não chega: a carta do ?? é o
+  // momento em que se descobre o que calhou, e quem estava a servir uma bebida
+  // perdia-o. Agora sai ao toque (o mesmo gesto de antes, agora escrito no
+  // ecrã), e o relógio só existe como rede para um telemóvel pousado — a mesma
+  // regra do palco (client/src/palco.js).
   //
   // O RELÓGIO QUE ESCONDE É ARMADO SEMPRE, e o guarda `shownKey` serve só ao som.
   // Antes o guarda vinha primeiro e levava o relógio com ele: o React monta o
@@ -28,7 +38,7 @@ export function EventoOverlay({ pending, reveal, isMyTurn, currentName, onPick }
     if (!revealKey) return;
     setVisibleReveal(reveal);
     setPicked(reveal.pickedIndex);
-    const t = setTimeout(() => setVisibleReveal(null), 3600);
+    const t = setTimeout(() => setVisibleReveal(null), LIMITE_LEITURA_MS);
 
     if (shownKey.current !== revealKey) {
       shownKey.current = revealKey;
@@ -195,7 +205,14 @@ export function EventoOverlay({ pending, reveal, isMyTurn, currentName, onPick }
                 {visibleReveal?.desc && (
                   <span className="block text-xs text-white/60 mt-1 leading-snug">{visibleReveal.desc}</span>
                 )}
-                <span className="block text-xs text-white/40 mt-1">(toca para continuar)</span>
+                <motion.span
+                  animate={{ opacity: [0.55, 1, 0.55] }}
+                  transition={{ opacity: { duration: 2.2, repeat: Infinity } }}
+                  className="inline-block rounded-full px-4 py-2 mt-3 text-sm font-bold"
+                  style={{ background: 'rgba(10,8,16,0.82)', border: '1px solid rgba(255,255,255,0.22)' }}
+                >
+                  toca para continuar
+                </motion.span>
               </motion.p>
             )}
           </div>
