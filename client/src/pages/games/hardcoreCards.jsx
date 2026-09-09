@@ -10,7 +10,7 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import { useState } from 'react';
 import { sfx } from '../../sfx.js';
-import { CardShell, Avatar } from './shared.jsx';
+import { CardShell, Avatar, Desfecho, EntraEmFila, ItemDaFila, useRevelacao } from './shared.jsx';
 import VereditoBand from './VereditoBand.jsx';
 import Timer from '../../components/Timer.jsx';
 import { MOLA, LISTA, ITEM_LISTA } from '../../motion.js';
@@ -135,9 +135,17 @@ export function LeilaoCard({ round, room, youId, canControl, onLicita, onContinu
   const [valor, setValor] = useState(2);
   const jaLicitei = round.jaLicitaram.includes(youId);
   const souParticipante = round.participantes.includes(youId);
+  const pronto = useRevelacao(round.substate === 'result');
 
   if (round.substate === 'result') {
     const r = round.result;
+    // Um leilão de carta fechada tem UM instante: aquele em que as licitações
+    // abrem ao mesmo tempo. Aqui elas viram-se primeiro (com a de quem ganhou
+    // ao fundo, porque é a mais baixa), e só depois se diz quem faz o desafio.
+    const licitacoes = [
+      ...r.pagantes.map((x) => ({ ...x, executor: false })),
+      { id: 'exec', name: r.executorName, golos: r.minimo, executor: true },
+    ];
     return (
       <CardShell typeKey="leilao">
         <p className="text-sm text-white/50">O desafio era:</p>
@@ -146,20 +154,31 @@ export function LeilaoCard({ round, room, youId, canControl, onLicita, onContinu
           <p className="text-white/60">Ninguém licitou a tempo — o leilão deu em nada.</p>
         ) : (
           <>
-            <p className="fd-title text-2xl font-extrabold text-amber-300">
-              🔨 {r.executorName} faz o desafio
-            </p>
-            <p className="text-sm text-white/55">
-              Licitou {r.minimo} — o mais baixo{r.empate ? ' (houve empate e saiu à sorte)' : ''}. E não bebe nada.
-            </p>
-            {r.pagantes.length > 0 && (
-              <div className="flex flex-col gap-0.5 mt-1">
-                {r.pagantes.map((p) => (
-                  <p key={p.id} className="text-sm text-white/60">
-                    {p.name} paga o que licitou: <b className="text-white">{p.golos}</b>
-                  </p>
-                ))}
-              </div>
+            <EntraEmFila className="flex flex-col gap-1 my-0.5">
+              {licitacoes.map((x) => (
+                <ItemDaFila
+                  key={x.id}
+                  className={`flex items-center justify-between gap-3 rounded-xl px-3 py-1.5 ${
+                    x.executor ? 'bg-amber-400/15' : 'bg-white/5'
+                  }`}
+                >
+                  <span className="text-sm text-white/70 truncate">{x.name}</span>
+                  <span className={`text-base font-extrabold ${x.executor ? 'text-amber-300' : 'text-white/85'}`}>
+                    {x.golos}
+                  </span>
+                </ItemDaFila>
+              ))}
+            </EntraEmFila>
+            <Desfecho pronto={pronto}>
+              <p className="fd-title text-2xl font-extrabold text-amber-300 leading-tight">
+                🔨 {r.executorName} faz o desafio
+              </p>
+            </Desfecho>
+            {pronto && (
+              <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-sm text-white/55">
+                Licitou {r.minimo} — o mais baixo{r.empate ? ' (houve empate e saiu à sorte)' : ''}. E não bebe
+                nada; os outros pagam o que licitaram.
+              </motion.p>
             )}
           </>
         )}
@@ -206,23 +225,27 @@ export function SincroniaCard({ round, room, youId, canControl, onResponde, onCo
   const naDupla = round.dupla.includes(youId);
   const jaRespondi = round.jaResponderam.includes(youId);
   const nomes = round.dupla.map((id) => room.players.find((p) => p.id === id)?.name).filter(Boolean);
+  const pronto = useRevelacao(round.substate === 'result');
 
   if (round.substate === 'result') {
     const r = round.result;
     return (
       <CardShell typeKey="sincronia">
         <p className="text-sm text-white/50">{round.pergunta}</p>
-        <div className="flex justify-center gap-6 my-1">
+        {/* As duas escolhas saem primeiro — é delas que se lê se bateu certo. */}
+        <EntraEmFila className="flex justify-center gap-6 my-1">
           {r.escolhas.map((e) => (
-            <div key={e.id} className="flex flex-col items-center gap-1">
-              <span className="text-xs text-white/45">{e.name}</span>
-              <span className="text-lg font-bold">{e.escolhaName || '—'}</span>
-            </div>
+            <ItemDaFila key={e.id} className="flex flex-col items-center gap-1 min-w-0">
+              <span className="text-xs text-white/45 truncate max-w-[8rem]">{e.name}</span>
+              <span className="text-lg font-bold truncate max-w-[8rem]">{e.escolhaName || '—'}</span>
+            </ItemDaFila>
           ))}
-        </div>
-        <p className={`fd-title text-2xl font-extrabold ${r.bateu ? 'text-emerald-300' : 'text-rose-300'}`}>
-          {r.bateu ? '🔗 Em sincronia!' : '💔 Não bateu certo'}
-        </p>
+        </EntraEmFila>
+        <Desfecho pronto={pronto}>
+          <p className={`fd-title text-2xl font-extrabold ${r.bateu ? 'text-emerald-300' : 'text-rose-300'}`}>
+            {r.bateu ? '🔗 Em sincronia!' : '💔 Não bateu certo'}
+          </p>
+        </Desfecho>
         <p className="text-sm text-white/55">
           {r.bateu
             ? `Bebe a mesa toda: ${r.bebedores.map((b) => b.name).join(', ')}`
@@ -255,15 +278,20 @@ export function SincroniaCard({ round, room, youId, canControl, onResponde, onCo
 export function DetetorCard({ round, room, youId, canControl, onMarca, onVota, onContinue }) {
   const souAtor = round.currentPlayerId === youId;
   const jaVotei = round.jaVotaram.includes(youId);
+  const pronto = useRevelacao(round.substate === 'result');
 
   if (round.substate === 'result') {
     const r = round.result;
     return (
       <CardShell typeKey="detetor">
         <p className="text-sm text-white/50">{round.pergunta}</p>
-        <p className={`fd-title text-2xl font-extrabold ${r.eraVerdade ? 'text-emerald-300' : 'text-rose-300'}`}>
-          {r.eraVerdade ? '✅ Era VERDADE' : '🤥 Era MENTIRA'}
-        </p>
+        {/* A marca esteve no servidor a ronda toda; o instante em que se abre é
+            o jogo inteiro. Não pode aparecer ao mesmo tempo que a pergunta. */}
+        <Desfecho pronto={pronto}>
+          <p className={`fd-title text-2xl font-extrabold ${r.eraVerdade ? 'text-emerald-300' : 'text-rose-300'}`}>
+            {r.eraVerdade ? '✅ Era VERDADE' : '🤥 Era MENTIRA'}
+          </p>
+        </Desfecho>
         {r.extremo === 'enganou_todos' && (
           <p className="text-sm text-amber-300">🏆 Enganou a mesa toda — ganha uma vida.</p>
         )}
@@ -339,18 +367,23 @@ export function DetetorCard({ round, room, youId, canControl, onMarca, onVota, o
 export function JulgamentoCard({ round, room, youId, canControl, onAoVoto, onVota, onContinue }) {
   const reu = room.players.find((p) => p.id === round.reuId);
   const adv = room.players.find((p) => p.id === round.advogadoId);
+  const pronto = useRevelacao(round.substate === 'result');
 
   if (round.substate === 'result') {
     const r = round.result;
     return (
       <CardShell typeKey="julgamento">
-        <p className="text-sm text-white/50">{r.reuName}: {round.acusacao}</p>
-        <p className={`fd-title text-2xl font-extrabold ${r.inocente ? 'text-emerald-300' : 'text-rose-300'}`}>
-          {r.inocente ? '⚖️ ABSOLVIDO' : '🔨 CULPADO'}
-        </p>
+        <p className="text-sm text-white/50 leading-snug">{r.reuName}: {round.acusacao}</p>
+        {/* A contagem primeiro (é o que se estava a tentar adivinhar), o
+            veredito depois. */}
         <p className="text-sm text-white/55">
           {r.inocentes} inocente · {r.culpados} culpado
         </p>
+        <Desfecho pronto={pronto}>
+          <p className={`fd-title text-2xl font-extrabold ${r.inocente ? 'text-emerald-300' : 'text-rose-300'}`}>
+            {r.inocente ? '⚖️ ABSOLVIDO' : '🔨 CULPADO'}
+          </p>
+        </Desfecho>
         {r.inocente ? (
           <p className="text-sm text-white/60">
             {r.pagantes.length
@@ -411,15 +444,19 @@ export function ContratoCard({ round, room, youId, canControl, onEscolhe, onAssi
   const souSpinner = round.currentPlayerId === youId;
   const naDupla = round.dupla.includes(youId);
   const jaDecidi = round.jaAssinaram.includes(youId);
+  const pronto = useRevelacao(round.substate === 'result');
 
   if (round.substate === 'result') {
     const r = round.result;
     return (
       <CardShell typeKey="contrato">
         <p className="text-lg leading-snug">{r.pacto}</p>
-        <p className={`fd-title text-2xl font-extrabold ${r.feito ? 'text-emerald-300' : 'text-white/50'}`}>
-          {r.feito ? '🤝 Assinado' : '✍️ O contrato caiu'}
-        </p>
+        {/* Os dois assinaram às cegas: até aqui ninguém sabe se o outro alinhou. */}
+        <Desfecho pronto={pronto}>
+          <p className={`fd-title text-2xl font-extrabold ${r.feito ? 'text-emerald-300' : 'text-white/50'}`}>
+            {r.feito ? '🤝 Assinado' : '✍️ O contrato caiu'}
+          </p>
+        </Desfecho>
         {r.feito ? (
           <p className="text-sm text-white/60">
             {r.entre.map((p) => p.name).join(' e ')} ganham uma vida cada. Vale {r.duracao} jogadas —
@@ -496,18 +533,21 @@ export function ContratoCard({ round, room, youId, canControl, onEscolhe, onAssi
 export function TribunalCard({ round, room, youId, canControl, onAoVoto, onVota, onContinue }) {
   const reu = room.players.find((p) => p.id === round.reuId);
   const souReu = round.reuId === youId;
+  const pronto = useRevelacao(round.substate === 'result');
 
   if (round.substate === 'result') {
     const r = round.result;
     return (
       <CardShell typeKey="tribunal">
         <p className="text-sm text-white/50 leading-snug">"{round.tese}"</p>
-        <p className={`fd-title text-2xl font-extrabold ${r.absolvido ? 'text-emerald-300' : 'text-rose-300'}`}>
-          {r.absolvido ? '⚖️ CONVENCEU' : '🔨 NEM UM POUCO'}
-        </p>
         <p className="text-sm text-white/55">
           {r.absolvicoes} a favor · {r.condenacoes} contra
         </p>
+        <Desfecho pronto={pronto}>
+          <p className={`fd-title text-2xl font-extrabold ${r.absolvido ? 'text-emerald-300' : 'text-rose-300'}`}>
+            {r.absolvido ? '⚖️ CONVENCEU' : '🔨 NEM UM POUCO'}
+          </p>
+        </Desfecho>
         <p className="text-sm text-white/60">
           {r.absolvido
             ? r.pagantes.length

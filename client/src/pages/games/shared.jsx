@@ -3,6 +3,7 @@
 // comportamento. TYPES é a fonte única dos tipos da roda (cor/emoji/label).
 
 import { AnimatePresence, motion } from 'framer-motion';
+import { useEffect, useState } from 'react';
 import { sfx } from '../../sfx.js';
 import { ENTRA, ITEM_LISTA, LISTA, MOLA, suavizado } from '../../motion.js';
 
@@ -178,4 +179,112 @@ export function BuddyBlock({ round, room, youId, isMyTurn, onChooseBuddy }) {
     );
   }
   return <p className="text-sm text-white/50">🤝 {round.currentPlayerName} está a escolher o buddy…</p>;
+}
+
+// ----- A batida dos resultados ------------------------------------------------
+//
+// Os resultados da Roda revelavam tudo no mesmo frame: quem ganhou o leilão, o
+// veredito do júri, se a dupla bateu certo — tudo já lá estava antes de alguém
+// ter tempo de perguntar. Isso não é falta de brilho, é falta de PERGUNTA antes
+// da resposta. No Tabuleiro isto já existia (o dado do Gamble a rodar, as cartas
+// do Blackjack a virarem-se); na Roda não.
+//
+// A regra, e é curta: a carta mostra logo o que levou ali (as licitações, as
+// duas escolhas, a contagem dos votos) e segura só o DESFECHO — um elemento por
+// carta, o que é o pagamento da ronda — por ~600 ms.
+//
+// O teto de tempo é deliberado. Um resultado acontece todas as rondas, 20 a 30
+// vezes por noite: a encenação que encanta à primeira é um imposto à trigésima.
+// É a mesma regra do motion.js — quem espera, espera pouco.
+
+const ESPERA_MS = 600;
+
+/** O gesto do desfecho: salta uma vez e assenta. */
+const POP_DESFECHO = {
+  initial: { scale: 0.55, opacity: 0, rotate: -4 },
+  animate: { scale: 1, opacity: 1, rotate: 0 },
+  transition: MOLA.salto,
+};
+
+/**
+ * `true` quando chega a hora de mostrar o desfecho. Recomeça sempre que `ativo`
+ * volta a ficar verdadeiro (a carta não remonta entre sub-estados: sem isto, o
+ * relógio disparava no início da ronda e o resultado nascia já revelado).
+ */
+export function useRevelacao(ativo, espera = ESPERA_MS) {
+  const [pronto, setPronto] = useState(false);
+  useEffect(() => {
+    if (!ativo) {
+      setPronto(false);
+      return undefined;
+    }
+    const t = setTimeout(() => setPronto(true), espera);
+    return () => clearTimeout(t);
+  }, [ativo, espera]);
+  return pronto;
+}
+
+/**
+ * O desfecho da ronda. Enquanto não é hora, ocupa o mesmo espaço com três pontos
+ * a pulsar — reservar a altura é o que evita a carta a saltar por baixo do dedo
+ * de quem está a ler.
+ */
+export function Desfecho({ pronto, children, som = true }) {
+  useEffect(() => {
+    if (pronto && som) {
+      try {
+        sfx.reveal();
+      } catch {
+        /* sem som lê-se na mesma */
+      }
+    }
+  }, [pronto, som]);
+
+  return (
+    <div className="min-h-[2.75rem] grid place-items-center">
+      <AnimatePresence mode="wait" initial={false}>
+        {pronto ? (
+          <motion.div key="desfecho" {...suavizado(POP_DESFECHO)}>
+            {children}
+          </motion.div>
+        ) : (
+          <motion.div
+            key="espera"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: [0.25, 0.7, 0.25] }}
+            // A SAÍDA leva transição própria. Sem ela herdava o `repeat:
+            // Infinity` da entrada, nunca terminava, e o AnimatePresence em
+            // `mode="wait"` ficava à espera dela para sempre: o desfecho não
+            // chegava a entrar e ficava um buraco no meio da carta.
+            exit={{ opacity: 0, transition: { duration: 0.15 } }}
+            transition={{ opacity: { duration: 1.1, repeat: Infinity } }}
+            className="text-2xl tracking-[0.3em] text-white/50 leading-none"
+          >
+            •••
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+/**
+ * As peças que EXPLICAM o desfecho (as licitações, as escolhas da dupla) entram
+ * uma a uma antes dele. Curto de propósito: é o compasso, não o número.
+ */
+export function EntraEmFila({ children, className = '' }) {
+  return (
+    <motion.div variants={LISTA} initial="initial" animate="animate" className={className}>
+      {children}
+    </motion.div>
+  );
+}
+
+/** Um item da fila acima. */
+export function ItemDaFila({ children, className = '' }) {
+  return (
+    <motion.div variants={suavizado(ITEM_LISTA)} className={className}>
+      {children}
+    </motion.div>
+  );
 }

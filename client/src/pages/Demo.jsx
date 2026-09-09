@@ -17,7 +17,7 @@ import { PromptCard, ChoiceCard, IntrigasCard } from './games/cards.jsx';
 import { RelampagoCard, MimicaCard, RoletaCard, DueloCard } from './games/quickCards.jsx';
 import { ReacaoCard } from './games/ReacaoCard.jsx';
 import {
-  TribunalCard, DetetorCard, BombaCard, SincroniaCard, JulgamentoCard, ContratoCard,
+  TribunalCard, DetetorCard, BombaCard, SincroniaCard, JulgamentoCard, ContratoCard, LeilaoCard,
 } from './games/hardcoreCards.jsx';
 import Beat from '../components/Beat.jsx';
 import PalpiteBand from './games/PalpiteBand.jsx';
@@ -214,6 +214,18 @@ const julgamentoRound = (patch = {}) => ({
   result: null,
   ...patch,
 });
+const DESAFIO_LEILAO = 'Canta o refrão da última música que ouviste, de pé.';
+const leilaoRound = (patch = {}) => ({
+  id: 'leilao-' + (patch.substate || 'licitar'),
+  gameTypeKey: 'leilao',
+  desafio: DESAFIO_LEILAO,
+  participantes: ['me', 'p2', 'p3'],
+  jaLicitaram: [],
+  maxLicitacao: 6,
+  substate: 'licitar', // licitar → result
+  result: null,
+  ...patch,
+});
 const PACTO = 'Sempre que um for desafiado, o outro tem de o defender em voz alta.';
 const contratoRound = (patch = {}) => ({
   id: 'contrato-' + (patch.substate || 'escolher'),
@@ -278,6 +290,8 @@ const PLAY = {
   'w-roleta': { mode: 'wheel', tipo: 'roleta_russa' },
   'w-moeda': { mode: 'wheel', tipo: 'duelo' },
   'w-duelo': { mode: 'wheel', tipo: 'duelo' },
+  'w-leilao': { mode: 'wheel', tipo: 'leilao' },
+  'w-leilao-result': { mode: 'wheel', tipo: 'leilao' },
   'w-bomba-comigo': { mode: 'wheel', tipo: 'bomba' },
   'w-bomba-mesa': { mode: 'wheel', tipo: 'bomba' },
   'w-bomba-tempo': { mode: 'wheel', tipo: 'bomba' },
@@ -521,6 +535,28 @@ const SCENARIOS = [
   },
   // ⚖️ Tribunal na Roda — os quatro estados. Só sai em hardcore/caos, por isso
   // vê-lo a pedido é a única forma prática de lhe afinar o texto.
+  // 🔨 Leilão — licitação fechada: a graça é o instante em que os números
+  // abrem todos ao mesmo tempo (ver a revelação em shared.jsx).
+  {
+    id: 'w-leilao', kind: 'wheel', group: 'Roda', label: '🔨 Leilão — licitar às cegas',
+    render: () => <LeilaoCard round={leilaoRound()} room={{ players: mkPlayersOnline() }} youId="me" canControl onLicita={noop} onContinue={noop} />,
+  },
+  {
+    id: 'w-leilao-result', kind: 'wheel', group: 'Roda', label: '🔨 Leilão — as licitações abrem',
+    render: () => (
+      <LeilaoCard
+        round={leilaoRound({
+          substate: 'result', jaLicitaram: ['me', 'p2', 'p3'],
+          result: {
+            vazio: false, desafio: DESAFIO_LEILAO, executorId: 'p2', executorName: 'Bea',
+            minimo: 1, empate: false, pagantes: [{ ...nomeP('me'), golos: 4 }, { ...nomeP('p3'), golos: 3 }],
+          },
+        })}
+        room={{ players: mkPlayersOnline() }} youId="me" canControl onLicita={noop} onContinue={noop}
+      />
+    ),
+  },
+
   // 💣 Bomba-Relógio — o pavio é secreto, e são DOIS (tempo e passagens): o
   // ecrã de resultado muda conforme o que rebentou, e essa é a linha que aqui
   // se vê lado a lado.
