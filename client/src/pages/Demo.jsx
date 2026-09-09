@@ -21,6 +21,8 @@ import Beat from '../components/Beat.jsx';
 import PalpiteBand from './games/PalpiteBand.jsx';
 import VereditoBand from './games/VereditoBand.jsx';
 import EventoDaNoite from '../components/EventoDaNoite.jsx';
+import Palco from '../components/Palco.jsx';
+import { limpaPalco } from '../palco.js';
 import { aplicaHumor, humorAtual, NIVEIS } from '../mood.js';
 import { confetti } from '../confetti.js';
 import { linkPlaytest } from '../playtest.js';
@@ -635,7 +637,12 @@ function PalcoAmbiente({ onBack }) {
 
 export default function Demo() {
   const [sel, setSel] = useState(null);
-  const back = () => setSel(null);
+  // As encenações de ecrã inteiro do Tabuleiro passaram a ser cenas do palco
+  // (ver ../palco.js), por isso o showroom também precisa de um palco montado —
+  // e de o limpar ao trocar de cartão: a fila lembra-se do que já encenou, e
+  // sem isto a mesma maldição só se via uma vez por visita.
+  const back = () => { limpaPalco(); setSel(null); };
+  const abre = (cena) => { limpaPalco(); setSel(cena); };
 
   if (sel?.kind === 'ambiente') return <PalcoAmbiente onBack={back} />;
   if (sel?.kind === 'palpites') return <PalcoPalpites onBack={back} />;
@@ -644,6 +651,7 @@ export default function Demo() {
   if (sel?.kind === 'board') {
     return (
       <div className="min-h-full mx-auto max-w-md px-5 py-6 flex flex-col relative">
+        <Palco />
         {sel.render(back)}
         {PLAY[sel.id] && (
           <div className="mt-4 flex items-center justify-between gap-2 text-xs text-white/40">
@@ -707,13 +715,13 @@ export default function Demo() {
       </div>
       <div className="flex flex-col gap-2">
         <p className="text-[11px] uppercase tracking-widest text-white/40 px-1">✨ Ambiente</p>
-        <button onClick={() => setSel(ambiente)} className="fd-card text-left px-4 py-3 text-sm">
+        <button onClick={() => abre(ambiente)} className="fd-card text-left px-4 py-3 text-sm">
           {ambiente.label}
         </button>
-        <button onClick={() => setSel(palpitesDemo)} className="fd-card text-left px-4 py-3 text-sm">
+        <button onClick={() => abre(palpitesDemo)} className="fd-card text-left px-4 py-3 text-sm">
           {palpitesDemo.label}
         </button>
-        <button onClick={() => setSel(eventosDemo)} className="fd-card text-left px-4 py-3 text-sm">
+        <button onClick={() => abre(eventosDemo)} className="fd-card text-left px-4 py-3 text-sm">
           {eventosDemo.label}
         </button>
       </div>
@@ -723,7 +731,7 @@ export default function Demo() {
           <div className="grid grid-cols-1 gap-2">
             {SCENARIOS.filter((s) => s.group === g).map((s) => (
               <div key={s.id} className="fd-card flex items-center gap-2 pr-3">
-                <button onClick={() => setSel(s)} className="flex-1 text-left px-4 py-3 text-sm">
+                <button onClick={() => abre(s)} className="flex-1 text-left px-4 py-3 text-sm">
                   {s.label}
                 </button>
                 <BotaoJogar spec={PLAY[s.id]} />

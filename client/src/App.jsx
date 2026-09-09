@@ -13,8 +13,8 @@ import ErrorBoundary from './components/ErrorBoundary.jsx';
 import Display from './pages/Display.jsx';
 import Settings from './components/Settings.jsx';
 import Rules from './components/Rules.jsx';
-import EventoDaNoite from './components/EventoDaNoite.jsx';
-import RegraNova from './components/RegraNova.jsx';
+import Palco from './components/Palco.jsx';
+import { encena, limpaPalco } from './palco.js';
 import { keepScreenAwake, loadA11y, applyA11y, registerServiceWorker, rememberRoom } from './device.js';
 import { aplicaHumor, humorDaSala } from './mood.js';
 import { setPaused } from './clock.js';
@@ -68,8 +68,8 @@ export default function App() {
   const [a11y, setA11y] = useState(loadA11y);
   const [showSettings, setShowSettings] = useState(false);
   const [showRules, setShowRules] = useState(false);
-  const [evento, setEvento] = useState(null); // Evento da Noite a encenar
-  const [regraNova, setRegraNova] = useState(null); // modificador que caiu a meio
+  // (o Evento da Noite e a Regra Nova já não vivem aqui: são cenas do palco —
+  // ver palco.js. O que fica é quem as põe na fila, mais abaixo.)
 
   const sessionRef = useRef(loadSession());
 
@@ -149,7 +149,7 @@ export default function App() {
   useEffect(() => {
     if (!eventoDaSala || eventoVistoRef.current === eventoDaSala.em) return;
     eventoVistoRef.current = eventoDaSala.em;
-    setEvento(eventoDaSala);
+    encena(`ev-${eventoDaSala.em}`, { tipo: 'evento', evento: eventoDaSala, duracaoMs: 5200 });
   }, [eventoDaSala?.em]);
 
   // A REGRA NOVA (server/src/game/modificadores.js). Mesmo mecanismo do Evento —
@@ -160,7 +160,7 @@ export default function App() {
   useEffect(() => {
     if (!regraDaSala || regraVistaRef.current === regraDaSala.em) return;
     regraVistaRef.current = regraDaSala.em;
-    setRegraNova(regraDaSala);
+    encena(`mod-${regraDaSala.em}`, { tipo: 'regra', regra: regraDaSala, duracaoMs: 5200 });
   }, [regraDaSala?.em]);
 
   useEffect(() => {
@@ -455,6 +455,7 @@ export default function App() {
     setMimicaWord(null);
     setDesenhoWord(null);
     setBoardHand(null);
+    limpaPalco(); // uma cena a meio não sobrevive à saída da sala
     setScreen('home');
   }, []);
 
@@ -519,15 +520,10 @@ export default function App() {
           />
         )}
         {showRules && <Rules key="rules" mode={room?.mode || 'wheel'} onClose={() => setShowRules(false)} />}
-        {evento && (
-          <EventoDaNoite key={`ev-${evento.em}`} evento={evento} onDone={() => setEvento(null)} />
-        )}
-        {/* Nunca sai ao mesmo tempo que o evento: o servidor já garante que os
-            dois não caem na mesma ronda (game.js, `caiuAlgo`). */}
-        {regraNova && (
-          <RegraNova key={`mod-${regraNova.em}`} regra={regraNova} onDone={() => setRegraNova(null)} />
-        )}
       </AnimatePresence>
+
+      {/* As encenações de ecrã inteiro, uma de cada vez (ver palco.js). */}
+      <Palco />
 
       {room?.paused && screen !== 'home' && (
         <div className="mb-3 rounded-lg bg-amber-500/20 text-amber-200 text-center text-sm py-2 font-bold">

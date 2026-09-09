@@ -3,11 +3,10 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { sfx } from '../sfx.js';
 import { confetti, haptic } from '../confetti.js';
 import { PlayingCard, BlackjackReveal } from './board/blackjack.jsx';
-import { GambleReveal, CardPlayReveal, OrderReveal } from './board/reveals.jsx';
+import { GambleReveal } from './board/reveals.jsx';
 import { Beerpong } from './board/Beerpong.jsx';
 import { EventoOverlay } from './board/EventoOverlay.jsx';
-import MaldicaoOverlay from './board/MaldicaoOverlay.jsx';
-import GananciaOverlay from './board/GananciaOverlay.jsx';
+import { encena } from '../palco.js';
 import TribunalBand from './board/TribunalBand.jsx';
 import { BotaoReacao } from './games/ReacaoCard.jsx';
 import Feed, { ShareResult } from '../components/Feed.jsx';
@@ -37,9 +36,12 @@ export default function Board({ room, youId, myHand, myTraps, onPickPawn, onRoll
   const isHost = you?.isHost;
   const [selCard, setSelCard] = useState(null); // carta selecionada p/ jogar (à espera de alvo)
   const [ruleFail, setRuleFail] = useState(null); // regra a marcar como falhada (à espera de quem falhou)
-  const [orderReveal, setOrderReveal] = useState(null); // { dice, order } — revelação da ordem
-  const [maldicao, setMaldicao] = useState(null); // ☠️ maldição a disparar (overlay de ecrã inteiro)
-  const [ganancia, setGanancia] = useState(null); // 🐍 azar da ganância (overlay de ecrã inteiro)
+  // A ordem de jogo, a maldição e o azar da ganância são encenações de ecrã
+  // inteiro e já não montam aqui: vão para a FILA do palco (../palco.js), que
+  // as toca uma de cada vez. Uma jogada do tabuleiro dispara facilmente duas ao
+  // mesmo tempo — a maldição que estava enterrada na casa e o castigo da
+  // ganância — e antes disto sobrepunham-se, com os dois sons por cima um do
+  // outro.
 
   // Efeitos por evento (vitória / prisão / passo / blackjack).
   const wonRef = useRef(false);
@@ -94,10 +96,16 @@ export default function Board({ room, youId, myHand, myTraps, onPickPawn, onRoll
     const prev = prevPhaseRef.current;
     prevPhaseRef.current = b?.phase;
     if (prev === 'order' && b?.phase === 'playing' && b?.order?.length) {
-      setOrderReveal({ dice: { ...b.dice }, order: [...b.order] });
-      sfx.spin();
-      const t = setTimeout(() => setOrderReveal(null), 2800);
-      return () => clearTimeout(t);
+      // Os dados e os peões vão em cópia: a cena pode entrar em palco daqui a
+      // uns segundos e o tabuleiro já ter andado.
+      encena(`ordem-${room.code}-${Date.now()}`, {
+        tipo: 'ordem',
+        som: 'spin',
+        duracaoMs: 2800,
+        data: { dice: { ...b.dice }, order: [...b.order] },
+        players: room.players.map((pp) => ({ id: pp.id, name: pp.name })),
+        boardPlayers: { ...b.players },
+      });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [b?.phase]);
@@ -109,9 +117,19 @@ export default function Board({ room, youId, myHand, myTraps, onPickPawn, onRoll
   const trapKey = b?.lastEvent?.trap ? `${b.lastEvent.trap.square}|${b.lastEvent.trap.key}` : null;
   useEffect(() => {
     if (!trapKey) return;
-    setMaldicao(b.lastEvent.trap);
+    encena(`trap-${trapKey}`, { tipo: 'maldicao', trap: b.lastEvent.trap, duracaoMs: 3600 });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [trapKey]);
+
+  // 🎴 A carta que alguém acabou de usar. É um banner de topo e não um ecrã
+  // inteiro, mas ia à mesma para a fila: com a maldição por cima (z-[70] contra
+  // z-50), o banner tocava os seus 2 s escondido atrás dela e ninguém o via.
+  const cardKey = b?.lastEvent?.card && !b?.pending ? b.lastEvent.text : null;
+  useEffect(() => {
+    if (!cardKey) return;
+    encena(`card-${cardKey}`, { tipo: 'carta', card: b.lastEvent.card, duracaoMs: 2100 });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cardKey]);
 
   // 🐍 Azar da ganância: mesmo tratamento. Aqui a chave é a JOGADA (`turn`), que
   // o servidor manda no payload — dois castigos iguais seguidos não têm mais
@@ -122,7 +140,7 @@ export default function Board({ room, youId, myHand, myTraps, onPickPawn, onRoll
   const greedKey = gd ? `${gd.turn}|${gd.titulo}|${gd.texto}` : null;
   useEffect(() => {
     if (!greedKey) return;
-    setGanancia(gd);
+    encena(`greed-${greedKey}`, { tipo: 'ganancia', greed: gd, duracaoMs: 3200 });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [greedKey]);
 
@@ -393,20 +411,6 @@ export default function Board({ room, youId, myHand, myTraps, onPickPawn, onRoll
         onFecha={onTribunalFecha}
       />
 
-      {/* ☠️ Maldição — encenação de ecrã inteiro, fecha-se sozinha */}
-      <AnimatePresence>
-        {maldicao && (
-          <MaldicaoOverlay key={`${maldicao.square}|${maldicao.key}`} trap={maldicao} onDone={() => setMaldicao(null)} />
-        )}
-      </AnimatePresence>
-
-      {/* 🐍 Azar da ganância — a armadilha a fechar, fecha-se sozinha */}
-      <AnimatePresence>
-        {ganancia && (
-          <GananciaOverlay key={`${ganancia.turn}|${ganancia.texto}`} greed={ganancia} onDone={() => setGanancia(null)} />
-        )}
-      </AnimatePresence>
-
       {/* Casa ?? — overlay de 3 cartas viradas + flip */}
       <EventoOverlay
         pending={eventoPending}
@@ -437,21 +441,6 @@ export default function Board({ room, youId, myHand, myTraps, onPickPawn, onRoll
           )}
         </div>
       )}
-
-      {/* Carta a ser usada — banner flutuante para todos (não bloqueia toques) */}
-      {ev?.card && !pending && <CardPlayReveal key={'card' + ev.text} card={ev.card} />}
-
-      {/* Revelação da ordem (breve, no arranque da corrida) */}
-      <AnimatePresence>
-        {orderReveal && (
-          <OrderReveal
-            data={orderReveal}
-            players={room.players}
-            boardPlayers={b.players}
-            onClose={() => setOrderReveal(null)}
-          />
-        )}
-      </AnimatePresence>
 
       {/* Pista em linha — tira horizontal que faz auto-scroll a seguir o jogador da vez */}
       <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} className="fd-card p-2.5 mt-1">

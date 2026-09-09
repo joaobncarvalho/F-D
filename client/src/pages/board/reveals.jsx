@@ -54,13 +54,19 @@ export function GambleReveal({ result, text }) {
 }
 
 // ---------- Carta a ser usada: banner flutuante para TODOS (não bloqueia toques) ----------
-export function CardPlayReveal({ card }) {
+export function CardPlayReveal({ card, onDone }) {
   const [visible, setVisible] = useState(true);
   useEffect(() => {
     sfx.reveal();
     haptic(15);
-    const t = setTimeout(() => setVisible(false), 2100);
+    // O `onDone` é para o palco (../../palco.js) saber que pode chamar a cena
+    // seguinte. Quem monta este banner à mão pode ignorá-lo.
+    const t = setTimeout(() => {
+      setVisible(false);
+      onDone?.();
+    }, 2100);
     return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   return (
     <AnimatePresence>
