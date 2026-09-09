@@ -15,8 +15,20 @@ import { MOLA, LISTA, ITEM_LISTA } from '../../motion.js';
  * Os votos são secretos até fechar, como os palpites. O que se mostra é só
  * quantos já votaram.
  */
+// O que se pergunta à mesa, quando o tipo não pede outra coisa. O Julgamento e
+// o Tribunal PEDEM: mandam `rotulos` no payload (server/src/game/veredito.js),
+// porque ali não se está a julgar se alguém "conseguiu" — julga-se se é culpado.
+// Estes textos estavam escritos à mão aqui e os do servidor eram ignorados: o
+// júri de um julgamento via "Conseguiu / Não conseguiu".
+const ROTULOS_BASE = {
+  sim: '👏 Conseguiu',
+  nao: '💔 Não conseguiu',
+  aviso: 'se falhar, perde uma vida',
+};
+
 export default function VereditoBand({ veredito, room, youId, onVota }) {
   if (!veredito) return null;
+  const rotulos = { ...ROTULOS_BASE, ...(veredito.rotulos || {}) };
 
   const souAtor = veredito.atores.includes(youId);
   const jaVotei = veredito.jaVotaram.includes(youId);
@@ -99,8 +111,8 @@ export default function VereditoBand({ veredito, room, youId, onVota }) {
       className="fd-card px-4 py-3 flex flex-col gap-2"
       style={{ borderColor: 'rgba(255,176,32,0.45)' }}
     >
-      <p className="text-xs uppercase tracking-widest text-amber-300/80 text-center">
-        Veredito da mesa · se falhar, perde uma vida
+      <p className="text-xs uppercase tracking-wide text-amber-300/80 text-center leading-snug">
+        Veredito da mesa · {rotulos.aviso}
       </p>
       <p className="text-center font-bold flex items-center justify-center gap-2">
         {ator && <Avatar player={ator} size={24} />}
@@ -113,9 +125,9 @@ export default function VereditoBand({ veredito, room, youId, onVota }) {
             sfx.click();
             onVota('sim');
           }}
-          className="fd-btn fd-btn-success flex-1 py-3"
+          className="fd-btn fd-btn-success flex-1 py-3 leading-tight"
         >
-          👏 Conseguiu
+          {rotulos.sim}
         </motion.button>
         <motion.button
           variants={ITEM_LISTA}
@@ -123,9 +135,9 @@ export default function VereditoBand({ veredito, room, youId, onVota }) {
             sfx.click();
             onVota('nao');
           }}
-          className="fd-btn fd-btn-danger flex-1 py-3"
+          className="fd-btn fd-btn-danger flex-1 py-3 leading-tight"
         >
-          💔 Não conseguiu
+          {rotulos.nao}
         </motion.button>
       </motion.div>
       <p className="text-[11px] text-white/35 text-center">
