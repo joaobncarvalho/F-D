@@ -62,13 +62,17 @@ export default function TribunalBand({ tribunal: t, room, youId, onAoVoto, onVot
       <p className="text-xs uppercase tracking-[0.25em] text-amber-300/80">⚖️ Tribunal da Injustiça</p>
       <div className="flex items-center gap-2">
         {reu && <Avatar player={reu} size={34} ring />}
-        <span className="text-sm text-white/60">
+        <span className="text-sm text-white/60 min-w-0 break-words">
           <b className="text-white">{t.reuName}</b> — acusado de {t.razao}
         </span>
       </div>
 
       <p className="text-[11px] uppercase tracking-widest text-white/35 mt-1">Tem de defender que…</p>
-      <p className="fd-title text-lg font-extrabold leading-snug text-amber-200">{t.tese}</p>
+      {/* Ver a nota no cartão da Roda (hardcoreCards.jsx): a tese é texto de
+          conteúdo e tem de caber em qualquer telemóvel. */}
+      <p className="fd-title text-base sm:text-lg font-extrabold leading-snug text-amber-200 break-words w-full">
+        {t.tese}
+      </p>
 
       {t.substate === 'defesa' ? (
         <>

@@ -90,7 +90,18 @@ export function EventoOverlay({ pending, reveal, isMyTurn, currentName, onPick }
               </p>
             </motion.div>
 
-            <div className="flex gap-3 justify-center">
+            {/* As três cartas medem-se pelo ECRÃ e não em pixels fixos: 92px
+                fixos davam 300px de cartas mais espaços num telemóvel de 320
+                de largura útil, e o texto de dentro (que vem do conteúdo, com
+                descrições de 20 a 50 caracteres) saía pela carta fora. Agora a
+                carta encolhe com o ecrã e o texto é cortado dentro dela.
+
+                E a medida é em REM, não em px: no telemóvel a base tipográfica
+                sobe para 17,5px (e para 20,5px com o "texto maior" da /ajustes,
+                index.css), por isso o texto crescia dentro de uma caixa que não
+                crescia. Era isso que o fazia sair da carta num telemóvel e não
+                no computador. */}
+            <div className="flex gap-2 sm:gap-3 justify-center w-full">
               {[0, 1, 2].map((i) => {
                 const isRevealed = mode === 'reveal' && i === visibleReveal.pickedIndex;
                 const dimmed = mode === 'reveal' && i !== visibleReveal.pickedIndex;
@@ -102,8 +113,8 @@ export function EventoOverlay({ pending, reveal, isMyTurn, currentName, onPick }
                     key={i}
                     disabled={!tappable}
                     onClick={(e) => { e.stopPropagation(); handleTap(i); }}
-                    className="relative"
-                    style={{ width: 92, height: 130, perspective: 800 }}
+                    className="relative flex-1 min-w-0"
+                    style={{ maxWidth: '6.5rem', aspectRatio: '92 / 140', perspective: 800 }}
                     initial={{ opacity: 0, y: 30, rotate: -8 + i * 8 }}
                     animate={
                       mode === 'pick' && !optimistic
@@ -138,7 +149,7 @@ export function EventoOverlay({ pending, reveal, isMyTurn, currentName, onPick }
                       </div>
                       {/* Frente (revelação) */}
                       <div
-                        className="absolute inset-0 rounded-2xl flex flex-col items-center justify-center gap-1 px-2 text-center"
+                        className="absolute inset-0 rounded-2xl flex flex-col items-center justify-center gap-1 px-1.5 py-2 text-center overflow-hidden"
                         style={{
                           backfaceVisibility: 'hidden',
                           WebkitBackfaceVisibility: 'hidden',
@@ -150,9 +161,17 @@ export function EventoOverlay({ pending, reveal, isMyTurn, currentName, onPick }
                       >
                         {front && (
                           <>
-                            <span className="text-4xl leading-none">{front.emoji}</span>
-                            <span className="text-sm font-extrabold leading-tight">{front.title}</span>
-                            <span className="text-[10px] text-white/70 leading-tight">{front.desc}</span>
+                            <span className="text-3xl leading-none">{front.emoji}</span>
+                            {/* `break-words` e o corte por linhas: a carta é do
+                                tamanho que é, e o texto que não caiba fica
+                                cortado DENTRO dela — nunca por fora. O título
+                                completo repete-se por baixo das cartas. */}
+                            <span className="text-[13px] font-extrabold leading-tight break-words fd-linhas-2">
+                              {front.title}
+                            </span>
+                            <span className="text-[10px] text-white/70 leading-tight break-words fd-linhas-3">
+                              {front.desc}
+                            </span>
                           </>
                         )}
                       </div>
@@ -170,7 +189,13 @@ export function EventoOverlay({ pending, reveal, isMyTurn, currentName, onPick }
                 transition={{ delay: 0.5 }}
                 className="text-center text-base font-semibold text-amber-200"
               >
-                {visibleReveal?.card ? '🎴 Carta nova!' : visibleReveal?.title} <span className="block text-xs text-white/40 mt-1">(toca para continuar)</span>
+                {visibleReveal?.card ? '🎴 Carta nova!' : visibleReveal?.title}
+                {/* Aqui em baixo há largura a sério: é onde a descrição se lê
+                    inteira, mesmo que na carta tenha ficado cortada. */}
+                {visibleReveal?.desc && (
+                  <span className="block text-xs text-white/60 mt-1 leading-snug">{visibleReveal.desc}</span>
+                )}
+                <span className="block text-xs text-white/40 mt-1">(toca para continuar)</span>
               </motion.p>
             )}
           </div>

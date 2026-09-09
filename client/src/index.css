@@ -164,6 +164,25 @@ h1, h2, h3 {
 }
 
 /* --- Componentes reutilizáveis --- */
+/* Corta o texto ao fim de N linhas, com reticências. Usado onde a caixa tem
+   tamanho fixo e o texto vem do conteúdo (as cartas da casa ??, cujas
+   descrições vão de "Bebes 3 golos" a "Ficas com escudo: bloqueia a próxima
+   carta contra ti"). Sem isto, o texto saía pela carta fora. */
+.fd-linhas-2,
+.fd-linhas-3 {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.fd-linhas-2 {
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+}
+.fd-linhas-3 {
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+}
+
 .fd-title {
   font-family: 'Baloo 2', sans-serif;
   font-weight: 800;

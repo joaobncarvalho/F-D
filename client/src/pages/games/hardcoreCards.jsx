@@ -527,12 +527,23 @@ export function TribunalCard({ round, room, youId, canControl, onAoVoto, onVota,
         <span className="text-[11px] uppercase tracking-widest text-amber-300/80">No banco dos réus</span>
       </div>
 
-      <p className="text-xs uppercase tracking-[0.25em] text-white/35">Tens de defender que…</p>
-      <p className="fd-title text-xl font-extrabold leading-snug text-amber-200">{round.tese}</p>
+      <p className="text-[11px] uppercase tracking-[0.2em] text-white/35">Tens de defender que…</p>
+      {/* A tese vem do conteúdo e vai até ~80 caracteres. `break-words` e um
+          tamanho que encolhe no ecrã pequeno: num telemóvel de 320 o texto a
+          20px empurrava a carta e o bloco saía do sítio. */}
+      <p className="fd-title text-lg sm:text-xl font-extrabold leading-snug text-amber-200 break-words">
+        {round.tese}
+      </p>
 
       {round.substate === 'defesa' ? (
         <>
-          <Timer seconds={round.segundos || 90} runKey={round.id} size={72} />
+          {/* O CardShell é uma coluna sem `items-center`: um elemento de largura
+              fixa (o anel do cronómetro) encosta-se à esquerda e fica torto ao
+              lado de tudo o resto, que é centrado. Todos os outros cartões com
+              cronómetro já o embrulhavam assim — este era o que faltava. */}
+          <div className="flex justify-center">
+            <Timer seconds={round.segundos || 90} runKey={round.id} size={72} />
+          </div>
           <p className="text-sm text-white/55 leading-snug">
             {souReu
               ? 'A sério, em voz alta, e com convicção. O júri está a ver-te.'

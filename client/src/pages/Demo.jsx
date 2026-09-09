@@ -252,6 +252,7 @@ const PLAY = {
   'b-evento-sorte': { mode: 'board', casa: 'evento' },
   'b-evento-carta': { mode: 'board', casa: 'evento' },
   'b-evento-preso': { mode: 'board', casa: 'evento' },
+  'b-evento-longo': { mode: 'board', casa: 'evento' },
   'b-gamble': { mode: 'board', casa: 'gamble' },
   'b-gamble-win': { mode: 'board', casa: 'gamble' },
   'b-gamble-lose': { mode: 'board', casa: 'gamble' },
@@ -344,6 +345,19 @@ const SCENARIOS = [
   { id: 'b-evento-sorte', kind: 'board', group: 'Tabuleiro', label: '❓ ?? revelado: Sorte 🚀', render: renderBoard({ lastEvent: { text: '🚀 Tu tiveste sorte — avança 2 casas!', evento: { pickedIndex: 1, emoji: '🚀', title: 'Sorte!', desc: 'Avanças 2 casas', card: null } } }) },
   { id: 'b-evento-carta', kind: 'board', group: 'Tabuleiro', label: '❓ ?? revelado: Carta 🎴', render: renderBoard({ lastEvent: { text: '🎴 Tu ganhaste a carta Roubo!', evento: { pickedIndex: 0, emoji: '🎁', title: 'Roubo', desc: 'Roubas uma carta a alguém', card: 'steal' } } }) },
   { id: 'b-evento-preso', kind: 'board', group: 'Tabuleiro', label: '❓ ?? revelado: Preso 🚔', render: renderBoard({ lastEvent: { text: '🚔 Tu foste PRESO!', evento: { pickedIndex: 2, emoji: '🚔', title: 'Preso!', desc: 'Vais para a prisão', card: null } } }) },
+  // O PIOR CASO de texto da casa ??, com a descrição mais comprida que o
+  // conteúdo tem (board.data.js). Está aqui de propósito e para ficar: a carta
+  // tem tamanho fixo e foi assim que o texto começou a sair-lhe por fora num
+  // telemóvel. Se voltar a acontecer, vê-se neste cartão.
+  {
+    id: 'b-evento-longo', kind: 'board', group: 'Tabuleiro', label: '❓ ?? revelado: texto no limite',
+    render: renderBoard({
+      lastEvent: {
+        text: '🛡️ Tu ficaste com escudo!',
+        evento: { pickedIndex: 1, emoji: '🛡️', title: 'Imunidade', desc: 'Ficas com escudo: bloqueia a próxima carta contra ti', card: null },
+      },
+    }),
+  },
   { id: 'b-gamble', kind: 'board', group: 'Tabuleiro', label: '🎲 Gamble — apostar', render: renderBoard({ pending: { kind: 'gamble', playerId: 'me' } }) },
   { id: 'b-gamble-win', kind: 'board', group: 'Tabuleiro', label: '🎲 Gamble ganhou 🎉', render: renderBoard({ lastEvent: { text: '🎲 Tu apostaste e GANHOU — avança 2 (bebe 4)! 🎉', gamble: { result: 'win' } } }) },
   { id: 'b-gamble-lose', kind: 'board', group: 'Tabuleiro', label: '🎲 Gamble perdeu 😬', render: renderBoard({ lastEvent: { text: '🎲 Tu apostaste e PERDEU — recua 2! 😬', gamble: { result: 'lose' } } }) },
